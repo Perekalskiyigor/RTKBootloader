@@ -14,13 +14,14 @@ class ModbusProvider:
             hr=ModbusSequentialDataBlock(0, [0] * 100)  # 100 регистров, инициализированных значением 0
         )
         # From Regul
-        self.inTable11free = 0 # Стол один ложе 1 свободно
-        self.inRobotTake11 = 0 # Взял плату 11
-        self.inTable12free = 0 # Стол один ложе 2 свободно
+        self.MoveTable = 0 # Стол один ложе 1 свободно
+        self.robot_place_board = 0 #Робот положи плату на ложе 1 первого стола
+        self.robot_take_board = 0 #Робот забери плату на ложе 1 первого стола
+        
         # In Regul
-        self.outTable11free = 0 # Стол один ложе 1 освободи
-        self.outRobotTake11 = 0 # Возьми плату 11
-        self.outTable12free = 0 # Стол один ложе 2 освободи
+        self.subMoveTable = 0 # Стол один ложе 1 свободно
+        self.subrobot_place_board = 0 #ответ Робот положил плату на ложе 1 первого стола
+        self.subrobot_take_board = 0 #ответ Робот забрал плату на ложе 1 первого стола
 
         # Запуск Modbus TCP сервера в отдельном потоке
         self.server_thread = threading.Thread(target=self.run_modbus_server, daemon=True)
@@ -40,46 +41,51 @@ class ModbusProvider:
         """Обновление значений регистров."""
         while True:
             # Чтение значений из регистров 0 и 1 (input1 и input2)
-            self.inTable11free = self.store.getValues(3, 0, count=1)[0]  # 3 - код функции для holding registers
-            self.inRobotTake11 = self.store.getValues(3, 1, count=1)[0]
-            self.inTable12free = self.store.getValues(3, 2, count=1)[0]
+            self.subMoveTable = self.store.getValues(3, 31, count=1)[0]  # 3 - код функции для holding registers
+            self.subrobot_place_board = self.store.getValues(3, 32, count=1)[0]
+            self.subrobot_take_board = self.store.getValues(3, 33, count=1)[0]
 
             # Запись значений в регистры 2 и 3 (output1 и output2)
-            self.store.setValues(3, 3, [self.outTable11free])
-            self.store.setValues(3, 4, [self.outRobotTake11])
-            self.store.setValues(3, 5, [self.outTable12free])
+            self.store.setValues(3, 0, [self.MoveTable])
+            self.store.setValues(3, 1, [self.robot_place_board])
+            self.store.setValues(3, 2, [self.robot_take_board])
 
             time.sleep(1)
-
-    def get_inTable11free(self):
+        
+    #######################Стол
+    def get_Tablefree(self):
         """Получение данных из регистров."""
-        return self.inTable11free
+        return self.subMoveTable
     
 
-    def set_outTable11free(self, outTable11free):
+    def set_Tablefree(self, MoveTable):
         """Установка данных в регистры."""
-        self.outTable11free = outTable11free
-        print(f"Modbus - Сдвинь плату освободив ложе1. {self.outTable11free}")
+        self.MoveTable = MoveTable
+        print(f"Modbus - Сдвинь плату сол")
 
     
-    def get_inRobotTake11(self):
+
+    ################# Робот
+    def get_subrobot_place_board(self):
         """Получение данных из регистров."""
-        return self.inRobotTake11
+        return self.subrobot_place_board
     
-    def set_outRobotTake11(self, outRobotTake11):
-        """Установка данных в регистры."""
-        self.outRobotTake11 = outRobotTake11
-        print(f"Modbus - Робот забери плату 1. {self.outRobotTake11}")
 
-    def get_inTable12free(self):
+    def set_robot_place_board(self, robot_place_board):
+        """Установка данных в регистры."""
+        self.robot_place_board = robot_place_board
+        print(f"Modbus - Робот положи плату. {self.robot_place_board}")
+
+    
+    def get_subrobot_take_board(self):
         """Получение данных из регистров."""
-        return self.inTable12free
+        return self.subrobot_take_board
     
 
-    def set_outTable12free(self, outTable12free):
+    def set_robot_take_board(self, robot_take_board):
         """Установка данных в регистры."""
-        self.outTable12free = outTable12free
-        print(f"Modbus - Сдвинь плату освободив ложе1. {self.outTable12free}")
+        self.robot_take_board = robot_take_board
+        print(f"Modbus - Робот забери плату с ложа.")
 
 
 #############################################################################################
@@ -92,6 +98,15 @@ class Table:
     def pause(self):
         time.sleep(2)
 
+    def robot_place_board_on_table1_lodge1_side(self):
+        print("Робот <- Положи плату на стол 1 ложе1 сторона.")
+        self.pause()
+        return "Робот -> Плату положил."
+
+    def robot_place_board_on_table1_lodge2_side(self):
+        print("Робот <- Положи плату на стол 1 ложе2 сторона.")
+        self.pause()
+        return "Робот -> Плату положил."
 
     def robot_take_board_from_lodge1(self):
         print("Робот <- Забери плату с ложе 1.")
@@ -132,6 +147,10 @@ class Table:
         self.lodge2 = None
         return "Регул -> Сдвинул."
 
+    def regul_lower_soldering_iron_lodge2(self):
+        print("Регул <- Опусти прошивальщик ложе 2.")
+        self.pause()
+        return "Регул -> Опустил."
 
     def regul_lower_soldering_iron(self):
         print("Регул <- Опусти прошивальщик на ложе")
@@ -156,14 +175,84 @@ class Table:
     # Метод для первого цикла
     def first_cycle(self):
         print("****ЦИКЛ SETUP******")
+
+        
+        # Ложим плату на ложе 1
         result = self.robot_place_board_on_lodge1()
         print(result)
-        result = self.regul_move_board_to_free_lodge2()
-        print(result)
+        # 100 - забрать плату из тары
+        # 200 - уложить в ложемент тетстирования
+        modbus_provider.set_robot_place_board(100)
+        sub = modbus_provider.get_subrobot_place_board()
+        while True:
+            sub = modbus_provider.get_subrobot_place_board()
+            if sub!=100:
+                print(f"Ждем ответ от робота что плата взята из тары - {sub}")
+            else:
+                break
+            time.sleep(1)    
+        modbus_provider.set_robot_place_board(0)
+
+        # Делаем фото платы
         result = self.make_photo_from_CAM()
         print(result)
+
+        modbus_provider.set_robot_place_board(200)
+        sub = modbus_provider.get_subrobot_place_board()
+        while True:
+            sub = modbus_provider.get_subrobot_place_board()
+            if sub!=200:
+                print(f"Ждем ответ от робота что плата уложена в ложемент1 - {sub}")
+            else:
+                break
+            time.sleep(1)    
+        modbus_provider.set_robot_place_board(0)
+
+        # Сдвигаем стол осовобождая ложе2
+        result = self.regul_move_board_to_free_lodge2()
+        print(result)
+        modbus_provider.set_Tablefree(1)
+        sub = modbus_provider.get_Tablefree()
+        while True:
+            sub = modbus_provider.get_Tablefree()
+            if sub!=1:
+                print(f"Ждем ответ о том что стол сдвинут - {sub}")
+            else:
+                break
+            time.sleep(1)    
+        modbus_provider.set_Tablefree(0)
+
+        # Делаем фото платы
+        result = self.make_photo_from_CAM()
+        print(result)
+
+        # Ложим плату на ложе 2
         result = self.robot_place_board_on_lodge2()
         print(result)
+        # 100 - забрать плату из тары
+        # 200 - уложить в ложемент тетстирования
+        modbus_provider.set_robot_place_board(100)
+        sub = modbus_provider.get_subrobot_place_board()
+        while True:
+            sub = modbus_provider.get_subrobot_place_board()
+            if sub!=100:
+                print(f"Ждем ответ от робота что плата взята из тары - {sub}")
+            else:
+                break
+            time.sleep(1)    
+        modbus_provider.set_robot_place_board(0)
+
+        modbus_provider.set_robot_place_board(200)
+        sub = modbus_provider.get_subrobot_place_board()
+        while True:
+            sub = modbus_provider.get_subrobot_place_board()
+            if sub!=200:
+                print(f"Ждем ответ от робота что плата уложена в ложемент2 - {sub}")
+            else:
+                break
+            time.sleep(1)    
+        modbus_provider.set_robot_place_board(0)
+
         print("Стол 1ложе занято")
         print("Стол 2ложе занято")
         print("Регул -> Ничего не делай.")
@@ -186,60 +275,69 @@ class Table:
         # 1 Регул <- Сдвинь плату освободив ложе1.
         result = self.regul_move_board_to_free_lodge1()
         print(result)
-        # Связь по мадбас с регулом
-        modbus_provider.set_outTable11free(1)
-        i = modbus_provider.get_inTable11free()
+        modbus_provider.set_Tablefree(1)
+        sub = modbus_provider.get_Tablefree()
         while True:
-            i = modbus_provider.get_inTable11free()
-            if i!=1:
-                print("Ожидаем ответа от мадбас стол сдвинут 1 ложе свободно")
-                time.sleep(1)
+            sub = modbus_provider.get_Tablefree()
+            if sub!=1:
+                print(f"Ждем ответ о том что стол сдвинут - {sub}")
             else:
-                modbus_provider.set_outTable11free(0)
                 break
+            time.sleep(1)    
+        modbus_provider.set_Tablefree(0)
+
         
+        # Связь по мадбас с регулом
         # 2. Робот <- Забери плату с ложе 1.
         result = self.robot_take_board_from_lodge1()
-        modbus_provider.set_outRobotTake11(1)
-        i = modbus_provider.get_inRobotTake11()
+        print(result)
+        sub = 0
+        modbus_provider.set_robot_take_board(1)
+        sub = modbus_provider.get_subrobot_take_board()
         while True:
-            i = modbus_provider.get_inRobotTake11()
-            if i!=1:
-                print("Ожидаем ответа от робота, что он взялл первую плату с ложе 1")
-                time.sleep(1)
+            sub = modbus_provider.get_subrobot_take_board()
+            if sub!=1:
+                print(f"Ждем ответ от робота, что плату забрал {sub}")
             else:
-                modbus_provider.set_outRobotTake11(0)
                 break
 
-        # 3 Регул <- Сдвинь плату освободив ложе2.
+            time.sleep(1)
+        modbus_provider.set_robot_take_board(0)  
+
+
+        # Регул <- Сдвинь плату освободив ложе2.
         result = self.regul_move_board_to_free_lodge2()
         print(result)
-        # Связь по мадбас с регулом
-        modbus_provider.set_outTable12free(1)
-        i = modbus_provider.get_inTable12free()
+        modbus_provider.set_Tablefree(1)
+        sub = modbus_provider.get_Tablefree()
         while True:
-            i = modbus_provider.get_inTable12free()
-            if i!=1:
-                print("Ожидаем ответа от мадбас стол сдвинут 2 ложе свободно")
-                time.sleep(1)
+            sub = modbus_provider.get_Tablefree()
+            if sub!=1:
+                print(f"Ждем ответ о том что стол сдвинут - {sub}")
             else:
-                modbus_provider.set_outTable12free(0)
                 break
+            time.sleep(1)    
+        modbus_provider.set_Tablefree(0)
 
         # 4. Робот <- Забери плату с ложе 2.
         result = self.robot_take_board_from_lodge2()
-        modbus_provider.set_outRobotTake11(1)
-        i = modbus_provider.get_inRobotTake11()
+        print(result)
+        sub = 0
+        modbus_provider.set_robot_take_board(1)
+        sub = modbus_provider.get_subrobot_take_board()
         while True:
-            i = modbus_provider.get_inRobotTake11()
-            if i!=1:
-                print("Ожидаем ответа от робота, что он взялл вторую плату с ложе 2")
-                time.sleep(1)
+            sub = modbus_provider.get_subrobot_take_board()
+            if sub!=1:
+                print(f"Ждем ответ от робота, что плату забрал {sub}")
             else:
-                modbus_provider.set_outRobotTake11(0)
                 break
+
+            time.sleep(1)
+        modbus_provider.set_robot_take_board(0)
         print("******ЦИКЛ DEFENCE Завершен*******")
 
+    
+    
     # Метод для основного цикла
     def main_cycle(self):
         while True:
@@ -304,28 +402,21 @@ if __name__ == "__main__":
     table = Table()
     modbus_provider = ModbusProvider()
 
-
+    """
     # Выполнение первого цикла
     flag1 = True
     if flag1 == True:
         table.defence_cycle()
         flag1 = False
+    """
+    
 
     # Выполнение первого цикла
     flag = True
     if flag == True:
         table.first_cycle()
         flag = False
+
+
     table.main_cycle()
     
-        # # Получение данных
-        # input1, input2 = modbus_provider.get_data()
-        # print(f"Received data - input1: {input1}, input2: {input2}")
-
-        # # Установка данных
-        # modbus_provider.set_data(i, 6)
-        # i=i+1
-        # time.sleep(2)
-
-
-

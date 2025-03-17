@@ -185,30 +185,9 @@ class Table:
         result = self.regul_move_board_to_free_lodge1()
         print(result)
         # Связь по мадбас с регулом
-        modbus_provider.set_outTable11free(1)
-        i = modbus_provider.get_inTable11free()
-        while True:
-            i = modbus_provider.get_inTable11free()
-            if i!=1:
-                print("Ожидаем ответа от мадбас стол сдвинут 1 ложе свободно")
-                time.sleep(1)
-            else:
-                modbus_provider.set_outTable11free(0)
-                break
-        
         # 2. Робот <- Забери плату с ложе 1.
         result = self.robot_take_board_from_lodge1()
-        modbus_provider.set_outRobotTake11(1)
-        i = modbus_provider.get_inRobotTake11()
-        while True:
-            i = modbus_provider.get_inRobotTake11()
-            if i!=1:
-                print("Ожидаем ответа от робота, что он взялл первую плату")
-                time.sleep(1)
-            else:
-                modbus_provider.set_outRobotTake11(0)
-                break
-
+        print(result)
         # Регул <- Сдвинь плату освободив ложе2.
         result = self.regul_move_board_to_free_lodge2()
         print(result)

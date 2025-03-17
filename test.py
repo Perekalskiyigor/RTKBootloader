@@ -1,7 +1,10 @@
+import time
 from pymodbus.server import StartTcpServer
 from pymodbus.datastore import ModbusSequentialDataBlock, ModbusSlaveContext, ModbusServerContext
 import threading
-import time
+
+
+
 
 class ModbusProvider:
     def __init__(self):
@@ -9,10 +12,14 @@ class ModbusProvider:
         self.store = ModbusSlaveContext(
             hr=ModbusSequentialDataBlock(0, [0] * 100)  # 100 регистров, инициализированных значением 0
         )
-        self.input1 = 0
-        self.input2 = 0
-        self.output1 = 0
-        self.output2 = 0
+        # From Regul
+        self.Table11free = 0  # Стол один ложе 1 свободно
+        self.RobotTake11 = 0  # Взял плату 11
+        self.Table12free = 0  # Стол один ложе 2 свободно
+        # In Regul
+        self.subTable11free = 0  # Стол один ложе 1 освободи
+        self.subRobotTake11 = 0  # Возьми плату 11
+        self.subTable12free = 0  # Стол один ложе 2 освободи
 
         # Запуск Modbus TCP сервера в отдельном потоке
         self.server_thread = threading.Thread(target=self.run_modbus_server, daemon=True)
@@ -32,35 +39,73 @@ class ModbusProvider:
         """Обновление значений регистров."""
         while True:
             # Чтение значений из регистров 0 и 1 (input1 и input2)
-            self.input1 = self.store.getValues(3, 0, count=1)[0]  # 3 - код функции для holding registers
-            self.input2 = self.store.getValues(3, 1, count=1)[0]
+            self.subTable11free = self.store.getValues(3, 31, count=1)[0]  # 3 - код функции для holding registers
+            self.subRobotTake11 = self.store.getValues(3, 32, count=1)[0]
+            self.subTable12free = self.store.getValues(3, 33, count=1)[0]
 
             # Запись значений в регистры 2 и 3 (output1 и output2)
-            self.store.setValues(3, 2, [self.output1])
-            self.store.setValues(3, 3, [self.output2])
+            self.store.setValues(3, 0, [self.Table11free])
+            self.store.setValues(3, 1, [self.RobotTake11])
+            self.store.setValues(3, 2, [self.Table12free])
 
             time.sleep(1)
 
-    def get_data(self):
+    def get_value_from_register(self, register):
+        """Получение данных из конкретного регистра."""
+        try:
+            value = self.store.getValues(3, register, count=1)[0]  # Чтение одного значения
+            return value
+        except Exception as e:
+            print(f"Error reading register {register}: {e}")
+            return None  # Возвращаем None в случае ошибки
+
+    def set_value_to_register(self, register, value):
+        """Запись данных в конкретный регистр."""
+        try:
+            self.store.setValues(3, register, [value])  # Запись значения в регистр
+            print(f"Successfully wrote {value} to register {register}")
+            return True  # Успешная запись
+        except Exception as e:
+            print(f"Error writing to register {register}: {e}")
+            return False  # Ошибка записи
+
+    def get_inTable11free(self):
         """Получение данных из регистров."""
-        return self.input1, self.input2
+        return self.subTable11free
 
-    def set_data(self, output1, output2):
+    def set_subTable11free(self, Table11free):
         """Установка данных в регистры."""
-        self.output1 = output1
-        self.output2 = output2
-        print(f"Data set to output1: {self.output1}, output2: {self.output2}")
+        self.Table11free = Table11free
+        print(f"Modbus - Сдвинь плату освободив ложе1. {self.subTable11free}")
 
-if __name__ == "__main__":
-    modbus_provider = ModbusProvider()
-    i=0
-    # Пример использования
-    while True:
-        # Получение данных
-        input1, input2 = modbus_provider.get_data()
-        print(f"Received data - input1: {input1}, input2: {input2}")
+    def get_inRobotTake11(self):
+        """Получение данных из регистров."""
+        return self.subRobotTake11
 
-        # Установка данных
-        modbus_provider.set_data(i, 6)
-        i=i+1
-        time.sleep(2)
+    def set_subRobotTake11(self, RobotTake11):
+        """Установка данных в регистры."""
+        self.RobotTake11 = RobotTake11
+        print(f"Modbus - Робот забери плату 1. {self.RobotTake11}")
+
+    def get_inTable12free(self):
+        """Получение данных из регистров."""
+        return self.subTable12free
+
+    def set_subTable12free(self, Table12free):
+        """Установка данных в регистры."""
+        self.Table12free = Table12free
+        print(f"Modbus - Сдвинь плату освободив ложе1. {self.subTable12free}")
+
+
+modbus_provider = ModbusProvider()
+
+# Get value from register 31 (for example)
+value = modbus_provider.get_value_from_register(31)
+print(f"Value from register 31: {value}")
+
+# Set value to register 1
+success = modbus_provider.set_value_to_register(1, 123)
+if success:
+    print("Successfully updated register 1.")
+else:
+    print("Failed to update register 1.")

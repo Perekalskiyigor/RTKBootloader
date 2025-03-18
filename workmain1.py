@@ -230,6 +230,100 @@ class Table:
         while True:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
+                print(f"Ждем ответ от робота, что плату уложили = {result1}")
+            elif result1 == 200:
+                print(f"От робота получен код 200 на на операции уложить плату")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        print("Стол 1ложе занято")
+        print("Стол 2ложе занято")
+        print("****ЦИКЛ SETUP Завершен******")
+    ############# ****ЦИКЛ SETUP END ******"
+
+    ############# ****ЦИКЛ MAIN ******"
+    def main(self):
+
+        print("****ЦИКЛ MAIN")
+
+ 
+        # 1. Регул <- Опусти прошивальщик ложе 2.
+        print("1 Регул <- Опусти прошивальщик ложе 2")
+        self.change_value('Reg_updown_Botloader', 100)
+        while True:
+            result1 = self.read_value("Reg_updown_Botloader")
+            if result1 != 100:
+                print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
+            elif result1 == 200:
+                print(f"От регула получен код 200 на на операции опустить прошивальщик")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_updown_Botloader', 0)
+        result1 = 0
+        
+        
+        # 2. Сервер <- Начни шить
+        # 3. Сервер -> Ответ по прошивке (плохо, хорошо)
+        print("2. Сервер <- Начни шить")
+        print("3. Сервер -> Ответ по прошивке (плохо, хорошо)")
+        
+        # 4. Регул <- Подними прошивальщик.
+        print("4. Регул <- Подними прошивальщик.")
+        self.change_value('Reg_updown_Botloader', 100)
+        while True:
+            result1 = self.read_value("Reg_updown_Botloader")
+            if result1 != 100:
+                print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
+            elif result1 == 200:
+                print(f"От регула получен код 200 на на операции поднять прошивальщик")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_updown_Botloader', 0)
+        result1 = 0
+
+        
+        # 4. Регул <- Сдвинь плату освободив ложе1.
+        print("4 Регул <- Сдвинь плату освободив ложе1")
+        self.change_value('Reg_move_Table', 100)
+        while True:
+            result1 = self.read_value("sub_Reg_move_Table")
+            if result1 != 100:
+                print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
+            elif result1 == 200:
+                print(f"От регула получен код 200 на операции движения стола")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_move_Table', 0)
+        result1 = 0
+
+        # 5. Робот <- Забери плату с ложе 1.
+        print("5 Робот <- Забери плату с ложе 1.")
+        self.change_value('Rob_Action', 300)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+
+            if result1 != 100:
+                print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
+            elif result1 == 200:
+                print(f"От робота получен код 200 на на операции взять плату с ложа")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        print("Стол 1ложе свободен")
+        result1 = 0
+
+
+        # 6 Робот <- Забери плату из тары
+        print("9 Робот <-  забрать плату из тары")
+        self.change_value('Rob_Action', 300)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+            if result1 != 100:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
             elif result1 == 200:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
@@ -237,24 +331,388 @@ class Table:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
+        result1=0
 
-        print("Стол 1ложе занято")
-        print("Стол 2ложе занято")
-
-        # 12 "Регул <- Опусти прошивальщик ложе 1."
-        print("12 Регул <- Опусти прошивальщик ложе 1.")
+        # 7 Делаем фото платы
+        print("7 Камера <- сделай фото")
+        time.sleep(1)
         
-        # "13 РСервер <- Начни шить. ложе 1"
-        print("13 РСервер <- Начни шить. ложе 1")
 
-        # "14 Регул <- Подними прошивальщик. ложе 1"
-        print("14 Регул <- Подними прошивальщик. ложе 1")
-        self.pause()
+        # 8 Робот <- Уложи плату в ложемент тетситрования 1
+        print("8 Робот <- Уложи плату в ложемент тетситрования 1")
+        self.change_value('Rob_Action', 300)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+            if result1 != 100:
+                print(f"Ждем ответ от робота, что плату уложили = {result1}")
+            elif result1 == 200:
+                print(f"От робота получен код 200 на на операции уложить плату")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        print("Стол 1ложе занято")
+        result1=0
 
-        print("****ЦИКЛ SETUP Завершен******")
-    ############# ****ЦИКЛ SETUP END ******"
+        # 9. Регул <- Опусти прошивальщик (плата на ложе2).
+        print("9. Регул <- Опусти прошивальщик (плата на ложе2).")
+        self.change_value('Reg_updown_Botloader', 100)
+        while True:
+            result1 = self.read_value("Reg_updown_Botloader")
+            if result1 != 100:
+                print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
+            elif result1 == 200:
+                print(f"От регула получен код 200 на на операции опустить прошивальщик")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_updown_Botloader', 0)
+        result1 = 0
 
-    ############# ****ЦИКЛ MAIN ******"
+        # 10. Сервер <- Начни шить
+        # 11. Сервер -> Ответ по прошивке (плохо, хорошо)
+        print("10. Сервер <- Начни шить")
+        print("11. Сервер -> Ответ по прошивке (плохо, хорошо)")
+
+
+
+        # 12 Регул <- Подними прошивальщик.
+        print("12. Регул <- Подними прошивальщик.")
+        self.change_value('Reg_updown_Botloader', 100)
+        while True:
+            result1 = self.read_value("Reg_updown_Botloader")
+            if result1 != 100:
+                print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
+            elif result1 == 200:
+                print(f"От регула получен код 200 на на операции поднять прошивальщик")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_updown_Botloader', 0)
+        result1 = 0
+
+
+        # 13. Регул <- Сдвинь плату освободив ложе2.
+        print("13 Регул <- Сдвинь плату освободив ложе2")
+        self.change_value('Reg_move_Table', 100)
+        while True:
+            result1 = self.read_value("sub_Reg_move_Table")
+            if result1 != 100:
+                print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
+            elif result1 == 200:
+                print(f"От регула получен код 200 на операции движения стола")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_move_Table', 0)
+        result1 = 0
+        print("Стол 2ложе свободен")
+
+
+        # 14. Робот <- Забери плату с ложе 2.
+        print("14 Робот <- Забери плату с ложе 2.")
+        self.change_value('Rob_Action', 300)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+
+            if result1 != 100:
+                print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
+            elif result1 == 200:
+                print(f"От робота получен код 200 на на операции взять плату с ложа")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        result1 = 0
+
+
+        # 15 Робот <- Забери плату из тары
+        print("15 Робот <-  забрать плату из тары")
+        self.change_value('Rob_Action', 300)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+            if result1 != 100:
+                print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
+            elif result1 == 200:
+                print(f"От робота получен код 200 на на операции забрать из тары плату")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        result1=0
+
+        # 16 Делаем фото платы
+        print("16 Камера <- сделай фото")
+        time.sleep(1)
+        
+
+        # 17 Робот <- Уложи плату в ложемент тетситрования 2
+        print("17 Робот <- Уложи плату в ложемент тетситрования 2")
+        self.change_value('Rob_Action', 300)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+            if result1 != 100:
+                print(f"Ждем ответ от робота, что плату уложили = {result1}")
+            elif result1 == 200:
+                print(f"От робота получен код 200 на на операции уложить плату")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        result1=0
+
+        # 18. Регул <- Опусти прошивальщик (плата на ложе2).
+        print("9. Регул <- Опусти прошивальщик ложе1..")
+        self.change_value('Reg_updown_Botloader', 100)
+        while True:
+            result1 = self.read_value("Reg_updown_Botloader")
+            if result1 != 100:
+                print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
+            elif result1 == 200:
+                print(f"От регула получен код 200 на на операции опустить прошивальщик")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_updown_Botloader', 0)
+        result1 = 0
+
+        # 19. Сервер <- Начни шить
+        # 20. Сервер -> Ответ по прошивке (плохо, хорошо)
+        print("19. Сервер <- Начни шить")
+        print("20. Сервер -> Ответ по прошивке (плохо, хорошо)")
+
+        # 21. Регул <- Подними прошивальщик.
+        print("21. Регул <- Подними прошивальщик.")
+        self.change_value('Reg_updown_Botloader', 100)
+        while True:
+            result1 = self.read_value("Reg_updown_Botloader")
+            if result1 != 100:
+                print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
+            elif result1 == 200:
+                print(f"От регула получен код 200 на на операции поднять прошивальщик")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_updown_Botloader', 0)
+        result1 = 0
+
+        # 22. Регул <- Сдвинь плату освободив ложе1.
+        print("22 Регул <- Сдвинь плату освободив ложе1")
+        self.change_value('Reg_move_Table', 100)
+        while True:
+            result1 = self.read_value("sub_Reg_move_Table")
+            if result1 != 100:
+                print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
+            elif result1 == 200:
+                print(f"От регула получен код 200 на операции движения стола")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_move_Table', 0)
+        result1 = 0
+        print("Стол 1 ложе свободен")
+        
+        
+        # 23. Робот <- Забери плату с ложе 1.
+        print("23 Робот <- Забери плату с ложе 1.")
+        self.change_value('Rob_Action', 300)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+
+            if result1 != 100:
+                print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
+            elif result1 == 200:
+                print(f"От робота получен код 200 на на операции взять плату с ложа")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        result1 = 0
+
+        # 24 Робот <- Забери плату из тары
+        print("24 Робот <-  забрать плату из тары")
+        self.change_value('Rob_Action', 300)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+            if result1 != 100:
+                print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
+            elif result1 == 200:
+                print(f"От робота получен код 200 на на операции забрать из тары плату")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        result1=0
+
+        # 25 Делаем фото платы
+        print("25 Камера <- сделай фото")
+        time.sleep(1)
+        
+
+        # 26 Робот <- Уложи плату в ложемент тетситрования 1
+        print("26 Робот <- Уложи плату в ложемент тетситрования 1")
+        self.change_value('Rob_Action', 300)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+            if result1 != 100:
+                print(f"Ждем ответ от робота, что плату уложили = {result1}")
+            elif result1 == 200:
+                print(f"От робота получен код 200 на на операции уложить плату")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        result1=0
+
+
+        # 27. Регул <- Опусти прошивальщик (плата на ложе2).
+        print("27 Регул <- Опусти прошивальщик ложе2")
+        self.change_value('Reg_updown_Botloader', 100)
+        while True:
+            result1 = self.read_value("Reg_updown_Botloader")
+            if result1 != 100:
+                print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
+            elif result1 == 200:
+                print(f"От регула получен код 200 на на операции опустить прошивальщик")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_updown_Botloader', 0)
+        result1 = 0
+
+        # 28. Сервер <- Начни шить
+        # 29. Сервер -> Ответ по прошивке (плохо, хорошо)
+        print("28. Сервер <- Начни шить")
+        print("29. Сервер -> Ответ по прошивке (плохо, хорошо)")
+
+        # 30. Регул <- Подними прошивальщик.
+        print("30. Регул <- Подними прошивальщик.")
+        self.change_value('Reg_updown_Botloader', 100)
+        while True:
+            result1 = self.read_value("Reg_updown_Botloader")
+            if result1 != 100:
+                print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
+            elif result1 == 200:
+                print(f"От регула получен код 200 на на операции поднять прошивальщик")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_updown_Botloader', 0)
+        result1 = 0
+
+
+
+        # 31. Регул <- Сдвинь плату освободив ложе2.
+        print("31. Регул <- Сдвинь плату освободив ложе2")
+        self.change_value('Reg_move_Table', 100)
+        while True:
+            result1 = self.read_value("sub_Reg_move_Table")
+            if result1 != 100:
+                print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
+            elif result1 == 200:
+                print(f"От регула получен код 200 на операции движения стола")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_move_Table', 0)
+        result1 = 0
+        print("Стол 2 ложе свободен")
+
+        # 32. Робот <- Забери плату с ложе 2.
+        print("32 Робот <- Забери плату с ложе 2.")
+        self.change_value('Rob_Action', 300)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+
+            if result1 != 100:
+                print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
+            elif result1 == 200:
+                print(f"От робота получен код 200 на на операции взять плату с ложа")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        result1 = 0
+
+
+        # 33 Робот <- Забери плату из тары
+        print("33 Робот <-  забрать плату из тары")
+        self.change_value('Rob_Action', 300)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+            if result1 != 100:
+                print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
+            elif result1 == 200:
+                print(f"От робота получен код 200 на на операции забрать из тары плату")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        result1=0
+
+        # 34 Делаем фото платы
+        print("34 Камера <- сделай фото")
+        time.sleep(1)
+        
+
+        # 35 Робот <- Уложи плату в ложемент тетситрования 2
+        print("35 Робот <- Уложи плату в ложемент тетситрования 2")
+        self.change_value('Rob_Action', 300)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+            if result1 != 100:
+                print(f"Ждем ответ от робота, что плату уложили = {result1}")
+            elif result1 == 200:
+                print(f"От робота получен код 200 на на операции уложить плату")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        result1=0
+
+
+
+
+        # 36. Регул <- Опусти прошивальщик ложе1.
+
+
+        # 36. Регул <- Опусти прошивальщик (плата на ложе1).
+        print("36 Регул <- Опусти прошивальщик ложе1.")
+        self.change_value('Reg_updown_Botloader', 100)
+        while True:
+            result1 = self.read_value("Reg_updown_Botloader")
+            if result1 != 100:
+                print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
+            elif result1 == 200:
+                print(f"От регула получен код 200 на на операции опустить прошивальщик")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_updown_Botloader', 0)
+        result1 = 0
+
+        # 37. Сервер <- Начни шить
+        # 38. Сервер -> Ответ по прошивке (плохо, хорошо)
+        print("37. Сервер <- Начни шить")
+        print("38. Сервер -> Ответ по прошивке (плохо, хорошо)")
+
+        # 39. Регул <- Подними прошивальщик.
+        print("39. Регул <- Подними прошивальщик.")
+        self.change_value('Reg_updown_Botloader', 100)
+        while True:
+            result1 = self.read_value("Reg_updown_Botloader")
+            if result1 != 100:
+                print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
+            elif result1 == 200:
+                print(f"От регула получен код 200 на на операции поднять прошивальщик")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_updown_Botloader', 0)
+        result1 = 0
+
+        print("Стол 1ложе свободен")
+        print("****ЦИКЛ MAIN END")
 
     ############# ****ЦИКЛ MAIN END ******"
 
@@ -292,4 +750,5 @@ if __name__ == "__main__":
         table1.setup_cycle()
         flag = False
 
-    
+
+    table1.main()

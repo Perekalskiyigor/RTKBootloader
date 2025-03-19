@@ -175,7 +175,7 @@ class Table:
         
 
         # 7 Робот <- Уложи плату в ложемент тетситрования
-        print("7 Робот <- Уложи плату в ложемент тетситрования")
+        print("7 Робот <- Уложи плату в ложемент тетситрования 2")
         self.change_value('Rob_Action', 300)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -191,7 +191,7 @@ class Table:
 
 
         # 8 Регул - Сдвигаем стол осовобождая ложе2
-        print("8 Регул <- Сдвинь плату освободив ложе2.")
+        print("8 Регул <- Сдвинь плату освободив ложе1.")
         self.change_value('Reg_move_Table', 100)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
@@ -225,7 +225,7 @@ class Table:
         
 
         # 11 Робот <- Уложи плату в ложемент тетситрования
-        print("11 Робот <- Уложи плату в ложемент тетситрования")
+        print("11 Робот <- Уложи плату в ложемент тетситрования 1")
         self.change_value('Rob_Action', 300)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -285,8 +285,8 @@ class Table:
         result1 = 0
 
         
-        # 4. Регул <- Сдвинь плату освободив ложе1.
-        print("4 Регул <- Сдвинь плату освободив ложе1")
+        # 5. Регул <- Сдвинь плату освободив ложе1.
+        print("5 Регул <- Сдвинь плату освободив ложе2")
         self.change_value('Reg_move_Table', 100)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
@@ -300,8 +300,8 @@ class Table:
         self.change_value('Reg_move_Table', 0)
         result1 = 0
 
-        # 5. Робот <- Забери плату с ложе 1.
-        print("5 Робот <- Забери плату с ложе 1.")
+        # 6. Робот <- Забери плату с ложе 2.
+        print("6 Робот <- Забери плату с ложе 2.")
         self.change_value('Rob_Action', 300)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -318,8 +318,8 @@ class Table:
         result1 = 0
 
 
-        # 6 Робот <- Забери плату из тары
-        print("9 Робот <-  забрать плату из тары")
+        # 7 Робот <- Забери плату из тары
+        print("7 Робот <-  забрать плату из тары")
         self.change_value('Rob_Action', 300)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -333,13 +333,13 @@ class Table:
         self.change_value('Rob_Action', 0)
         result1=0
 
-        # 7 Делаем фото платы
-        print("7 Камера <- сделай фото")
+        # 8 Делаем фото платы
+        print("8 Камера <- сделай фото")
         time.sleep(1)
         
 
-        # 8 Робот <- Уложи плату в ложемент тетситрования 1
-        print("8 Робот <- Уложи плату в ложемент тетситрования 1")
+        # 9 Робот <- Уложи плату в ложемент тетситрования 1
+        print("9 Робот <- Уложи плату в ложемент тетситрования 2")
         self.change_value('Rob_Action', 300)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -354,8 +354,8 @@ class Table:
         print("Стол 1ложе занято")
         result1=0
 
-        # 9. Регул <- Опусти прошивальщик (плата на ложе2).
-        print("9. Регул <- Опусти прошивальщик (плата на ложе2).")
+        # 10. Регул <- Опусти прошивальщик (плата на ложе1).
+        print("10. Регул <- Опусти прошивальщик (плата на ложе1).")
         self.change_value('Reg_updown_Botloader', 100)
         while True:
             result1 = self.read_value("Reg_updown_Botloader")
@@ -369,15 +369,15 @@ class Table:
         self.change_value('Reg_updown_Botloader', 0)
         result1 = 0
 
-        # 10. Сервер <- Начни шить
-        # 11. Сервер -> Ответ по прошивке (плохо, хорошо)
-        print("10. Сервер <- Начни шить")
-        print("11. Сервер -> Ответ по прошивке (плохо, хорошо)")
+        # 11. Сервер <- Начни шить
+        # 12. Сервер -> Ответ по прошивке (плохо, хорошо)
+        print("11. Сервер <- Начни шить")
+        print("12. Сервер -> Ответ по прошивке (плохо, хорошо)")
 
 
 
-        # 12 Регул <- Подними прошивальщик.
-        print("12. Регул <- Подними прошивальщик.")
+        # 13 Регул <- Подними прошивальщик.
+        print("13. Регул <- Подними прошивальщик.")
         self.change_value('Reg_updown_Botloader', 100)
         while True:
             result1 = self.read_value("Reg_updown_Botloader")
@@ -392,8 +392,8 @@ class Table:
         result1 = 0
 
 
-        # 13. Регул <- Сдвинь плату освободив ложе2.
-        print("13 Регул <- Сдвинь плату освободив ложе2")
+        # 14. Регул <- Сдвинь плату освободив ложе1.
+        print("14 Регул <- Сдвинь плату освободив ложе1")
         self.change_value('Reg_move_Table', 100)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
@@ -409,8 +409,8 @@ class Table:
         print("Стол 2ложе свободен")
 
 
-        # 14. Робот <- Забери плату с ложе 2.
-        print("14 Робот <- Забери плату с ложе 2.")
+        # 15. Робот <- Забери плату с ложе 1.
+        print("15 Робот <- Забери плату с ложе 1.")
         self.change_value('Rob_Action', 300)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -426,8 +426,8 @@ class Table:
         result1 = 0
 
 
-        # 15 Робот <- Забери плату из тары
-        print("15 Робот <-  забрать плату из тары")
+        # 16 Робот <- Забери плату из тары
+        print("16 Робот <-  забрать плату из тары")
         self.change_value('Rob_Action', 300)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -441,13 +441,13 @@ class Table:
         self.change_value('Rob_Action', 0)
         result1=0
 
-        # 16 Делаем фото платы
-        print("16 Камера <- сделай фото")
+        # 17 Делаем фото платы
+        print("17 Камера <- сделай фото")
         time.sleep(1)
         
 
-        # 17 Робот <- Уложи плату в ложемент тетситрования 2
-        print("17 Робот <- Уложи плату в ложемент тетситрования 2")
+        # 18 Робот <- Уложи плату в ложемент тетситрования 1
+        print("18 Робот <- Уложи плату в ложемент тетситрования 1")
         self.change_value('Rob_Action', 300)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -461,8 +461,8 @@ class Table:
         self.change_value('Rob_Action', 0)
         result1=0
 
-        # 18. Регул <- Опусти прошивальщик (плата на ложе2).
-        print("9. Регул <- Опусти прошивальщик ложе1..")
+        # 19. Регул <- Опусти прошивальщик (плата на ложе2).
+        print("19. Регул <- Опусти прошивальщик ложе1..")
         self.change_value('Reg_updown_Botloader', 100)
         while True:
             result1 = self.read_value("Reg_updown_Botloader")
@@ -476,13 +476,13 @@ class Table:
         self.change_value('Reg_updown_Botloader', 0)
         result1 = 0
 
-        # 19. Сервер <- Начни шить
-        # 20. Сервер -> Ответ по прошивке (плохо, хорошо)
-        print("19. Сервер <- Начни шить")
-        print("20. Сервер -> Ответ по прошивке (плохо, хорошо)")
+        # 20. Сервер <- Начни шить
+        # 21. Сервер -> Ответ по прошивке (плохо, хорошо)
+        print("20. Сервер <- Начни шить")
+        print("21. Сервер -> Ответ по прошивке (плохо, хорошо)")
 
-        # 21. Регул <- Подними прошивальщик.
-        print("21. Регул <- Подними прошивальщик.")
+        # 22. Регул <- Подними прошивальщик.
+        print("22. Регул <- Подними прошивальщик.")
         self.change_value('Reg_updown_Botloader', 100)
         while True:
             result1 = self.read_value("Reg_updown_Botloader")
@@ -496,8 +496,8 @@ class Table:
         self.change_value('Reg_updown_Botloader', 0)
         result1 = 0
 
-        # 22. Регул <- Сдвинь плату освободив ложе1.
-        print("22 Регул <- Сдвинь плату освободив ложе1")
+        # 23. Регул <- Сдвинь плату освободив ложе1.
+        print("23 Регул <- Сдвинь плату освободив ложе2")
         self.change_value('Reg_move_Table', 100)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
@@ -513,8 +513,8 @@ class Table:
         print("Стол 1 ложе свободен")
         
         
-        # 23. Робот <- Забери плату с ложе 1.
-        print("23 Робот <- Забери плату с ложе 1.")
+        # 24. Робот <- Забери плату с ложе 2.
+        print("24 Робот <- Забери плату с ложе 1.")
         self.change_value('Rob_Action', 300)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -529,8 +529,8 @@ class Table:
         self.change_value('Rob_Action', 0)
         result1 = 0
 
-        # 24 Робот <- Забери плату из тары
-        print("24 Робот <-  забрать плату из тары")
+        # 25 Робот <- Забери плату из тары
+        print("25 Робот <-  забрать плату из тары")
         self.change_value('Rob_Action', 300)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -544,13 +544,13 @@ class Table:
         self.change_value('Rob_Action', 0)
         result1=0
 
-        # 25 Делаем фото платы
-        print("25 Камера <- сделай фото")
+        # 26 Делаем фото платы
+        print("26 Камера <- сделай фото")
         time.sleep(1)
         
 
-        # 26 Робот <- Уложи плату в ложемент тетситрования 1
-        print("26 Робот <- Уложи плату в ложемент тетситрования 1")
+        # 27 Робот <- Уложи плату в ложемент тетситрования 2
+        print("27 Робот <- Уложи плату в ложемент тетситрования 2")
         self.change_value('Rob_Action', 300)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -565,8 +565,8 @@ class Table:
         result1=0
 
 
-        # 27. Регул <- Опусти прошивальщик (плата на ложе2).
-        print("27 Регул <- Опусти прошивальщик ложе2")
+        # 28. Регул <- Опусти прошивальщик (плата на ложе2).
+        print("28 Регул <- Опусти прошивальщик ложе 1")
         self.change_value('Reg_updown_Botloader', 100)
         while True:
             result1 = self.read_value("Reg_updown_Botloader")
@@ -580,13 +580,13 @@ class Table:
         self.change_value('Reg_updown_Botloader', 0)
         result1 = 0
 
-        # 28. Сервер <- Начни шить
-        # 29. Сервер -> Ответ по прошивке (плохо, хорошо)
-        print("28. Сервер <- Начни шить")
-        print("29. Сервер -> Ответ по прошивке (плохо, хорошо)")
+        # 29. Сервер <- Начни шить
+        # 30. Сервер -> Ответ по прошивке (плохо, хорошо)
+        print("29. Сервер <- Начни шить")
+        print("30. Сервер -> Ответ по прошивке (плохо, хорошо)")
 
-        # 30. Регул <- Подними прошивальщик.
-        print("30. Регул <- Подними прошивальщик.")
+        # 31. Регул <- Подними прошивальщик.
+        print("31. Регул <- Подними прошивальщик.")
         self.change_value('Reg_updown_Botloader', 100)
         while True:
             result1 = self.read_value("Reg_updown_Botloader")
@@ -602,8 +602,8 @@ class Table:
 
 
 
-        # 31. Регул <- Сдвинь плату освободив ложе2.
-        print("31. Регул <- Сдвинь плату освободив ложе2")
+        # 32. Регул <- Сдвинь плату освободив ложе 1.
+        print("32. Регул <- Сдвинь плату освободив ложе2")
         self.change_value('Reg_move_Table', 100)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")

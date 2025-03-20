@@ -157,7 +157,7 @@ class Table:
 
         # 5 Робот <- Забери плату из тары
         print("5 Робот <-  забрать плату из тары")
-        self.change_value('Rob_Action', 300)
+        self.change_value('Rob_Action', 100)
         while True:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
@@ -176,7 +176,7 @@ class Table:
 
         # 7 Робот <- Уложи плату в ложемент тетситрования
         print("7 Робот <- Уложи плату в ложемент тетситрования 2")
-        self.change_value('Rob_Action', 300)
+        self.change_value('Rob_Action', 200)
         while True:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
@@ -190,7 +190,7 @@ class Table:
 
 
 
-        # 8 Регул - Сдвигаем стол осовобождая ложе2
+        # 8 Регул - Сдвигаем стол осовобождая ложе1
         print("8 Регул <- Сдвинь плату освободив ложе1.")
         self.change_value('Reg_move_Table', 100)
         while True:
@@ -207,7 +207,7 @@ class Table:
 
         # 9 Робот <- Забери плату из тары
         print("9 Робот <-  забрать плату из тары")
-        self.change_value('Rob_Action', 300)
+        self.change_value('Rob_Action', 100)
         while True:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
@@ -226,7 +226,7 @@ class Table:
 
         # 11 Робот <- Уложи плату в ложемент тетситрования
         print("11 Робот <- Уложи плату в ложемент тетситрования 1")
-        self.change_value('Rob_Action', 300)
+        self.change_value('Rob_Action', 200)
         while True:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
@@ -320,7 +320,7 @@ class Table:
 
         # 7 Робот <- Забери плату из тары
         print("7 Робот <-  забрать плату из тары")
-        self.change_value('Rob_Action', 300)
+        self.change_value('Rob_Action', 100)
         while True:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
@@ -340,7 +340,7 @@ class Table:
 
         # 9 Робот <- Уложи плату в ложемент тетситрования 1
         print("9 Робот <- Уложи плату в ложемент тетситрования 2")
-        self.change_value('Rob_Action', 300)
+        self.change_value('Rob_Action', 200)
         while True:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
@@ -428,7 +428,7 @@ class Table:
 
         # 16 Робот <- Забери плату из тары
         print("16 Робот <-  забрать плату из тары")
-        self.change_value('Rob_Action', 300)
+        self.change_value('Rob_Action', 100)
         while True:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
@@ -448,7 +448,7 @@ class Table:
 
         # 18 Робот <- Уложи плату в ложемент тетситрования 1
         print("18 Робот <- Уложи плату в ложемент тетситрования 1")
-        self.change_value('Rob_Action', 300)
+        self.change_value('Rob_Action', 200)
         while True:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
@@ -531,7 +531,7 @@ class Table:
 
         # 25 Робот <- Забери плату из тары
         print("25 Робот <-  забрать плату из тары")
-        self.change_value('Rob_Action', 300)
+        self.change_value('Rob_Action', 100)
         while True:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
@@ -551,7 +551,7 @@ class Table:
 
         # 27 Робот <- Уложи плату в ложемент тетситрования 2
         print("27 Робот <- Уложи плату в ложемент тетситрования 2")
-        self.change_value('Rob_Action', 300)
+        self.change_value('Rob_Action', 200)
         while True:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
@@ -565,7 +565,7 @@ class Table:
         result1=0
 
 
-        # 28. Регул <- Опусти прошивальщик (плата на ложе2).
+        # 28. Регул <- Опусти прошивальщик (плата на ложе1).
         print("28 Регул <- Опусти прошивальщик ложе 1")
         self.change_value('Reg_updown_Botloader', 100)
         while True:
@@ -637,7 +637,7 @@ class Table:
 
         # 33 Робот <- Забери плату из тары
         print("33 Робот <-  забрать плату из тары")
-        self.change_value('Rob_Action', 300)
+        self.change_value('Rob_Action', 100)
         while True:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
@@ -657,7 +657,7 @@ class Table:
 
         # 35 Робот <- Уложи плату в ложемент тетситрования 2
         print("35 Робот <- Уложи плату в ложемент тетситрования 2")
-        self.change_value('Rob_Action', 300)
+        self.change_value('Rob_Action', 200)
         while True:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
@@ -670,10 +670,6 @@ class Table:
         self.change_value('Rob_Action', 0)
         result1=0
 
-
-
-
-        # 36. Регул <- Опусти прошивальщик ложе1.
 
 
         # 36. Регул <- Опусти прошивальщик (плата на ложе1).

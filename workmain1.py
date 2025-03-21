@@ -96,12 +96,12 @@ class Table:
     def defence_cycle(self):
         print("******ЦИКЛ DEFENCE*******")
         print("1 Регул <- Сдвинь плату освободив ложе1.")
-        self.change_value('Reg_move_Table', 100)
+        self.change_value('Reg_move_Table', 101)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
-            if result1 != 100:
+            if result1 != 101:
                 print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От регула получен код 200 на операции движения стола")
             else:
                 break
@@ -113,9 +113,9 @@ class Table:
         while True:
             result1 = self.read_value("sub_Rob_Action")
 
-            if result1 != 100:
+            if result1 != 300:
                 print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
             else:
                 break
@@ -123,12 +123,12 @@ class Table:
         self.change_value('Rob_Action', 0)
 
         print("3 Регул <- Сдвинь плату освободив ложе2.")
-        self.change_value('Reg_move_Table', 100)
+        self.change_value('Reg_move_Table', 102)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
-            if result1 != 100:
+            if result1 != 102:
                 print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От регула получен код 200 на операции движения стола")
             else:
                 break
@@ -139,9 +139,9 @@ class Table:
         self.change_value('Rob_Action', 300)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 100:
+            if result1 != 300:
                 print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
             else:
                 break
@@ -162,7 +162,7 @@ class Table:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
             else:
                 break
@@ -179,9 +179,9 @@ class Table:
         self.change_value('Rob_Action', 200)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 100:
+            if result1 != 200:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
             else:
                 break
@@ -192,12 +192,12 @@ class Table:
 
         # 8 Регул - Сдвигаем стол осовобождая ложе1
         print("8 Регул <- Сдвинь плату освободив ложе1.")
-        self.change_value('Reg_move_Table', 100)
+        self.change_value('Reg_move_Table', 101)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
-            if result1 != 100:
+            if result1 != 101:
                 print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От регула получен код 200 на операции движения стола")
             else:
                 break
@@ -212,7 +212,7 @@ class Table:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
             else:
                 break
@@ -229,9 +229,9 @@ class Table:
         self.change_value('Rob_Action', 200)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 100:
+            if result1 != 200:
                 print(f"Ждем ответ от робота, что плату уложили = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От робота получен код 200 на на операции уложить плату")
             else:
                 break
@@ -250,12 +250,12 @@ class Table:
  
         # 1. Регул <- Опусти прошивальщик ложе 2.
         print("1 Регул <- Опусти прошивальщик ложе 2")
-        self.change_value('Reg_updown_Botloader', 100)
+        self.change_value('Reg_updown_Botloader', 103)
         while True:
             result1 = self.read_value("Reg_updown_Botloader")
-            if result1 != 100:
+            if result1 != 103:
                 print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От регула получен код 200 на на операции опустить прошивальщик")
             else:
                 break
@@ -271,12 +271,12 @@ class Table:
         
         # 4. Регул <- Подними прошивальщик.
         print("4. Регул <- Подними прошивальщик.")
-        self.change_value('Reg_updown_Botloader', 100)
+        self.change_value('Reg_updown_Botloader', 104)
         while True:
             result1 = self.read_value("Reg_updown_Botloader")
-            if result1 != 100:
+            if result1 != 104:
                 print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От регула получен код 200 на на операции поднять прошивальщик")
             else:
                 break
@@ -287,12 +287,12 @@ class Table:
         
         # 5. Регул <- Сдвинь плату освободив ложе1.
         print("5 Регул <- Сдвинь плату освободив ложе2")
-        self.change_value('Reg_move_Table', 100)
+        self.change_value('Reg_move_Table', 101)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
-            if result1 != 100:
+            if result1 != 101:
                 print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От регула получен код 200 на операции движения стола")
             else:
                 break
@@ -306,9 +306,9 @@ class Table:
         while True:
             result1 = self.read_value("sub_Rob_Action")
 
-            if result1 != 100:
+            if result1 != 300:
                 print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
             else:
                 break
@@ -325,7 +325,7 @@ class Table:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
             else:
                 break
@@ -343,9 +343,9 @@ class Table:
         self.change_value('Rob_Action', 200)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 100:
+            if result1 != 200:
                 print(f"Ждем ответ от робота, что плату уложили = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От робота получен код 200 на на операции уложить плату")
             else:
                 break
@@ -356,12 +356,12 @@ class Table:
 
         # 10. Регул <- Опусти прошивальщик (плата на ложе1).
         print("10. Регул <- Опусти прошивальщик (плата на ложе1).")
-        self.change_value('Reg_updown_Botloader', 100)
+        self.change_value('Reg_updown_Botloader', 103)
         while True:
             result1 = self.read_value("Reg_updown_Botloader")
-            if result1 != 100:
+            if result1 != 103:
                 print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От регула получен код 200 на на операции опустить прошивальщик")
             else:
                 break
@@ -378,12 +378,12 @@ class Table:
 
         # 13 Регул <- Подними прошивальщик.
         print("13. Регул <- Подними прошивальщик.")
-        self.change_value('Reg_updown_Botloader', 100)
+        self.change_value('Reg_updown_Botloader', 104)
         while True:
             result1 = self.read_value("Reg_updown_Botloader")
-            if result1 != 100:
+            if result1 != 104:
                 print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От регула получен код 200 на на операции поднять прошивальщик")
             else:
                 break
@@ -394,12 +394,12 @@ class Table:
 
         # 14. Регул <- Сдвинь плату освободив ложе1.
         print("14 Регул <- Сдвинь плату освободив ложе1")
-        self.change_value('Reg_move_Table', 100)
+        self.change_value('Reg_move_Table', 101)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
-            if result1 != 100:
+            if result1 != 101:
                 print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От регула получен код 200 на операции движения стола")
             else:
                 break
@@ -415,9 +415,9 @@ class Table:
         while True:
             result1 = self.read_value("sub_Rob_Action")
 
-            if result1 != 100:
+            if result1 != 300:
                 print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
             else:
                 break
@@ -433,7 +433,7 @@ class Table:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
             else:
                 break
@@ -451,9 +451,9 @@ class Table:
         self.change_value('Rob_Action', 200)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 100:
+            if result1 != 200:
                 print(f"Ждем ответ от робота, что плату уложили = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От робота получен код 200 на на операции уложить плату")
             else:
                 break
@@ -463,12 +463,12 @@ class Table:
 
         # 19. Регул <- Опусти прошивальщик (плата на ложе2).
         print("19. Регул <- Опусти прошивальщик ложе1..")
-        self.change_value('Reg_updown_Botloader', 100)
+        self.change_value('Reg_updown_Botloader', 103)
         while True:
             result1 = self.read_value("Reg_updown_Botloader")
-            if result1 != 100:
+            if result1 != 103:
                 print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От регула получен код 200 на на операции опустить прошивальщик")
             else:
                 break
@@ -483,12 +483,12 @@ class Table:
 
         # 22. Регул <- Подними прошивальщик.
         print("22. Регул <- Подними прошивальщик.")
-        self.change_value('Reg_updown_Botloader', 100)
+        self.change_value('Reg_updown_Botloader', 104)
         while True:
             result1 = self.read_value("Reg_updown_Botloader")
-            if result1 != 100:
+            if result1 != 104:
                 print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От регула получен код 200 на на операции поднять прошивальщик")
             else:
                 break
@@ -498,12 +498,12 @@ class Table:
 
         # 23. Регул <- Сдвинь плату освободив ложе1.
         print("23 Регул <- Сдвинь плату освободив ложе2")
-        self.change_value('Reg_move_Table', 100)
+        self.change_value('Reg_move_Table', 102)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
-            if result1 != 100:
+            if result1 != 102:
                 print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От регула получен код 200 на операции движения стола")
             else:
                 break
@@ -519,9 +519,9 @@ class Table:
         while True:
             result1 = self.read_value("sub_Rob_Action")
 
-            if result1 != 100:
+            if result1 != 300:
                 print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
             else:
                 break
@@ -536,7 +536,7 @@ class Table:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
             else:
                 break
@@ -554,9 +554,9 @@ class Table:
         self.change_value('Rob_Action', 200)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 100:
+            if result1 != 200:
                 print(f"Ждем ответ от робота, что плату уложили = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От робота получен код 200 на на операции уложить плату")
             else:
                 break
@@ -567,12 +567,12 @@ class Table:
 
         # 28. Регул <- Опусти прошивальщик (плата на ложе1).
         print("28 Регул <- Опусти прошивальщик ложе 1")
-        self.change_value('Reg_updown_Botloader', 100)
+        self.change_value('Reg_updown_Botloader', 103)
         while True:
             result1 = self.read_value("Reg_updown_Botloader")
-            if result1 != 100:
+            if result1 != 103:
                 print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От регула получен код 200 на на операции опустить прошивальщик")
             else:
                 break
@@ -587,12 +587,12 @@ class Table:
 
         # 31. Регул <- Подними прошивальщик.
         print("31. Регул <- Подними прошивальщик.")
-        self.change_value('Reg_updown_Botloader', 100)
+        self.change_value('Reg_updown_Botloader', 104)
         while True:
             result1 = self.read_value("Reg_updown_Botloader")
-            if result1 != 100:
+            if result1 != 104:
                 print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От регула получен код 200 на на операции поднять прошивальщик")
             else:
                 break
@@ -604,12 +604,12 @@ class Table:
 
         # 32. Регул <- Сдвинь плату освободив ложе 1.
         print("32. Регул <- Сдвинь плату освободив ложе2")
-        self.change_value('Reg_move_Table', 100)
+        self.change_value('Reg_move_Table', 102)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
-            if result1 != 100:
+            if result1 != 102:
                 print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От регула получен код 200 на операции движения стола")
             else:
                 break
@@ -624,9 +624,9 @@ class Table:
         while True:
             result1 = self.read_value("sub_Rob_Action")
 
-            if result1 != 100:
+            if result1 != 300:
                 print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
             else:
                 break
@@ -642,7 +642,7 @@ class Table:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 100:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
             else:
                 break
@@ -660,9 +660,9 @@ class Table:
         self.change_value('Rob_Action', 200)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 100:
+            if result1 != 200:
                 print(f"Ждем ответ от робота, что плату уложили = {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От робота получен код 200 на на операции уложить плату")
             else:
                 break
@@ -674,12 +674,12 @@ class Table:
 
         # 36. Регул <- Опусти прошивальщик (плата на ложе1).
         print("36 Регул <- Опусти прошивальщик ложе1.")
-        self.change_value('Reg_updown_Botloader', 100)
+        self.change_value('Reg_updown_Botloader', 103)
         while True:
             result1 = self.read_value("Reg_updown_Botloader")
-            if result1 != 100:
+            if result1 != 103:
                 print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От регула получен код 200 на на операции опустить прошивальщик")
             else:
                 break
@@ -694,12 +694,12 @@ class Table:
 
         # 39. Регул <- Подними прошивальщик.
         print("39. Регул <- Подними прошивальщик.")
-        self.change_value('Reg_updown_Botloader', 100)
+        self.change_value('Reg_updown_Botloader', 104)
         while True:
             result1 = self.read_value("Reg_updown_Botloader")
-            if result1 != 100:
+            if result1 != 104:
                 print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
-            elif result1 == 200:
+            elif result1 == 404:
                 print(f"От регула получен код 200 на на операции поднять прошивальщик")
             else:
                 break

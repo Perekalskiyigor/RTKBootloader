@@ -36,7 +36,7 @@ class ModbusProvider:
         context = ModbusServerContext(slaves=self.store, single=True)
         print("Starting Modbus TCP server on localhost:502")
         try:
-            StartTcpServer(context, address=("localhost", 502))
+            StartTcpServer(context, address=("192.168.1.100", 502))
         except Exception as e:
             print(f"Error starting Modbus server: {e}")
 
@@ -109,11 +109,11 @@ class Table:
         self.change_value('Reg_move_Table', 0)
 
         print("2 Робот <- Забери плату с ложе 1.")
-        self.change_value('Rob_Action', 300)
+        self.change_value('Rob_Action', 301)
         while True:
             result1 = self.read_value("sub_Rob_Action")
 
-            if result1 != 300:
+            if result1 != 301:
                 print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
@@ -136,10 +136,10 @@ class Table:
         self.change_value('Reg_move_Table', 0)
 
         print("4 Робот <- Забери плату с ложе 2.")
-        self.change_value('Rob_Action', 300)
+        self.change_value('Rob_Action', 302)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 300:
+            if result1 != 302:
                 print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
@@ -244,15 +244,12 @@ class Table:
 
     ############# ****ЦИКЛ MAIN ******"
     def main(self):
-
         print("****ЦИКЛ MAIN")
-
- 
         # 1. Регул <- Опусти прошивальщик ложе 2.
         print("1 Регул <- Опусти прошивальщик ложе 2")
         self.change_value('Reg_updown_Botloader', 103)
         while True:
-            result1 = self.read_value("Reg_updown_Botloader")
+            result1 = self.read_value("sub_Reg_updown_Botloader")
             if result1 != 103:
                 print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
             elif result1 == 404:
@@ -273,7 +270,7 @@ class Table:
         print("4. Регул <- Подними прошивальщик.")
         self.change_value('Reg_updown_Botloader', 104)
         while True:
-            result1 = self.read_value("Reg_updown_Botloader")
+            result1 = self.read_value("sub_Reg_updown_Botloader")
             if result1 != 104:
                 print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
             elif result1 == 404:
@@ -285,12 +282,12 @@ class Table:
         result1 = 0
 
         
-        # 5. Регул <- Сдвинь плату освободив ложе1.
+        # 5. Регул <- Сдвинь плату освободив ложе2.
         print("5 Регул <- Сдвинь плату освободив ложе2")
-        self.change_value('Reg_move_Table', 101)
+        self.change_value('Reg_move_Table', 102)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
-            if result1 != 101:
+            if result1 != 102:
                 print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
             elif result1 == 404:
                 print(f"От регула получен код 200 на операции движения стола")
@@ -338,7 +335,7 @@ class Table:
         time.sleep(1)
         
 
-        # 9 Робот <- Уложи плату в ложемент тетситрования 1
+        # 9 Робот <- Уложи плату в ложемент тетситрования 2
         print("9 Робот <- Уложи плату в ложемент тетситрования 2")
         self.change_value('Rob_Action', 200)
         while True:
@@ -358,7 +355,7 @@ class Table:
         print("10. Регул <- Опусти прошивальщик (плата на ложе1).")
         self.change_value('Reg_updown_Botloader', 103)
         while True:
-            result1 = self.read_value("Reg_updown_Botloader")
+            result1 = self.read_value("sub_Reg_updown_Botloader")
             if result1 != 103:
                 print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
             elif result1 == 404:
@@ -380,7 +377,7 @@ class Table:
         print("13. Регул <- Подними прошивальщик.")
         self.change_value('Reg_updown_Botloader', 104)
         while True:
-            result1 = self.read_value("Reg_updown_Botloader")
+            result1 = self.read_value("sub_Reg_updown_Botloader")
             if result1 != 104:
                 print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
             elif result1 == 404:
@@ -406,7 +403,7 @@ class Table:
             time.sleep(1)
         self.change_value('Reg_move_Table', 0)
         result1 = 0
-        print("Стол 2ложе свободен")
+        print("Стол 1ложе свободен")
 
 
         # 15. Робот <- Забери плату с ложе 1.
@@ -462,10 +459,10 @@ class Table:
         result1=0
 
         # 19. Регул <- Опусти прошивальщик (плата на ложе2).
-        print("19. Регул <- Опусти прошивальщик ложе1..")
+        print("19. Регул <- Опусти прошивальщик ложе2..")
         self.change_value('Reg_updown_Botloader', 103)
         while True:
-            result1 = self.read_value("Reg_updown_Botloader")
+            result1 = self.read_value("sub_Reg_updown_Botloader")
             if result1 != 103:
                 print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
             elif result1 == 404:
@@ -485,7 +482,7 @@ class Table:
         print("22. Регул <- Подними прошивальщик.")
         self.change_value('Reg_updown_Botloader', 104)
         while True:
-            result1 = self.read_value("Reg_updown_Botloader")
+            result1 = self.read_value("sub_Reg_updown_Botloader")
             if result1 != 104:
                 print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
             elif result1 == 404:
@@ -496,7 +493,7 @@ class Table:
         self.change_value('Reg_updown_Botloader', 0)
         result1 = 0
 
-        # 23. Регул <- Сдвинь плату освободив ложе1.
+        # 23. Регул <- Сдвинь плату освободив ложе2.
         print("23 Регул <- Сдвинь плату освободив ложе2")
         self.change_value('Reg_move_Table', 102)
         while True:
@@ -514,7 +511,7 @@ class Table:
         
         
         # 24. Робот <- Забери плату с ложе 2.
-        print("24 Робот <- Забери плату с ложе 1.")
+        print("24 Робот <- Забери плату с ложе 2.")
         self.change_value('Rob_Action', 300)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -569,7 +566,7 @@ class Table:
         print("28 Регул <- Опусти прошивальщик ложе 1")
         self.change_value('Reg_updown_Botloader', 103)
         while True:
-            result1 = self.read_value("Reg_updown_Botloader")
+            result1 = self.read_value("sub_Reg_updown_Botloader")
             if result1 != 103:
                 print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
             elif result1 == 404:
@@ -589,7 +586,7 @@ class Table:
         print("31. Регул <- Подними прошивальщик.")
         self.change_value('Reg_updown_Botloader', 104)
         while True:
-            result1 = self.read_value("Reg_updown_Botloader")
+            result1 = self.read_value("sub_Reg_updown_Botloader")
             if result1 != 104:
                 print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
             elif result1 == 404:
@@ -603,11 +600,11 @@ class Table:
 
 
         # 32. Регул <- Сдвинь плату освободив ложе 1.
-        print("32. Регул <- Сдвинь плату освободив ложе2")
-        self.change_value('Reg_move_Table', 102)
+        print("32. Регул <- Сдвинь плату освободив ложе1")
+        self.change_value('Reg_move_Table', 101)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
-            if result1 != 102:
+            if result1 != 101:
                 print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
             elif result1 == 404:
                 print(f"От регула получен код 200 на операции движения стола")
@@ -616,10 +613,10 @@ class Table:
             time.sleep(1)
         self.change_value('Reg_move_Table', 0)
         result1 = 0
-        print("Стол 2 ложе свободен")
+        print("Стол 1 ложе свободен")
 
-        # 32. Робот <- Забери плату с ложе 2.
-        print("32 Робот <- Забери плату с ложе 2.")
+        # 32. Робот <- Забери плату с ложе 1.
+        print("32 Робот <- Забери плату с ложе 1.")
         self.change_value('Rob_Action', 300)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -655,8 +652,8 @@ class Table:
         time.sleep(1)
         
 
-        # 35 Робот <- Уложи плату в ложемент тетситрования 2
-        print("35 Робот <- Уложи плату в ложемент тетситрования 2")
+        # 35 Робот <- Уложи плату в ложемент тетситрования 1
+        print("35 Робот <- Уложи плату в ложемент тетситрования 1")
         self.change_value('Rob_Action', 200)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -672,11 +669,11 @@ class Table:
 
 
 
-        # 36. Регул <- Опусти прошивальщик (плата на ложе1).
-        print("36 Регул <- Опусти прошивальщик ложе1.")
+        # 36. Регул <- Опусти прошивальщик (плата на ложе2).
+        print("36 Регул <- Опусти прошивальщик ложе2.")
         self.change_value('Reg_updown_Botloader', 103)
         while True:
-            result1 = self.read_value("Reg_updown_Botloader")
+            result1 = self.read_value("sub_Reg_updown_Botloader")
             if result1 != 103:
                 print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
             elif result1 == 404:
@@ -696,7 +693,7 @@ class Table:
         print("39. Регул <- Подними прошивальщик.")
         self.change_value('Reg_updown_Botloader', 104)
         while True:
-            result1 = self.read_value("Reg_updown_Botloader")
+            result1 = self.read_value("sub_Reg_updown_Botloader")
             if result1 != 104:
                 print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
             elif result1 == 404:
@@ -707,7 +704,7 @@ class Table:
         self.change_value('Reg_updown_Botloader', 0)
         result1 = 0
 
-        print("Стол 1ложе свободен")
+        #print("Стол 2ложе свободен")
         print("****ЦИКЛ MAIN END")
 
     ############# ****ЦИКЛ MAIN END ******"
@@ -728,7 +725,8 @@ class Table:
 if __name__ == "__main__":
     modbus_provider = ModbusProvider()
     
-    # Создание объекта и выполнение алгоритма
+    table1 = Table("Table 1", dict_Table1)
+         # Создание объекта и выполнение алгоритма
     table1 = Table("Table 1", dict_Table1)
     
 
@@ -745,6 +743,5 @@ if __name__ == "__main__":
     if flag == True:
         table1.setup_cycle()
         flag = False
-
 
     table1.main()

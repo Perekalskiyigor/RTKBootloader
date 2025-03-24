@@ -1,0 +1,128 @@
+PROGRAM relizeA
+VAR
+	IsInitializedX: BOOL := FALSE;	// Флаг для проверки первого запуска
+ 	IsInitializedZ: BOOL := FALSE; 	// Флаг для проверки первого запуска	
+	
+	Xleft :BOOL; 					// Конечники оси X
+	Xright:BOOL; 					// Конечники оси X
+  	Zup   :BOOL; 					// Конечники оси Z
+	Zdown: BOOL:= FALSE; 			// Конечники оси Z
+	
+	ENAX:		BOOL;
+	ENAZ:		BOOL;
+	DIRX:		BOOL;
+	DIRZ:		BOOL;
+	
+	duty:		BYTE;
+	freq:		UINT;
+	step:		BOOL;
+	
+	Reg_move_table:				INT;
+	Sub_Reg_move_table:			INT;
+	Reg_updown_bootloader:		INT;
+	Sub_Reg_updown_bootloader:	INT;
+	Rob_Action:					INT;
+	sub_Rob_Action:				INT;
+	
+	kob_Rob_Action:				INT;
+	sub_kob_Rob_Action:			INT;
+	
+END_VAR
+
+
+
+ENAX := TRUE;
+ENAZ :=TRUE;
+step := TRUE; // генератор импульсов
+
+duty :=50;
+freq :=3000;
+
+///////////////////////////////////////////////////////////////////////////////////////
+// Код для выполнения один раз при старте. Проверяем, что столы в начальном положении.
+// Цикл для проверки начальных условий, если не выполняется мы в него уходим и не выходим, пока не выполнятся
+IF IsInitializedZ = FALSE THEN
+  ENAZ := TRUE; //	Отключение драйвера после достижения 
+  ENAX := TRUE; //	Отключение драйвера после достижения 
+  
+    // Проверка, что по оси Z прошиватель вверху, если нет — поднимаем
+    IF Zup = TRUE THEN
+    ENAZ := TRUE;  //ENA Z  (* Отключение драйвера после достижения *)
+    IsInitializedZ := TRUE;
+    ELSE
+    DIRZ :=	TRUE;  (* Направление * 1 драйвер есали лож то против часовой если истина по часовой *)
+    ENAZ :=	FALSE; (* Включение драйвера 1 драйвер включен, когда лож*)
+  END_IF;
+END_IF;
+
+IF IsInitializedX = FALSE AND IsInitializedZ = TRUE THEN
+  
+// Проверка, что по оси X стол в начальном положении, если нет — двигаем
+
+  IF Xright = FALSE THEN
+	DIRX := TRUE;  (* Направление: против часовой *)
+    ENAX := FALSE;  (* Включение драйвера *)
+  ELSE
+      ENAX := TRUE;   (* Отключение драйвера после достижения *)
+      IsInitializedX := TRUE;
+    END_IF;
+END_IF;
+
+///////////////////////////////////////////////////////////////////////////////////////
+
+IF IsInitializedX = TRUE AND IsInitializedZ = TRUE THEN 	
+	// движение влево вправо
+	IF Reg_move_Table = 101 THEN
+		
+		DIRX := TRUE;   //направление вправо
+   		ENAX := Xright; // едем пока Хright неактивен
+		IF Xright THEN
+			sub_Reg_move_Table := Reg_move_Table;
+		END_IF
+	END_IF
+	
+	IF Reg_move_Table = 102 THEN
+		
+		DIRX := FALSE;   //направление влево
+   		ENAX := Xleft; // едем пока Хleft неактивен
+		IF Xleft THEN
+			sub_Reg_move_Table := Reg_move_Table;
+		END_IF
+	END_IF
+	
+	// движения вверх вниз
+
+IF Reg_updown_bootloader = 103 THEN
+		DIRZ := FALSE;   //направление влево
+   		ENAZ := Zdown; 	//едем пока Zdown неактивен
+		IF Zdown THEN
+			sub_Reg_updown_bootloader := Reg_updown_bootloader;
+		END_IF
+	END_IF
+	
+IF Reg_updown_bootloader = 104 THEN
+		DIRZ := TRUE;   //направление влево
+   		ENAZ := Zup; 	// едем пока Zup неактивен
+		IF Zup THEN
+			sub_Reg_updown_bootloader := Reg_updown_bootloader;
+		END_IF
+	END_IF
+
+	//передача команд роботу
+	 kob_Rob_Action := Rob_Action;					//передали роботу
+	 IF sub_kob_Rob_Action = kob_Rob_Action THEN	//получили от робота
+		 sub_Rob_Action := sub_kob_Rob_Action;		//передали питону
+	 END_IF
+	 
+END_IF
+
+
+
+
+
+
+
+
+
+
+

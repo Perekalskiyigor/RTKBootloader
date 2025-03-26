@@ -1,7 +1,14 @@
+import logging
 import time
 from pymodbus.server import StartTcpServer
 from pymodbus.datastore import ModbusSequentialDataBlock, ModbusSlaveContext, ModbusServerContext
 import threading
+
+# Пользовательский класс камеры
+import CameraClass as CAM
+
+# Пользовательский класс БД
+import SQLite as SQL
 
 dict_Table1 = {
     'Reg_move_Table': 0, 
@@ -11,6 +18,32 @@ dict_Table1 = {
     'Rob_Action': 0,
     'sub_Rob_Action': 0
 }
+
+# Set up basic logging configuration
+logging.basicConfig(
+    filename='RTK.log',
+    level=logging.INFO,
+    format='MAIN - %(asctime)s - %(levelname)s - %(message)s'
+)
+
+################################################# START CAMERA Communication class ###################################
+
+# Пример использования
+camera_ip = '192.168.1.50'
+camera = CAM.CameraConnection(camera_ip)
+
+################################################# STOP CAMERA Communication class ###################################
+
+
+
+################################################# START SQL Communication class ###################################
+
+try:
+        # Create an instance of DatabaseConnection
+        db_connection = SQL.DatabaseConnection()
+except Exception as e:
+        logging.error(f"Error Create an instance of DatabaseConnection: {e}")
+################################################# STOP SQL Communication class ###################################
 
 
 ################################################# START MODBUS Communication class with Modbus regul ###################################
@@ -26,6 +59,12 @@ class ModbusProvider:
         self.Reg_updown_Botloader = 0        # Move botloader
         self.Rob_Action = 0                  # Action to Robot
 
+        self.sub_Reg_move_Table = 0              # Move Table
+        self.sub_Reg_updown_Botloader = 0        # Move botloader
+        self.sub_Rob_Action = 0                  # Action to Robot
+
+
+
         self.server_thread = threading.Thread(target=self.run_modbus_server, daemon=True)
         self.server_thread.start()
 
@@ -36,7 +75,7 @@ class ModbusProvider:
         context = ModbusServerContext(slaves=self.store, single=True)
         print("Starting Modbus TCP server on localhost:502")
         try:
-            StartTcpServer(context, address=("192.168.1.100", 502))
+            StartTcpServer(context, address=("localhost", 502))
         except Exception as e:
             print(f"Error starting Modbus server: {e}")
 
@@ -47,6 +86,17 @@ class ModbusProvider:
         while True:
             try:
                 with self.lock:
+
+                    self.sub_Reg_move_Table = dict_Table1["sub_Reg_move_Table"]
+                    self.sub_Reg_updown_Botloader = dict_Table1["sub_Reg_updown_Botloader"]
+                    self.sub_Rob_Action = dict_Table1["sub_Rob_Action"]
+
+                    print (f"*********{self.sub_Rob_Action}")
+
+                    self.store.setValues(3, 1, [self.sub_Reg_move_Table])
+                    self.store.setValues(3, 3, [self.sub_Reg_updown_Botloader])
+                    self.store.setValues(3, 5, [self.sub_Rob_Action])
+
                     dict_Table1["sub_Reg_move_Table"] = self.store.getValues(3, 1, count=1)[0]
                     dict_Table1["sub_Reg_updown_Botloader"] = self.store.getValues(3, 3, count=1)[0]
                     dict_Table1["sub_Rob_Action"] = self.store.getValues(3, 5, count=1)[0]
@@ -171,7 +221,30 @@ class Table:
 
         # 6 Делаем фото платы
         print("6 Камера <- сделай фото")
-        time.sleep(1)
+        code, QRresult = camera.take_three_pictures()
+        if code == 200:
+            logging.error("Error: Pictures are not identical or not received.")
+            print("CAM - Ошибка: фотографии не совпадают или не получены.")
+        else:
+            logging.info("Successfully received identical picture.")
+            print("CAM - Получено совпадающее фото:", QRresult)
+
+        # Делаем запрос в ПЛМ с штрихкодом платы и получаем ответ что плату существует и версию прошивки
+        serial_number_8 = "555555"#серийник платы для указанного датаматрикс
+        
+        # Фото сохраняем в бд
+        try:
+            # Connect to the database and create tables
+            db_connection.db_connect()
+
+            # Call the methods that print to the console
+            db_connection.camera_photo(QRresult, serial_number_8)
+
+            # Close the connection
+            db_connection.close_connection()
+        except Exception as e:
+            logging.error(f"Error in main execution: {e}")
+            time.sleep(1)
         
 
         # 7 Робот <- Уложи плату в ложемент тетситрования
@@ -221,6 +294,29 @@ class Table:
 
         # 10 Делаем фото платы
         print("10 Камера <- сделай фото")
+        code, QRresult = camera.take_three_pictures()
+        if code == 200:
+            logging.error("Error: Pictures are not identical or not received.")
+            print("CAM - Ошибка: фотографии не совпадают или не получены.")
+        else:
+            logging.info("Successfully received identical picture.")
+            print("CAM - Получено совпадающее фото:", QRresult)
+
+        # Делаем запрос в ПЛМ с штрихкодом платы и получаем ответ что плату существует и версию прошивки
+
+        # Фото сохраняем в бд
+        try:
+            # Connect to the database and create tables
+            db_connection.db_connect()
+
+            # Call the methods that print to the console
+            db_connection.camera_photo(QRresult)
+
+            # Close the connection
+            db_connection.close_connection()
+        except Exception as e:
+            logging.error(f"Error in main execution: {e}")
+
         time.sleep(1)
         
 
@@ -332,6 +428,29 @@ class Table:
 
         # 8 Делаем фото платы
         print("8 Камера <- сделай фото")
+        code, QRresult = camera.take_three_pictures()
+        if code == 200:
+            logging.error("Error: Pictures are not identical or not received.")
+            print("CAM - Ошибка: фотографии не совпадают или не получены.")
+        else:
+            logging.info("Successfully received identical picture.")
+            print("CAM - Получено совпадающее фото:", QRresult)
+
+        # Делаем запрос в ПЛМ с штрихкодом платы и получаем ответ что плату существует и версию прошивки
+
+        # Фото сохраняем в бд
+        try:
+            # Connect to the database and create tables
+            db_connection.db_connect()
+
+            # Call the methods that print to the console
+            db_connection.camera_photo(QRresult)
+
+            # Close the connection
+            db_connection.close_connection()
+        except Exception as e:
+            logging.error(f"Error in main execution: {e}")
+
         time.sleep(1)
         
 
@@ -440,6 +559,13 @@ class Table:
 
         # 17 Делаем фото платы
         print("17 Камера <- сделай фото")
+        code, QRresult = camera.take_three_pictures()
+        if code == 200:
+            logging.error("Error: Pictures are not identical or not received.")
+            print("CAM - Ошибка: фотографии не совпадают или не получены.")
+        else:
+            logging.info("Successfully received identical picture.")
+            print("CAM - Получено совпадающее фото:", QRresult)
         time.sleep(1)
         
 
@@ -478,6 +604,9 @@ class Table:
 if __name__ == "__main__":
     modbus_provider = ModbusProvider()
     
+    
+    
+    """
     table1 = Table("Table 1", dict_Table1)
          # Создание объекта и выполнение алгоритма
     table1 = Table("Table 1", dict_Table1)
@@ -498,3 +627,25 @@ if __name__ == "__main__":
         flag = False
 
     table1.main()
+    
+    """
+
+    table1 = Table("Table 1", dict_Table1)
+
+    while True:
+        table1.change_value("sub_Rob_Action", 45)
+        time.sleep(3)
+
+
+        a = table1.read_value("sub_Rob_Action")
+        print(a)
+        time.sleep(3)
+
+        table1.change_value("sub_Rob_Action", 223)
+        time.sleep(3)
+
+        a = table1.read_value("sub_Rob_Action")
+        print(a)
+        time.sleep(3)
+    
+    

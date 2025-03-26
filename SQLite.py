@@ -51,21 +51,39 @@ class DatabaseConnection:
             logging.error(f"Error occurred while creating tables: {e}")
             raise
 
-    def method_1(self):
-        logging.info("Method 1 called.")
-        print("Method 1")
     
-    def method_2(self):
+    def camera_photo(self, QRresult, serial_number_8):
+        """Добавление данных по штрих коду с камеры в базу"""
+    
+        logging.info("Method camera_photo called.")
+        print("Method 1")
+        # Update the record
+        self.cursor.execute('''
+            UPDATE order_details 
+            SET data_matrix = ? 
+            WHERE serial_number_8 = ?
+        ''', (QRresult, serial_number_8))
+
+        # Check if any row was updated
+        if self.cursor.rowcount == 0:
+            print(f"Error: No record found with Serial = {serial_number_8}")
+        else:
+            # Commit changes if the update was successful
+            self.conn.commit()
+            print(f"Successfully updated record with Serial = {serial_number_8}")
+
+    
+    def getOrders(self):
+        """ Запрос заказов всех """
         logging.info("Method 2 called.")
         print("Method 2")
 
-    def method_3(self):
+    def get_order_detail(self):
+        """ Запрос информации по заказам """
         logging.info("Method 3 called.")
         print("Method 3")
     
-    def method_4(self):
-        logging.info("Method 4 called.")
-        print("Method 4")
+    
     
     def close_connection(self):
         """ Close the connection to the database """
@@ -73,6 +91,7 @@ class DatabaseConnection:
         self.conn.close()
         logging.info("Database connection closed.")
 
+"""
 # Instantiate the class and call methods
 if __name__ == "__main__":
     try:
@@ -92,3 +111,7 @@ if __name__ == "__main__":
         db_connection.close_connection()
     except Exception as e:
         logging.error(f"Error in main execution: {e}")
+
+"""
+
+

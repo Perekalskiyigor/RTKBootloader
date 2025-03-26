@@ -6,15 +6,15 @@ import threading
 
 # Пользовательский класс камеры
 import CameraClass as CAM
-
-# Пользовательский класс БД
+ 
+ # Пользовательский класс БД
 import SQLite as SQL
 
 dict_Table1 = {
-    'Reg_move_Table': 0, 
-    'sub_Reg_move_Table': 0, 
-    'Reg_updown_Botloader': 0, 
-    'sub_Reg_updown_Botloader': 0, 
+    'Reg_move_Table': 0,
+    'sub_Reg_move_Table': 0,
+    'Reg_updown_Botloader': 0,
+    'sub_Reg_updown_Botloader': 0,
     'Rob_Action': 0,
     'sub_Rob_Action': 0
 }
@@ -34,16 +34,14 @@ camera = CAM.CameraConnection(camera_ip)
 
 ################################################# STOP CAMERA Communication class ###################################
 
-
-
 ################################################# START SQL Communication class ###################################
-
+ 
 try:
         # Create an instance of DatabaseConnection
         db_connection = SQL.DatabaseConnection()
 except Exception as e:
         logging.error(f"Error Create an instance of DatabaseConnection: {e}")
-################################################# STOP SQL Communication class ###################################
+ ################################################# STOP SQL Communication class ###################################
 
 
 ################################################# START MODBUS Communication class with Modbus regul ###################################
@@ -55,15 +53,9 @@ class ModbusProvider:
         )
         self.lock = threading.Lock()
 
-        self.Reg_move_Table = 0              # Move Table
+        self.Reg_move_Table = 0             # Move Table
         self.Reg_updown_Botloader = 0        # Move botloader
-        self.Rob_Action = 0                  # Action to Robot
-
-        self.sub_Reg_move_Table = 0              # Move Table
-        self.sub_Reg_updown_Botloader = 0        # Move botloader
-        self.sub_Rob_Action = 0                  # Action to Robot
-
-
+        self.Rob_Action = 0                 # Action to Robot
 
         self.server_thread = threading.Thread(target=self.run_modbus_server, daemon=True)
         self.server_thread.start()
@@ -75,7 +67,7 @@ class ModbusProvider:
         context = ModbusServerContext(slaves=self.store, single=True)
         print("Starting Modbus TCP server on localhost:502")
         try:
-            StartTcpServer(context, address=("localhost", 502))
+            StartTcpServer(context, address=("192.168.1.100", 502))
         except Exception as e:
             print(f"Error starting Modbus server: {e}")
 
@@ -86,17 +78,6 @@ class ModbusProvider:
         while True:
             try:
                 with self.lock:
-
-                    self.sub_Reg_move_Table = dict_Table1["sub_Reg_move_Table"]
-                    self.sub_Reg_updown_Botloader = dict_Table1["sub_Reg_updown_Botloader"]
-                    self.sub_Rob_Action = dict_Table1["sub_Rob_Action"]
-
-                    print (f"*********{self.sub_Rob_Action}")
-
-                    self.store.setValues(3, 1, [self.sub_Reg_move_Table])
-                    self.store.setValues(3, 3, [self.sub_Reg_updown_Botloader])
-                    self.store.setValues(3, 5, [self.sub_Rob_Action])
-
                     dict_Table1["sub_Reg_move_Table"] = self.store.getValues(3, 1, count=1)[0]
                     dict_Table1["sub_Reg_updown_Botloader"] = self.store.getValues(3, 3, count=1)[0]
                     dict_Table1["sub_Rob_Action"] = self.store.getValues(3, 5, count=1)[0]
@@ -206,7 +187,7 @@ class Table:
         print("****ЦИКЛ SETUP******")
 
         # 5 Робот <- Забери плату из тары
-        print("5 Робот <-  забрать плату из тары")
+        print("5 Робот <- забрать плату из тары")
         self.change_value('Rob_Action', 100)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -245,14 +226,15 @@ class Table:
         except Exception as e:
             logging.error(f"Error in main execution: {e}")
             time.sleep(1)
+        time.sleep(1)
         
 
         # 7 Робот <- Уложи плату в ложемент тетситрования
         print("7 Робот <- Уложи плату в ложемент тетситрования 2")
-        self.change_value('Rob_Action', 200)
+        self.change_value('Rob_Action', 202)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 200:
+            if result1 != 202:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
@@ -279,7 +261,7 @@ class Table:
 
 
         # 9 Робот <- Забери плату из тары
-        print("9 Робот <-  забрать плату из тары")
+        print("9 Робот <- забрать плату из тары")
         self.change_value('Rob_Action', 100)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -303,29 +285,30 @@ class Table:
             print("CAM - Получено совпадающее фото:", QRresult)
 
         # Делаем запрос в ПЛМ с штрихкодом платы и получаем ответ что плату существует и версию прошивки
-
+        serial_number_8 = "555555"#серийник платы для указанного датаматрикс
+        
         # Фото сохраняем в бд
         try:
             # Connect to the database and create tables
             db_connection.db_connect()
 
             # Call the methods that print to the console
-            db_connection.camera_photo(QRresult)
+            db_connection.camera_photo(QRresult, serial_number_8)
 
             # Close the connection
             db_connection.close_connection()
         except Exception as e:
             logging.error(f"Error in main execution: {e}")
-
+            time.sleep(1)
         time.sleep(1)
         
 
         # 11 Робот <- Уложи плату в ложемент тетситрования
         print("11 Робот <- Уложи плату в ложемент тетситрования 1")
-        self.change_value('Rob_Action', 200)
+        self.change_value('Rob_Action', 201)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 200:
+            if result1 != 201:
                 print(f"Ждем ответ от робота, что плату уложили = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции уложить плату")
@@ -395,11 +378,11 @@ class Table:
 
         # 6. Робот <- Забери плату с ложе 2.
         print("6 Робот <- Забери плату с ложе 2.")
-        self.change_value('Rob_Action', 300)
+        self.change_value('Rob_Action', 302)
         while True:
             result1 = self.read_value("sub_Rob_Action")
 
-            if result1 != 300:
+            if result1 != 302:
                 print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
@@ -412,7 +395,7 @@ class Table:
 
 
         # 7 Робот <- Забери плату из тары
-        print("7 Робот <-  забрать плату из тары")
+        print("7 Робот <- забрать плату из тары")
         self.change_value('Rob_Action', 100)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -437,29 +420,30 @@ class Table:
             print("CAM - Получено совпадающее фото:", QRresult)
 
         # Делаем запрос в ПЛМ с штрихкодом платы и получаем ответ что плату существует и версию прошивки
-
+        serial_number_8 = "555555"#серийник платы для указанного датаматрикс
+        
         # Фото сохраняем в бд
         try:
             # Connect to the database and create tables
             db_connection.db_connect()
 
             # Call the methods that print to the console
-            db_connection.camera_photo(QRresult)
+            db_connection.camera_photo(QRresult, serial_number_8)
 
             # Close the connection
             db_connection.close_connection()
         except Exception as e:
             logging.error(f"Error in main execution: {e}")
-
+            time.sleep(1)
         time.sleep(1)
         
 
         # 9 Робот <- Уложи плату в ложемент тетситрования 2
         print("9 Робот <- Уложи плату в ложемент тетситрования 2")
-        self.change_value('Rob_Action', 200)
+        self.change_value('Rob_Action', 202)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 200:
+            if result1 != 202:
                 print(f"Ждем ответ от робота, что плату уложили = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции уложить плату")
@@ -527,11 +511,11 @@ class Table:
 
         # 15. Робот <- Забери плату с ложе 1.
         print("15 Робот <- Забери плату с ложе 1.")
-        self.change_value('Rob_Action', 300)
+        self.change_value('Rob_Action', 301)
         while True:
             result1 = self.read_value("sub_Rob_Action")
 
-            if result1 != 300:
+            if result1 != 301:
                 print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
@@ -543,7 +527,7 @@ class Table:
 
 
         # 16 Робот <- Забери плату из тары
-        print("16 Робот <-  забрать плату из тары")
+        print("16 Робот <- забрать плату из тары")
         self.change_value('Rob_Action', 100)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -566,15 +550,32 @@ class Table:
         else:
             logging.info("Successfully received identical picture.")
             print("CAM - Получено совпадающее фото:", QRresult)
+
+        # Делаем запрос в ПЛМ с штрихкодом платы и получаем ответ что плату существует и версию прошивки
+        serial_number_8 = "555555"#серийник платы для указанного датаматрикс
+        
+        # Фото сохраняем в бд
+        try:
+            # Connect to the database and create tables
+            db_connection.db_connect()
+
+            # Call the methods that print to the console
+            db_connection.camera_photo(QRresult, serial_number_8)
+
+            # Close the connection
+            db_connection.close_connection()
+        except Exception as e:
+            logging.error(f"Error in main execution: {e}")
+            time.sleep(1)
         time.sleep(1)
         
 
         # 18 Робот <- Уложи плату в ложемент тетситрования 1
         print("18 Робот <- Уложи плату в ложемент тетситрования 1")
-        self.change_value('Rob_Action', 200)
+        self.change_value('Rob_Action', 201)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 200:
+            if result1 != 201:
                 print(f"Ждем ответ от робота, что плату уложили = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции уложить плату")
@@ -604,15 +605,12 @@ class Table:
 if __name__ == "__main__":
     modbus_provider = ModbusProvider()
     
-    
-    
-    """
     table1 = Table("Table 1", dict_Table1)
          # Создание объекта и выполнение алгоритма
     table1 = Table("Table 1", dict_Table1)
     
 
-    # Выполнение первого цикла 
+    # Выполнение первого цикла
     flag1 = True
     if flag1 == True:
         table1.defence_cycle()
@@ -627,25 +625,3 @@ if __name__ == "__main__":
         flag = False
 
     table1.main()
-    
-    """
-
-    table1 = Table("Table 1", dict_Table1)
-
-    while True:
-        table1.change_value("sub_Rob_Action", 45)
-        time.sleep(3)
-
-
-        a = table1.read_value("sub_Rob_Action")
-        print(a)
-        time.sleep(3)
-
-        table1.change_value("sub_Rob_Action", 223)
-        time.sleep(3)
-
-        a = table1.read_value("sub_Rob_Action")
-        print(a)
-        time.sleep(3)
-    
-    

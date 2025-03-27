@@ -31,6 +31,7 @@ VAR
 	green:						BOOL;
 	yellow:						BOOL;
 	
+	error:						INT;
 END_VAR
 
 
@@ -42,7 +43,7 @@ ENAZ := TRUE;
 step := TRUE; // генератор импульсов
 
 duty :=50;
-freq :=5000;
+freq :=8000;
 
 ///////////////////////////////////////////////////////////////////////////////////////
 // Код для выполнения один раз при старте. Проверяем, что столы в начальном положении.
@@ -50,7 +51,6 @@ freq :=5000;
 IF IsInitializedZ = FALSE THEN
   ENAZ := TRUE; //	Отключение драйвера после достижения 
   ENAX := TRUE; //	Отключение драйвера после достижения 
-  red := TRUE;
   
     // Проверка, что по оси Z прошиватель вверху, если нет — поднимаем
     IF Zup = TRUE THEN
@@ -64,7 +64,6 @@ END_IF;
 
 IF IsInitializedX = FALSE AND IsInitializedZ = TRUE THEN
 // Проверка, что по оси X стол в начальном положении, если нет — двигаем
-	red := TRUE;
   	IF Xright = FALSE THEN
 		DIRX := TRUE;  (* Направление: против часовой *)
 		ENAX := FALSE;  (* Включение драйвера *)
@@ -77,20 +76,21 @@ END_IF;
 ///////////////////////////////////////////////////////////////////////////////////////
 
 IF IsInitializedX = TRUE AND IsInitializedZ = TRUE THEN 
-	green:= TRUE;	
 	// движение влево вправо
 	IF Reg_move_Table = 101 THEN
 		DIRX := TRUE;   //направление вправо
    		ENAX := Xright; // едем пока Хright неактивен
+		green := TRUE;
 		IF Xright THEN
 			sub_Reg_move_Table := Reg_move_Table;
 		END_IF
 	END_IF
 	
 	IF Reg_move_Table = 102 THEN
-		
-		DIRX := FALSE;   //направление влево
-   		ENAX := Xleft; // едем пока Хleft неактивен
+		green := TRUE;
+		DIRX := FALSE;  //направление влево
+   		ENAX := Xleft; 	//едем пока Хleft неактивен
+		green := TRUE;
 		IF Xleft THEN
 			sub_Reg_move_Table := Reg_move_Table;
 		END_IF
@@ -102,6 +102,7 @@ IF Reg_updown_bootloader = 103 THEN
 		yellow := TRUE;
 		DIRZ := FALSE;   //направление вниз
    		ENAZ := Zdown; 	//едем пока Zdown неактивен
+		green := TRUE;
 		IF Zdown THEN
 			sub_Reg_updown_bootloader := Reg_updown_bootloader;
 		END_IF
@@ -111,6 +112,7 @@ IF Reg_updown_bootloader = 104 THEN
 		yellow := TRUE;
 		DIRZ := TRUE;   //направление вверх
    		ENAZ := Zup; 	// едем пока Zup неактивен
+		green := TRUE;
 		IF Zup THEN
 			sub_Reg_updown_bootloader := Reg_updown_bootloader;
 		END_IF
@@ -122,10 +124,15 @@ IF Reg_updown_bootloader = 104 THEN
 		 sub_Rob_Action := sub_kob_Rob_Action;		//передали питону
 	 END_IF
 	 
+	 IF kob_Rob_Action > 0 AND green = FALSE THEN
+		 yellow := TRUE;
+	 END_IF
+	 
+	 IF error = 404 THEN
+		 red := TRUE;
+	 END_IF
+	 
 END_IF
-
-
-
 
 
 

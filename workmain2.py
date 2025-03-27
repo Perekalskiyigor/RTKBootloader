@@ -5,7 +5,8 @@ from pymodbus.datastore import ModbusSequentialDataBlock, ModbusSlaveContext, Mo
 import threading
 
 # Пользовательский класс камеры
-import CameraClass as CAM
+# mport CameraClass as CAM
+import CameraSocket
  
  # Пользовательский класс БД
 import SQLite as SQL
@@ -29,8 +30,8 @@ logging.basicConfig(
 ################################################# START CAMERA Communication class ###################################
 
 # Пример использования
-camera_ip = '192.168.1.50'
-camera = CAM.CameraConnection(camera_ip)
+# camera_ip = '192.168.1.50'
+# camera = CAM.CameraConnection(camera_ip)
 
 ################################################# STOP CAMERA Communication class ###################################
 
@@ -202,30 +203,14 @@ class Table:
 
         # 6 Делаем фото платы
         print("6 Камера <- сделай фото")
-        code, QRresult = camera.take_three_pictures()
-        if code == 200:
-            logging.error("Error: Pictures are not identical or not received.")
-            print("CAM - Ошибка: фотографии не совпадают или не получены.")
-        else:
-            logging.info("Successfully received identical picture.")
-            print("CAM - Получено совпадающее фото:", QRresult)
-
-        # Делаем запрос в ПЛМ с штрихкодом платы и получаем ответ что плату существует и версию прошивки
-        serial_number_8 = "555555"#серийник платы для указанного датаматрикс
-        
-        # Фото сохраняем в бд
-        try:
-            # Connect to the database and create tables
-            db_connection.db_connect()
-
-            # Call the methods that print to the console
-            db_connection.camera_photo(QRresult, serial_number_8)
-
-            # Close the connection
-            db_connection.close_connection()
-        except Exception as e:
-            logging.error(f"Error in main execution: {e}")
-            time.sleep(1)
+        a = CameraSocket.photo()
+        print (a)
+        time.sleep(1)
+        a = CameraSocket.photo()
+        print (a)
+        time.sleep(1)
+        a = CameraSocket.photo()
+        print (a)
         time.sleep(1)
         
 
@@ -276,30 +261,14 @@ class Table:
 
         # 10 Делаем фото платы
         print("10 Камера <- сделай фото")
-        code, QRresult = camera.take_three_pictures()
-        if code == 200:
-            logging.error("Error: Pictures are not identical or not received.")
-            print("CAM - Ошибка: фотографии не совпадают или не получены.")
-        else:
-            logging.info("Successfully received identical picture.")
-            print("CAM - Получено совпадающее фото:", QRresult)
-
-        # Делаем запрос в ПЛМ с штрихкодом платы и получаем ответ что плату существует и версию прошивки
-        serial_number_8 = "555555"#серийник платы для указанного датаматрикс
-        
-        # Фото сохраняем в бд
-        try:
-            # Connect to the database and create tables
-            db_connection.db_connect()
-
-            # Call the methods that print to the console
-            db_connection.camera_photo(QRresult, serial_number_8)
-
-            # Close the connection
-            db_connection.close_connection()
-        except Exception as e:
-            logging.error(f"Error in main execution: {e}")
-            time.sleep(1)
+        a = CameraSocket.photo()
+        print (a)
+        time.sleep(1)
+        a = CameraSocket.photo()
+        print (a)
+        time.sleep(1)
+        a = CameraSocket.photo()
+        print (a)
         time.sleep(1)
         
 
@@ -411,30 +380,14 @@ class Table:
 
         # 8 Делаем фото платы
         print("8 Камера <- сделай фото")
-        code, QRresult = camera.take_three_pictures()
-        if code == 200:
-            logging.error("Error: Pictures are not identical or not received.")
-            print("CAM - Ошибка: фотографии не совпадают или не получены.")
-        else:
-            logging.info("Successfully received identical picture.")
-            print("CAM - Получено совпадающее фото:", QRresult)
-
-        # Делаем запрос в ПЛМ с штрихкодом платы и получаем ответ что плату существует и версию прошивки
-        serial_number_8 = "555555"#серийник платы для указанного датаматрикс
-        
-        # Фото сохраняем в бд
-        try:
-            # Connect to the database and create tables
-            db_connection.db_connect()
-
-            # Call the methods that print to the console
-            db_connection.camera_photo(QRresult, serial_number_8)
-
-            # Close the connection
-            db_connection.close_connection()
-        except Exception as e:
-            logging.error(f"Error in main execution: {e}")
-            time.sleep(1)
+        a = CameraSocket.photo()
+        print (a)
+        time.sleep(1)
+        a = CameraSocket.photo()
+        print (a)
+        time.sleep(1)
+        a = CameraSocket.photo()
+        print (a)
         time.sleep(1)
         
 
@@ -543,30 +496,14 @@ class Table:
 
         # 17 Делаем фото платы
         print("17 Камера <- сделай фото")
-        code, QRresult = camera.take_three_pictures()
-        if code == 200:
-            logging.error("Error: Pictures are not identical or not received.")
-            print("CAM - Ошибка: фотографии не совпадают или не получены.")
-        else:
-            logging.info("Successfully received identical picture.")
-            print("CAM - Получено совпадающее фото:", QRresult)
-
-        # Делаем запрос в ПЛМ с штрихкодом платы и получаем ответ что плату существует и версию прошивки
-        serial_number_8 = "555555"#серийник платы для указанного датаматрикс
-        
-        # Фото сохраняем в бд
-        try:
-            # Connect to the database and create tables
-            db_connection.db_connect()
-
-            # Call the methods that print to the console
-            db_connection.camera_photo(QRresult, serial_number_8)
-
-            # Close the connection
-            db_connection.close_connection()
-        except Exception as e:
-            logging.error(f"Error in main execution: {e}")
-            time.sleep(1)
+        a = CameraSocket.photo()
+        print (a)
+        time.sleep(1)
+        a = CameraSocket.photo()
+        print (a)
+        time.sleep(1)
+        a = CameraSocket.photo()
+        print (a)
         time.sleep(1)
         
 

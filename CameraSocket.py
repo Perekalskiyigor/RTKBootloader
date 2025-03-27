@@ -1,7 +1,7 @@
 """Связь с камерой по ТСП"""
 import socket
 
-def make_photo():
+def photo():
     # Адрес и порт камеры
     camera_ip = '192.168.1.50'
     trigger_port = 2001  # Порт для отправки команды "start"
@@ -30,3 +30,4 @@ def make_photo():
 
     # Закрываем сокет для получения данных
     receive_socket.close()
+    return data

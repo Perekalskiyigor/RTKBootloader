@@ -3,10 +3,10 @@ VAR
 	IsInitializedX: BOOL := FALSE;	// Флаг для проверки первого запуска
  	IsInitializedZ: BOOL := FALSE; 	// Флаг для проверки первого запуска	
 	
-	Xleft :BOOL; 					// Конечники оси X
-	Xright:BOOL; 					// Конечники оси X
-  	Zup   :BOOL; 					// Конечники оси Z
-	Zdown: BOOL:= FALSE; 			// Конечники оси Z
+	Xleft :		BOOL; 					// Конечники оси X
+	Xright:		BOOL; 					// Конечники оси X
+  	Zup:		BOOL; 					// Конечники оси Z
+	Zdown: 		BOOL;		 			// Конечники оси Z
 	
 	ENAX:		BOOL;
 	ENAZ:		BOOL;
@@ -27,16 +27,22 @@ VAR
 	kob_Rob_Action:				INT;
 	sub_kob_Rob_Action:			INT;
 	
+	red:						BOOL;
+	green:						BOOL;
+	yellow:						BOOL;
+	
 END_VAR
 
 
 
+
+
 ENAX := TRUE;
-ENAZ :=TRUE;
+ENAZ := TRUE;
 step := TRUE; // генератор импульсов
 
 duty :=50;
-freq :=3000;
+freq :=5000;
 
 ///////////////////////////////////////////////////////////////////////////////////////
 // Код для выполнения один раз при старте. Проверяем, что столы в начальном положении.
@@ -44,6 +50,7 @@ freq :=3000;
 IF IsInitializedZ = FALSE THEN
   ENAZ := TRUE; //	Отключение драйвера после достижения 
   ENAX := TRUE; //	Отключение драйвера после достижения 
+  red := TRUE;
   
     // Проверка, что по оси Z прошиватель вверху, если нет — поднимаем
     IF Zup = TRUE THEN
@@ -56,24 +63,23 @@ IF IsInitializedZ = FALSE THEN
 END_IF;
 
 IF IsInitializedX = FALSE AND IsInitializedZ = TRUE THEN
-  
 // Проверка, что по оси X стол в начальном положении, если нет — двигаем
-
-  IF Xright = FALSE THEN
-	DIRX := TRUE;  (* Направление: против часовой *)
-    ENAX := FALSE;  (* Включение драйвера *)
-  ELSE
-      ENAX := TRUE;   (* Отключение драйвера после достижения *)
-      IsInitializedX := TRUE;
-    END_IF;
+	red := TRUE;
+  	IF Xright = FALSE THEN
+		DIRX := TRUE;  (* Направление: против часовой *)
+		ENAX := FALSE;  (* Включение драйвера *)
+	ELSE
+		ENAX := TRUE;   (* Отключение драйвера после достижения *)
+		IsInitializedX := TRUE;
+	END_IF;
 END_IF;
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
-IF IsInitializedX = TRUE AND IsInitializedZ = TRUE THEN 	
+IF IsInitializedX = TRUE AND IsInitializedZ = TRUE THEN 
+	green:= TRUE;	
 	// движение влево вправо
 	IF Reg_move_Table = 101 THEN
-		
 		DIRX := TRUE;   //направление вправо
    		ENAX := Xright; // едем пока Хright неактивен
 		IF Xright THEN
@@ -93,7 +99,8 @@ IF IsInitializedX = TRUE AND IsInitializedZ = TRUE THEN
 	// движения вверх вниз
 
 IF Reg_updown_bootloader = 103 THEN
-		DIRZ := FALSE;   //направление влево
+		yellow := TRUE;
+		DIRZ := FALSE;   //направление вниз
    		ENAZ := Zdown; 	//едем пока Zdown неактивен
 		IF Zdown THEN
 			sub_Reg_updown_bootloader := Reg_updown_bootloader;
@@ -101,7 +108,8 @@ IF Reg_updown_bootloader = 103 THEN
 	END_IF
 	
 IF Reg_updown_bootloader = 104 THEN
-		DIRZ := TRUE;   //направление влево
+		yellow := TRUE;
+		DIRZ := TRUE;   //направление вверх
    		ENAZ := Zup; 	// едем пока Zup неактивен
 		IF Zup THEN
 			sub_Reg_updown_bootloader := Reg_updown_bootloader;

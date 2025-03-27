@@ -76,7 +76,7 @@ class CameraConnection:
         return self.receive_data()
 
 
-"""
+
 # Пример использования
 camera_ip = '192.168.1.50'
 camera = CameraConnection(camera_ip)
@@ -91,6 +91,6 @@ if code == 200:
 else:
     logging.info("Successfully received identical picture.")
     print("CAM - Получено совпадающее фото:", result)
-"""
+
 
 

@@ -32,6 +32,12 @@ VAR
 	yellow:						BOOL;
 	
 	error:						INT;
+	
+	TON1:						TON;
+	L_Rob_Action:				INT;		//предыдущая команда роботу
+	in_t:						BOOL;		//флаг для начала таймера
+	//отладка
+	x:							INT;
 END_VAR
 
 
@@ -43,7 +49,31 @@ ENAZ := TRUE;
 step := TRUE; // генератор импульсов
 
 duty :=50;
-freq :=8000;
+freq :=7000;
+
+(*
+IF sub_kob_Rob_Action = 1 OR x=1 THEN 
+	DIRX := TRUE;   // направление вправо
+   	ENAX := Xright;
+END_IF
+
+
+IF sub_kob_Rob_Action = 2 OR x=2 THEN 
+	DIRX := FALSE;   // направление влево
+   	ENAX := Xleft;
+END_IF
+
+IF x = 3 THEN
+	DIRZ := FALSE;   //направление вниз
+   	ENAZ := Zdown; 	//едем пока Zdown неактивен
+END_IF
+
+IF x = 4 THEN
+	DIRZ := TRUE;   //направление вверх
+   	ENAZ := Zup; 	// едем пока Zup неактивен
+END_IF
+*)
+
 
 ///////////////////////////////////////////////////////////////////////////////////////
 // Код для выполнения один раз при старте. Проверяем, что столы в начальном положении.
@@ -119,11 +149,28 @@ IF Reg_updown_bootloader = 104 THEN
 	END_IF
 
 	//передача команд роботу
-	 kob_Rob_Action := Rob_Action;					//передали роботу
+	
+	
+	//  передача переменной роботу 1с
+	(*
+	IF Rob_Action <> L_Rob_Action THEN // текущее значение не равно предыдущему
+		L_Rob_Action := Rob_Action;
+		in_t:= TRUE;
+		TON1(in_t, T#1S);
+		in_t:= FALSE;
+	END_IF
+	
+	IF  TON1.Q THEN
+		kob_Rob_Action := Rob_Action;
+	ELSE
+		kob_Rob_Action := 0;
+	 *)	
+	 
+	kob_Rob_Action := Rob_Action;					//передали роботу
 	 IF sub_kob_Rob_Action = kob_Rob_Action THEN	//получили от робота
 		 sub_Rob_Action := sub_kob_Rob_Action;		//передали питону
 	 END_IF
-	 
+	
 	 IF kob_Rob_Action > 0 AND green = FALSE THEN
 		 yellow := TRUE;
 	 END_IF
@@ -133,6 +180,12 @@ IF Reg_updown_bootloader = 104 THEN
 	 END_IF
 	 
 END_IF
+
+
+
+
+
+
 
 
 

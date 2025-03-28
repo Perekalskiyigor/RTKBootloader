@@ -141,11 +141,11 @@ class Table:
         self.change_value('Reg_move_Table', 0)
 
         print("2 Робот <- Забери плату с ложе 1.")
-        self.change_value('Rob_Action', 301)
+        self.change_value('Rob_Action', 231)
         while True:
             result1 = self.read_value("sub_Rob_Action")
 
-            if result1 != 301:
+            if result1 != 231:
                 print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
@@ -168,10 +168,10 @@ class Table:
         self.change_value('Reg_move_Table', 0)
 
         print("4 Робот <- Забери плату с ложе 2.")
-        self.change_value('Rob_Action', 302)
+        self.change_value('Rob_Action', 232)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 302:
+            if result1 != 232:
                 print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
@@ -189,10 +189,10 @@ class Table:
 
         # 5 Робот <- Забери плату из тары
         print("5 Робот <- забрать плату из тары")
-        self.change_value('Rob_Action', 100)
+        self.change_value('Rob_Action', 210)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 100:
+            if result1 != 210:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
@@ -216,10 +216,10 @@ class Table:
 
         # 7 Робот <- Уложи плату в ложемент тетситрования
         print("7 Робот <- Уложи плату в ложемент тетситрования 2")
-        self.change_value('Rob_Action', 202)
+        self.change_value('Rob_Action', 222)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 202:
+            if result1 != 222:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
@@ -247,10 +247,10 @@ class Table:
 
         # 9 Робот <- Забери плату из тары
         print("9 Робот <- забрать плату из тары")
-        self.change_value('Rob_Action', 100)
+        self.change_value('Rob_Action', 210)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 100:
+            if result1 != 210:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
@@ -274,10 +274,10 @@ class Table:
 
         # 11 Робот <- Уложи плату в ложемент тетситрования
         print("11 Робот <- Уложи плату в ложемент тетситрования 1")
-        self.change_value('Rob_Action', 201)
+        self.change_value('Rob_Action', 221)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 201:
+            if result1 != 221:
                 print(f"Ждем ответ от робота, что плату уложили = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции уложить плату")
@@ -347,11 +347,11 @@ class Table:
 
         # 6. Робот <- Забери плату с ложе 2.
         print("6 Робот <- Забери плату с ложе 2.")
-        self.change_value('Rob_Action', 302)
+        self.change_value('Rob_Action', 232)
         while True:
             result1 = self.read_value("sub_Rob_Action")
 
-            if result1 != 302:
+            if result1 != 232:
                 print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
@@ -365,10 +365,10 @@ class Table:
 
         # 7 Робот <- Забери плату из тары
         print("7 Робот <- забрать плату из тары")
-        self.change_value('Rob_Action', 100)
+        self.change_value('Rob_Action', 210)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 100:
+            if result1 != 210:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
@@ -393,10 +393,10 @@ class Table:
 
         # 9 Робот <- Уложи плату в ложемент тетситрования 2
         print("9 Робот <- Уложи плату в ложемент тетситрования 2")
-        self.change_value('Rob_Action', 202)
+        self.change_value('Rob_Action', 222)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 202:
+            if result1 != 222:
                 print(f"Ждем ответ от робота, что плату уложили = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции уложить плату")
@@ -464,11 +464,11 @@ class Table:
 
         # 15. Робот <- Забери плату с ложе 1.
         print("15 Робот <- Забери плату с ложе 1.")
-        self.change_value('Rob_Action', 301)
+        self.change_value('Rob_Action', 231)
         while True:
             result1 = self.read_value("sub_Rob_Action")
 
-            if result1 != 301:
+            if result1 != 231:
                 print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
@@ -481,10 +481,10 @@ class Table:
 
         # 16 Робот <- Забери плату из тары
         print("16 Робот <- забрать плату из тары")
-        self.change_value('Rob_Action', 100)
+        self.change_value('Rob_Action', 210)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 100:
+            if result1 != 210:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
@@ -509,10 +509,10 @@ class Table:
 
         # 18 Робот <- Уложи плату в ложемент тетситрования 1
         print("18 Робот <- Уложи плату в ложемент тетситрования 1")
-        self.change_value('Rob_Action', 201)
+        self.change_value('Rob_Action', 221)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 201:
+            if result1 != 221:
                 print(f"Ждем ответ от робота, что плату уложили = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции уложить плату")

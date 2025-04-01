@@ -45,7 +45,15 @@ except Exception as e:
  ################################################# STOP SQL Communication class ###################################
 
 
-################################################# START MODBUS Communication class with Modbus regul ###################################
+
+
+################################################# START OPC Communication class ###################################
+
+
+################################################# START OPC Communication class l ###################################
+
+
+
 class ModbusProvider:
     """Class MODBUS Communication with Modbus regul"""
     def __init__(self):

@@ -1,19 +1,38 @@
+import logging
 import threading
 import time
 from opcua import Client
 from opcua import ua
 
-# Глобальный словарь для хранения данных
-global_data = {}
+# Set up basic logging configuration
+logging.basicConfig(
+    filename='RTK.log',
+    level=logging.INFO,
+    format='OPC - %(asctime)s - %(levelname)s - %(message)s'
+)
+
+# Словарь опс интерфейса глобальный
+dict_OPC = {
+    "ns=2;s=Application.PLC_PRG.VAL2": 0,
+    "ns=2;s=Application.PLC_PRG.VAL1": 0,
+    "ns=2;s=Application.PLC_PRG.orderNode":""
+}
 
 class OPCClient:
-    def __init__(self, url, node_ids):
+    def __init__(self, url):
         self.url = url
-        self.node_ids = node_ids  # Список узлов для чтения
+        self.lock = threading.Lock()
+
         self.client = Client(url)
-        self.client.timeout = 5  # Устанавливаем таймаут на 5 секунд
         self.running = False
-        self.thread = None
+        self.stop_event = threading.Event()  # Event to signal when to stop the threads
+
+        # Start threads after initializing the client
+        self.server_thread = threading.Thread(target=self.connect, daemon=True)
+        self.update_thread = threading.Thread(target=self.update_registers, daemon=True)
+
+        self.server_thread.start()
+        self.update_thread.start()
 
     def connect(self):
         try:
@@ -29,71 +48,51 @@ class OPCClient:
         except Exception as e:
             print(f"Ошибка отключения: {e}")
 
-    def read_data(self):
-        while self.running:
+    def update_registers(self):
+        """ Метод обгновления пременных опс и словаря"""
+        global dict_OPC
+        while not self.stop_event.is_set():  # Check if the stop event is set
             try:
-                for node_id in self.node_ids:
-                    node = self.client.get_node(node_id)
-                    value = node.get_value()
-                    
-                    # Сохраняем данные в глобальный словарь
-                    global_data[node_id] = value
-                    print(f"Считано значение {value} для узла {node_id}")
+                with self.lock:
 
-                    # Записываем значение 5 в VAL2, если это тот узел
-                    if node_id == "ns=2;s=Application.PLC_PRG.VAL2":
-                        self.write_data(node, 5)
-                
+                    ################### Пишем ###################
+                    mes = 1
+                    data_value1 = ua.DataValue(ua.Variant(mes, ua.VariantType.Float))
+                    # Записываем новое значение в узел
+                    node2 = self.client.get_node("ns=2;s=Application.PLC_PRG.VAL1")
+                    node2.set_value(data_value1)
+
+                    ################### Читаем п ишемв словарь ###################
+                    node3 = self.client.get_node("ns=2;s=Application.PLC_PRG.VAL1")
+                    value2 = node3.get_value()
+                    dict_OPC["ns=2;s=Application.PLC_PRG.VAL2"] = value2
+                    print(f"*********: {dict_OPC["ns=2;s=Application.PLC_PRG.VAL2"]}")
+
+                    node4 = self.client.get_node("ns=2;s=Application.PLC_PRG.VAL2")
+                    value3 = node4.get_value()
+                    dict_OPC["ns=2;s=Application.PLC_PRG.VAL1"] = value3
+                    print(f"*******: {dict_OPC["ns=2;s=Application.PLC_PRG.VAL1"]}")
+
+                    node5 = self.client.get_node("ns=2;s=Application.PLC_PRG.orderNode")
+                    value4 = node5.get_value()
+                    dict_OPC["ns=2;s=Application.PLC_PRG.orderNode"] = value4
+                    print(f"******N*: {dict_OPC["ns=2;s=Application.PLC_PRG.orderNode"]}")
+
             except Exception as e:
-                print(f"Ошибка при чтении данных: {e}")
+                print(f"Error updating registers: {e}")
+            time.sleep(1)
             
-            time.sleep(1)  # Задержка между запросами
-
-    def write_data(self, node, value):
-        try:
-            # Создаем объект DataValue с заданным значением и текущим временем
-            data_value = ua.DataValue(ua.Variant(value, ua.VariantType.Float))
-            # Записываем новое значение в узел
-            node.set_value(data_value)
-            print(f"Записано значение {value} в узел {node.nodeid}")
-        except Exception as e:
-            print(f"Ошибка при записи данных: {e}")
-
-    def start(self):
-        self.running = True
-        self.thread = threading.Thread(target=self.read_data)
-        self.thread.start()
 
     def stop(self):
-        self.running = False
-        if self.thread is not None:
-            self.thread.join()
+        self.stop_event.set()  # Set the event to stop threads
 
-# Пример использования
+# Example usage
 if __name__ == "__main__":
-    # Укажите адрес OPC сервера и Node ID для чтения данных
     url = "opc.tcp://172.21.10.219:48010"
-    
-    # Пример нескольких Node ID
-    node_ids = [
-        "ns=2;s=Application.PLC_PRG.VAL2", 
-        "ns=2;s=Application.PLC_PRG.VAL1"
-    ]
+    opc_client = OPCClient(url)
 
-    # Создание и подключение OPC клиента
-    opc_client = OPCClient(url, node_ids)
-    opc_client.connect()
-
-    # Запуск потока для чтения данных
-    opc_client.start()
-
-    try:
-        # Работать клиент будет до тех пор, пока не нажмете Ctrl+C
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("Остановка клиента...")
-    finally:
-        # Остановка потока и отключение
-        opc_client.stop()
-        opc_client.disconnect()
+    # Graceful shutdown after some time
+    time.sleep(10)  # Let the program run for 10 seconds
+    opc_client.stop()  # Signal the threads to stop
+    time.sleep(2)  # Wait a little for threads to finish
+    opc_client.disconnect()

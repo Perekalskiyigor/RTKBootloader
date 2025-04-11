@@ -301,45 +301,9 @@ class Table:
     ############# ****ЦИКЛ MAIN ******"
     def main(self):
         print("****ЦИКЛ MAIN")
-        # 1. Регул <- Опусти прошивальщик ложе 2.
-        print("1 Регул <- Опусти прошивальщик ложе 2")
-        self.change_value('Reg_updown_Botloader', 103)
-        while True:
-            result1 = self.read_value("sub_Reg_updown_Botloader")
-            if result1 != 103:
-                print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
-            elif result1 == 404:
-                print(f"От регула получен код 200 на на операции опустить прошивальщик")
-            else:
-                break
-            time.sleep(1)
-        self.change_value('Reg_updown_Botloader', 0)
-        result1 = 0
-        
-        
-        # 2. Сервер <- Начни шить
-        # 3. Сервер -> Ответ по прошивке (плохо, хорошо)
-        print("2. Сервер <- Начни шить")
-        print("3. Сервер -> Ответ по прошивке (плохо, хорошо)")
-        
-        # 4. Регул <- Подними прошивальщик.
-        print("4. Регул <- Подними прошивальщик.")
-        self.change_value('Reg_updown_Botloader', 104)
-        while True:
-            result1 = self.read_value("sub_Reg_updown_Botloader")
-            if result1 != 104:
-                print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
-            elif result1 == 404:
-                print(f"От регула получен код 200 на на операции поднять прошивальщик")
-            else:
-                break
-            time.sleep(1)
-        self.change_value('Reg_updown_Botloader', 0)
-        result1 = 0
-
-        
-        # 5. Регул <- Сдвинь плату освободив ложе2.
-        print("5 Регул <- Сдвинь плату освободив ложе2")
+    
+        # 1. Регул <- Сдвинь плату освободив ложе2.
+        print("1 Регул <- Сдвинь плату освободив ложе2")
         self.change_value('Reg_move_Table', 102)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
@@ -353,14 +317,14 @@ class Table:
         self.change_value('Reg_move_Table', 0)
         result1 = 0
 
-        # 6. Робот <- Забери плату с ложе 2. # 10. Регул <- Опусти прошивальщик (плата на ложе1).
-        print("6 Робот <- Забери плату с ложе 2.  10. Регул <- Опусти прошивальщик (плата на ложе1).")
+        # 2.1. Робот <- Забери плату с ложе 2. # 2.2 Регул <- Опусти прошивальщик (плата на ложе1).
+        print("2.1 Робот <- Забери плату с ложе 2.  2.2. Регул <- Опусти прошивальщик (плата на ложе1).")
         self.change_value('Rob_Action', 232)
         self.change_value('Reg_updown_Botloader', 103)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-
-            if result1 != 232 and result1 != 103:
+            result2 = self.read_value("sub_Reg_updown_Botloader")
+            if result1 != 232 and result2 != 103:
                 print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
@@ -368,14 +332,16 @@ class Table:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
-        print("Стол 1ложе свободен")
+        self.change_value('Reg_updown_Botloader', 0)
+        print("Стол 2ложе свободен, прошивальщик опущен")
+
         result1 = 0
-        # 7 Робот <- Уложи плату в тару
-        print("# 7 Робот <- Уложи плату в тару.")
-        # 11. Сервер <- Начни шить
-        # 12. Сервер -> Ответ по прошивке (плохо, хорошо)
-        print("11. Сервер <- Начни шить")
-        print("12. Сервер -> Ответ по прошивке (плохо, хорошо)")
+        result2 = 0
+
+        # 3.1 Робот <- Уложи плату в тару # 3.2.1 Сервер <- Начни шить # 3.2.2 Сервер -> Ответ по прошивке (плохо, хорошо)
+        print("3.1 Робот <- Уложи плату в тару.")
+        print("3.2.1 Сервер <- Начни шить")
+        print("3.2.2. Сервер -> Ответ по прошивке (плохо, хорошо)")
         self.change_value('Rob_Action', 241)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -391,14 +357,14 @@ class Table:
         print("плата уложена в тару")
         result1 = 0
 
-        # 7 Робот <- Забери плату из тары
-        # 13 Регул <- Подними прошивальщик.
-        print("7 Робот <- забрать плату из тары 3. Регул <- Подними прошивальщик")
+        # 4.1 Робот <- Забери плату из тары # 4.2 Регул <- Подними прошивальщик.
+        print("4.1 Робот <- забрать плату из тары # 4.2 Регул <- Подними прошивальщик")
         self.change_value('Rob_Action', 210)
         self.change_value('Reg_updown_Botloader', 104)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 210 and result1 != 104:
+            result2 = self.read_value("sub_Reg_updown_Botloader")
+            if result1 != 210 and result2 != 104:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
@@ -406,9 +372,11 @@ class Table:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
+        self.change_value('Reg_updown_Botloader', 0)
         result1=0
+        result2=0
         
-        # 8 Делаем фото платы
+        # 5 Делаем фото платы
         print("8 Камера <- сделай фото")
         a = CameraSocket.photo()
         print (a)
@@ -420,8 +388,7 @@ class Table:
         print (a)
         time.sleep(1)
         
-
-        # 9 Робот <- Уложи плату в ложемент тетситрования 2
+        # 6 Робот <- Уложи плату в ложемент тетситрования 2
         print("9 Робот <- Уложи плату в ложемент тетситрования 2")
         self.change_value('Rob_Action', 222)
         while True:
@@ -437,12 +404,7 @@ class Table:
         print("Стол 1ложе занято")
         result1=0
 
-       
-
-    
-
-
-        # 14. Регул <- Сдвинь плату освободив ложе1.
+        # 7. Регул <- Сдвинь плату освободив ложе1.
         print("14 Регул <- Сдвинь плату освободив ложе1")
         self.change_value('Reg_move_Table', 101)
         while True:
@@ -458,14 +420,14 @@ class Table:
         result1 = 0
         print("Стол 1ложе свободен")
 
-
-        # 15. Робот <- Забери плату с ложе 1.
-        print("15 Робот <- Забери плату с ложе 1.")
+        # 8.1 Робот <- Забери плату с ложе 1. # 8.2 Регул <- Опусти прошивальщик (плата на ложе2).
+        print("# 8.1 Робот <- Забери плату с ложе 1. # 8.2 Регул <- Опусти прошивальщик (плата на ложе2).")
+        self.change_value('Reg_updown_Botloader', 103)
         self.change_value('Rob_Action', 231)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-
-            if result1 != 231:
+            result2 = self.read_value("sub_Reg_updown_Botloader")
+            if result1 != 231 and result2!= 103:
                 print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
@@ -473,10 +435,14 @@ class Table:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
+        self.change_value('Reg_updown_Botloader', 0)
         result1 = 0
+        result2 = 0
 
-        # 15 Робот <- Уложи плату в тару
-        print("# 7 Робот <- Уложи плату в тару.")
+        # 9.1 Робот <- Уложи плату в тару # 9.2.1 Сервер <- Начни шить # 9.2.2 Сервер -> Ответ по прошивке (плохо, хорошо)
+        print("9.1 Робот <- Уложи плату в тару.")
+        print("9.2.1 Сервер <- Начни шить")
+        print("9.2.2. Сервер -> Ответ по прошивке (плохо, хорошо)")
         self.change_value('Rob_Action', 241)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -492,12 +458,14 @@ class Table:
         print("плата уложена в тару")
         result1 = 0
 
-        # 16 Робот <- Забери плату из тары
-        print("16 Робот <- забрать плату из тары")
+        # 10.1 Робот <- Забери плату из тары # 10.2 Регул <- Подними прошивальщик.
+        print("10.1 Робот <- забрать плату из тары # 10.2 Регул <- Подними прошивальщик")
         self.change_value('Rob_Action', 210)
+        self.change_value('Reg_updown_Botloader', 104)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 210:
+            result2 = self.read_value("sub_Reg_updown_Botloader")
+            if result1 != 210 and result2 !=104:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
@@ -505,9 +473,11 @@ class Table:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
+        self.change_value('Reg_updown_Botloader', 0)
         result1=0
+        result2 = 0
 
-        # 17 Делаем фото платы
+        # 11 Делаем фото платы
         print("17 Камера <- сделай фото")
         a = CameraSocket.photo()
         print (a)
@@ -520,7 +490,7 @@ class Table:
         time.sleep(1)
         
 
-        # 18 Робот <- Уложи плату в ложемент тетситрования 1
+        # 12 Робот <- Уложи плату в ложемент тетситрования 1
         print("18 Робот <- Уложи плату в ложемент тетситрования 1")
         self.change_value('Rob_Action', 221)
         while True:

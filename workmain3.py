@@ -325,7 +325,7 @@ class Table:
             result1 = self.read_value("sub_Rob_Action")
             result2 = self.read_value("sub_Reg_updown_Botloader")
             if result1 != 232 and result2 != 103:
-                print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
+                print(f"от робота = {result1}, от регула = {result2}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
             else:
@@ -347,7 +347,7 @@ class Table:
             result1 = self.read_value("sub_Rob_Action")
 
             if result1 != 241:
-                print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
+                print(f"от робота = {result1}, от регула = {result2}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
             else:
@@ -365,7 +365,7 @@ class Table:
             result1 = self.read_value("sub_Rob_Action")
             result2 = self.read_value("sub_Reg_updown_Botloader")
             if result1 != 210 and result2 != 104:
-                print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
+                print(f"от робота = {result1}, от регула = {result2}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
             else:
@@ -377,7 +377,7 @@ class Table:
         result2=0
         
         # 5 Делаем фото платы
-        print("8 Камера <- сделай фото")
+        print("5 Камера <- сделай фото")
         a = CameraSocket.photo()
         print (a)
         time.sleep(1)
@@ -389,7 +389,7 @@ class Table:
         time.sleep(1)
         
         # 6 Робот <- Уложи плату в ложемент тетситрования 2
-        print("9 Робот <- Уложи плату в ложемент тетситрования 2")
+        print("6 Робот <- Уложи плату в ложемент тетситрования 2")
         self.change_value('Rob_Action', 222)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -405,12 +405,12 @@ class Table:
         result1=0
 
         # 7. Регул <- Сдвинь плату освободив ложе1.
-        print("14 Регул <- Сдвинь плату освободив ложе1")
+        print("7 Регул <- Сдвинь плату освободив ложе1")
         self.change_value('Reg_move_Table', 101)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
             if result1 != 101:
-                print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
+                print(f"от робота = {result1}, от регула = {result2}")
             elif result1 == 404:
                 print(f"От регула получен код 200 на операции движения стола")
             else:
@@ -428,7 +428,7 @@ class Table:
             result1 = self.read_value("sub_Rob_Action")
             result2 = self.read_value("sub_Reg_updown_Botloader")
             if result1 != 231 and result2!= 103:
-                print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
+                print(f"от робота = {result1}, от регула = {result2}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
             else:
@@ -466,7 +466,7 @@ class Table:
             result1 = self.read_value("sub_Rob_Action")
             result2 = self.read_value("sub_Reg_updown_Botloader")
             if result1 != 210 and result2 !=104:
-                print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
+                print(f"от робота = {result1}, от регула = {result2}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
             else:
@@ -478,7 +478,7 @@ class Table:
         result2 = 0
 
         # 11 Делаем фото платы
-        print("17 Камера <- сделай фото")
+        print("11 Камера <- сделай фото")
         a = CameraSocket.photo()
         print (a)
         time.sleep(1)
@@ -491,7 +491,7 @@ class Table:
         
 
         # 12 Робот <- Уложи плату в ложемент тетситрования 1
-        print("18 Робот <- Уложи плату в ложемент тетситрования 1")
+        print("12 Робот <- Уложи плату в ложемент тетситрования 1")
         self.change_value('Rob_Action', 221)
         while True:
             result1 = self.read_value("sub_Rob_Action")

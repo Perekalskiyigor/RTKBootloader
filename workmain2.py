@@ -369,7 +369,22 @@ class Table:
         self.change_value('Rob_Action', 0)
         print("Стол 1ложе свободен")
         result1 = 0
+        # 7 Робот <- Уложи плату в тару
+        print("# 7 Робот <- Уложи плату в тару.")
+        self.change_value('Rob_Action', 241)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
 
+            if result1 != 241:
+                print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
+            elif result1 == 404:
+                print(f"От робота получен код 200 на на операции взять плату с ложа")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        print("плата уложена в тару")
+        result1 = 0
 
         # 7 Робот <- Забери плату из тары
         print("7 Робот <- забрать плату из тары")
@@ -385,7 +400,7 @@ class Table:
             time.sleep(1)
         self.change_value('Rob_Action', 0)
         result1=0
-
+        
         # 8 Делаем фото платы
         print("8 Камера <- сделай фото")
         a = CameraSocket.photo()
@@ -486,6 +501,22 @@ class Table:
         self.change_value('Rob_Action', 0)
         result1 = 0
 
+        # 15 Робот <- Уложи плату в тару
+        print("# 7 Робот <- Уложи плату в тару.")
+        self.change_value('Rob_Action', 241)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+
+            if result1 != 241:
+                print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
+            elif result1 == 404:
+                print(f"От робота получен код 200 на на операции взять плату с ложа")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        print("плата уложена в тару")
+        result1 = 0
 
         # 16 Робот <- Забери плату из тары
         print("16 Робот <- забрать плату из тары")

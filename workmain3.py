@@ -11,13 +11,22 @@ import CameraSocket
  # Пользовательский класс БД
 import SQLite as SQL
 
+# Глобальные ящик и ясейка 
+Tray1 = 0
+Cell1 = 0
+
 dict_Table1 = {
     'Reg_move_Table': 0,
     'sub_Reg_move_Table': 0,
     'Reg_updown_Botloader': 0,
     'sub_Reg_updown_Botloader': 0,
     'Rob_Action': 0,
-    'sub_Rob_Action': 0
+    'sub_Rob_Action': 0,
+    
+    # Коробка и ячейка которая предается роботу
+    'Tray1': 0,
+    'Cell1': 0
+    
 }
 
 # Set up basic logging configuration
@@ -56,6 +65,8 @@ except Exception as e:
 
 class ModbusProvider:
     """Class MODBUS Communication with Modbus regul"""
+    global Tray1
+    global Cell1
     def __init__(self):
         self.store = ModbusSlaveContext(
             hr=ModbusSequentialDataBlock(0, [0] * 100)
@@ -65,6 +76,7 @@ class ModbusProvider:
         self.Reg_move_Table = 0             # Move Table
         self.Reg_updown_Botloader = 0        # Move botloader
         self.Rob_Action = 0                 # Action to Robot
+
 
         self.server_thread = threading.Thread(target=self.run_modbus_server, daemon=True)
         self.server_thread.start()
@@ -76,7 +88,7 @@ class ModbusProvider:
         context = ModbusServerContext(slaves=self.store, single=True)
         print("Starting Modbus TCP server on localhost:502")
         try:
-            StartTcpServer(context, address=("192.168.1.100", 502))
+            StartTcpServer(context, address=("localhost", 502))
         except Exception as e:
             print(f"Error starting Modbus server: {e}")
 
@@ -84,6 +96,7 @@ class ModbusProvider:
     # Modbus registers read/write
     def update_registers(self):
         global dict_Table1
+
         while True:
             try:
                 with self.lock:
@@ -95,9 +108,16 @@ class ModbusProvider:
                     self.Reg_updown_Botloader = dict_Table1["Reg_updown_Botloader"]
                     self.Rob_Action = dict_Table1["Rob_Action"]
 
+
                     self.store.setValues(3, 0, [self.Reg_move_Table])
                     self.store.setValues(3, 2, [self.Reg_updown_Botloader])
                     self.store.setValues(3, 4, [self.Rob_Action])
+
+                    print (f"Tray1 {Tray1}")
+                    print (f"Cell1 {Cell1}")
+
+                    self.store.setValues(3, 6, [Tray1])
+                    self.store.setValues(3, 8, [Cell1])
             except Exception as e:
                 print(f"Error updating registers: {e}")
             time.sleep(1)
@@ -108,6 +128,9 @@ class ModbusProvider:
 ################################################# START TABLE CLASS #####################################################################
 class Table:
     """ TABLE CLASS"""
+    global Tray1
+    global Cell1
+
     def __init__(self, name, initial_dict):
         self.name = name
         self.data = initial_dict
@@ -194,10 +217,15 @@ class Table:
     ############# ****ЦИКЛ SETUP ******"
     def setup_cycle(self):
         print("****ЦИКЛ SETUP******")
+        global Tray1
+        global Cell1
 
         # 5 Робот <- Забери плату из тары
         print("5 Робот <- забрать плату из тары")
-        self.change_value('Rob_Action', 210)
+        # Передаем ящик из которого нужно забрать и номер ячейки
+        Tray1 = 1
+        Cell1 = Cell1 + 1
+
         while True:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 210:
@@ -210,16 +238,13 @@ class Table:
         self.change_value('Rob_Action', 0)
 
         # 6 Делаем фото платы
-        print("6 Камера <- сделай фото")
-        a = CameraSocket.photo()
-        print (a)
-        time.sleep(1)
-        a = CameraSocket.photo()
-        print (a)
-        time.sleep(1)
-        a = CameraSocket.photo()
-        print (a)
-        time.sleep(1)
+        for i in range(3):
+            try:
+                a = CameraSocket.photo()
+                print(a)
+            except Exception as e:
+                print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
+            time.sleep(1)
         
 
         # 7 Робот <- Уложи плату в ложемент тетситрования
@@ -255,6 +280,10 @@ class Table:
 
         # 9 Робот <- Забери плату из тары
         print("9 Робот <- забрать плату из тары")
+        # Передаем ящик из которого нужно забрать и номер ячейки
+        Tray1 = 1
+        Cell1 = Cell1 + 1
+
         self.change_value('Rob_Action', 210)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -269,15 +298,13 @@ class Table:
 
         # 10 Делаем фото платы
         print("10 Камера <- сделай фото")
-        a = CameraSocket.photo()
-        print (a)
-        time.sleep(1)
-        a = CameraSocket.photo()
-        print (a)
-        time.sleep(1)
-        a = CameraSocket.photo()
-        print (a)
-        time.sleep(1)
+        for i in range(3):
+            try:
+                a = CameraSocket.photo()
+                print(a)
+            except Exception as e:
+                print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
+            time.sleep(1)
         
 
         # 11 Робот <- Уложи плату в ложемент тетситрования
@@ -300,6 +327,8 @@ class Table:
 
     ############# ****ЦИКЛ MAIN ******"
     def main(self):
+        global Tray1
+        global Cell1
         print("****ЦИКЛ MAIN")
     
         # 1. Регул <- Сдвинь плату освободив ложе2.
@@ -359,6 +388,10 @@ class Table:
 
         # 4.1 Робот <- Забери плату из тары # 4.2 Регул <- Подними прошивальщик.
         print("4.1 Робот <- забрать плату из тары # 4.2 Регул <- Подними прошивальщик")
+        # Передаем ящик из которого нужно забрать и номер ячейки
+        Tray1 = 1
+        Cell1 = Cell1 + 1
+
         self.change_value('Rob_Action', 210)
         self.change_value('Reg_updown_Botloader', 104)
         while True:
@@ -378,15 +411,13 @@ class Table:
         
         # 5 Делаем фото платы
         print("5 Камера <- сделай фото")
-        a = CameraSocket.photo()
-        print (a)
-        time.sleep(1)
-        a = CameraSocket.photo()
-        print (a)
-        time.sleep(1)
-        a = CameraSocket.photo()
-        print (a)
-        time.sleep(1)
+        for i in range(3):
+            try:
+                a = CameraSocket.photo()
+                print(a)
+            except Exception as e:
+                print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
+            time.sleep(1)
         
         # 6 Робот <- Уложи плату в ложемент тетситрования 2
         print("6 Робот <- Уложи плату в ложемент тетситрования 2")
@@ -460,6 +491,10 @@ class Table:
 
         # 10.1 Робот <- Забери плату из тары # 10.2 Регул <- Подними прошивальщик.
         print("10.1 Робот <- забрать плату из тары # 10.2 Регул <- Подними прошивальщик")
+        # Передаем ящик из которого нужно забрать и номер ячейки
+        Tray1 = 1
+        Cell1 = Cell1 + 1
+
         self.change_value('Rob_Action', 210)
         self.change_value('Reg_updown_Botloader', 104)
         while True:
@@ -479,15 +514,13 @@ class Table:
 
         # 11 Делаем фото платы
         print("11 Камера <- сделай фото")
-        a = CameraSocket.photo()
-        print (a)
-        time.sleep(1)
-        a = CameraSocket.photo()
-        print (a)
-        time.sleep(1)
-        a = CameraSocket.photo()
-        print (a)
-        time.sleep(1)
+        for i in range(3):
+            try:
+                a = CameraSocket.photo()
+                print(a)
+            except Exception as e:
+                print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
+            time.sleep(1)
         
 
         # 12 Робот <- Уложи плату в ложемент тетситрования 1
@@ -526,15 +559,17 @@ if __name__ == "__main__":
     modbus_provider = ModbusProvider()
     
     table1 = Table("Table 1", dict_Table1)
-         # Создание объекта и выполнение алгоритма
-    table1 = Table("Table 1", dict_Table1)
+    
     
 
+    
     # Выполнение первого цикла
     flag1 = True
     if flag1 == True:
         table1.defence_cycle()
         flag1 = False
+    
+    
     
 
     

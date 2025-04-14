@@ -11,6 +11,9 @@ import CameraSocket
  # Пользовательский класс БД
 import SQLite as SQL
 
+# OPC Класс
+import OPCClient as OPC
+
 dict_Table1 = {
     'Reg_move_Table': 0,
     'sub_Reg_move_Table': 0,
@@ -549,6 +552,21 @@ class Table:
 
 if __name__ == "__main__":
     modbus_provider = ModbusProvider()
+    
+    
+    ################################################# START OPC Communication class ###################################
+    # Example usage
+    url = "opc.tcp://172.21.10.39:48010"
+    opc_client = OPC.OPCClient(url)
+
+    # Graceful shutdown after some time
+    time.sleep(10)  # Let the program run for 10 seconds
+    opc_client.stop()  # Signal the threads to stop
+    time.sleep(2)  # Wait a little for threads to finish
+    opc_client.disconnect()
+
+
+    ################################################# START OPC Communication class l ###################################
     
     table1 = Table("Table 1", dict_Table1)
          # Создание объекта и выполнение алгоритма

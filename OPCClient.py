@@ -86,9 +86,12 @@ class OPCClient:
     def stop(self):
         self.stop_event.set()  # Set the event to stop threads
 
+
+
+"""
 # Example usage
 if __name__ == "__main__":
-    url = "opc.tcp://172.21.10.219:48010"
+    url = "opc.tcp://172.21.10.39:48010"
     opc_client = OPCClient(url)
 
     # Graceful shutdown after some time
@@ -96,3 +99,5 @@ if __name__ == "__main__":
     opc_client.stop()  # Signal the threads to stop
     time.sleep(2)  # Wait a little for threads to finish
     opc_client.disconnect()
+
+"""

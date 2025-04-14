@@ -1,4 +1,5 @@
 """Связь с базой данных сделана классом"""
+import datetime
 import sqlite3
 import logging
 
@@ -40,7 +41,8 @@ class DatabaseConnection:
                     status INTEGER,
                     desk_id INTEGER,
                     firmware_link TEXT NOT NULL,
-                    FOREIGN KEY (order_number) REFERENCES orders(order_number) ON DELETE CASCADE
+                    test_result INTEGER,
+                    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
                 );
             ''')
             logging.info("Order details table checked/created.")
@@ -73,10 +75,151 @@ class DatabaseConnection:
             print(f"Successfully updated record with Serial = {serial_number_8}")
 
     
-    def getOrders(self):
+    def setOrder(self, order_number, Module, Nomeclature, Value, Version_Loader, QRresult, serial_number_8):
+        """ Запрос заказов всех """
+        logging.info("Sent Order in DB")
+        print("Method 1")
+        current_time = datetime.now()
+        # Update the record
+        self.cursor.execute('''
+            INSERT INTO order_details (
+                time_added,
+                order_number, 
+                module, 
+                nomenclature, 
+                value, 
+                version_loader, 
+                data_matrix, 
+                serial_number_8
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            current_time,
+            order_number, 
+            Module, 
+            Nomeclature, 
+            Value, 
+            Version_Loader, 
+            QRresult, 
+            serial_number_8
+        ))
+
+        # Check if any row was updated
+        if self.cursor.rowcount == 0:
+            print(f"Error: No record found with Serial = {serial_number_8}")
+        else:
+            # Commit changes if the update was successful
+            self.conn.commit()
+            print(f"Successfully updated record with Serial = {serial_number_8}")
+
+        print("Method 2")
+
+    def setBoard(self,
+            date_added,
+            order_id,
+            stand_id,
+            serial_number_8,
+            data_matrix,
+            ERPMatrix,
+            fw_type,
+            fw_path,
+            date_sent,
+            stand_status,
+            logStend,
+            hard_stopToStand):
+
+        try:
+            self.cursor.execute('''
+                INSERT INTO order_details (
+                    date_added,
+                    order_id, 
+                    stand_id, 
+                    serial_number_8, 
+                    data_matrix, 
+                    ERPMatrix, 
+                    fw_type, 
+                    fw_path,
+                    date_sent,
+                    stand_status,
+                    logStend,
+                    hard_stopToStand
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                date_added,
+                order_id,
+                stand_id,
+                serial_number_8,
+                data_matrix,
+                ERPMatrix,
+                fw_type,
+                fw_path,
+                date_sent,
+                stand_status,
+                logStend,
+                hard_stopToStand
+            ))
+
+            self.conn.commit()
+
+        except Exception as e:
+            logging.error(f"Error inserting board: {e}")
+            print(f"Error inserting record: {e}")
+
+            print("Method 2")
+    
+    def getBoard_id(self, order_number):
         """ Запрос заказов всех """
         logging.info("Method 2 called.")
-        print("Method 2")
+        self.cursor.execute('''
+                    SELECT 
+                        O.order_number, 
+                        D.id, 
+                        D.stand_id,
+                        D.serial_number_8,
+                        D.data_matrix, 
+                        D.ERPMatrix, 
+                        D.fw_type,
+                        D.fw_path,
+                        D.date_sent,
+                        D.test_result
+                    FROM orders AS O
+                    JOIN order_details AS D ON O.id = D.order_id
+                    WHERE D.test_result <> 200 OR D.test_result IS NULL AND O.order_number = ?
+        ''', (order_number,))
+
+        row = self.cursor.fetchone()
+
+        if row:
+            record_id = row[1]  # D.id
+            print(f"Найдена запись для order_number '{order_number}', id: {record_id}")
+        return record_id
+    
+
+    def set_TableForBoard(self, new_stand_id ,record_id):
+        """ Запрос заказов всех """
+        logging.info("Method 2 called.")
+        update_query = """
+        UPDATE order_details
+        SET test_result = 0,
+            stand_id = ?
+        WHERE id = ?
+        """
+        self.cursor.execute(update_query, (new_stand_id, record_id))
+        self.conn.commit()
+
+    def set_BoardTest_Result(self, result, record_id):
+        """ Запрос заказов всех """
+        logging.info("Method 2 called.")
+        update_query = """
+        UPDATE order_details
+        SET test_result = ?
+        WHERE id = ?
+        """
+        self.cursor.execute(update_query, (result, record_id))
+        self.conn.commit()
+        
+
+
+        
 
     def get_order_detail(self):
         """ Запрос информации по заказам """
@@ -91,27 +234,22 @@ class DatabaseConnection:
         self.conn.close()
         logging.info("Database connection closed.")
 
-"""
-# Instantiate the class and call methods
-if __name__ == "__main__":
-    try:
-        # Create an instance of DatabaseConnection
-        db_connection = DatabaseConnection()
-
-        # Connect to the database and create tables
-        db_connection.db_connect()
-
-        # Call the methods that print to the console
-        db_connection.method_1()
-        db_connection.method_2()
-        db_connection.method_3()
-        db_connection.method_4()
-
-        # Close the connection
-        db_connection.close_connection()
-    except Exception as e:
-        logging.error(f"Error in main execution: {e}")
-
-"""
 
 
+
+# Create an instance of DatabaseConnection
+db_connection = DatabaseConnection()
+
+# Connect to the database and create tables
+db_connection.db_connect()
+
+# Call the methods that print to the console
+record_id = db_connection.getBoard_id("ЗНП-0005747")
+
+# Назначаем стол плате по id записи
+new_stand_id = 1
+db_connection.set_TableForBoard(new_stand_id ,record_id)
+
+result = 500
+
+db_connection.set_BoardTest_Result(result, record_id)

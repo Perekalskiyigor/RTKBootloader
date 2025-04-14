@@ -14,6 +14,7 @@ import SQLite as SQL
 # Глобальные ящик и ясейка 
 Tray1 = 0
 Cell1 = 0
+Order = ""
 
 dict_Table1 = {
     'Reg_move_Table': 0,
@@ -60,7 +61,6 @@ except Exception as e:
 
 
 ################################################# START OPC Communication class l ###################################
-
 
 
 class ModbusProvider:
@@ -130,6 +130,7 @@ class Table:
     """ TABLE CLASS"""
     global Tray1
     global Cell1
+    global Order
 
     def __init__(self, name, initial_dict):
         self.name = name
@@ -219,6 +220,7 @@ class Table:
         print("****ЦИКЛ SETUP******")
         global Tray1
         global Cell1
+        global Order
 
         # 5 Робот <- Забери плату из тары
         print("5 Робот <- забрать плату из тары")
@@ -245,7 +247,7 @@ class Table:
             except Exception as e:
                 print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
             time.sleep(1)
-        
+
 
         # 7 Робот <- Уложи плату в ложемент тетситрования
         print("7 Робот <- Уложи плату в ложемент тетситрования 2")
@@ -556,6 +558,28 @@ class Table:
 
 
 if __name__ == "__main__":
+
+    try:
+        # Create an instance of DatabaseConnection
+        db_connection = SQL.DatabaseConnection()
+        # Connect to the database and create tables
+        db_connection.db_connect()
+        # Call the methods that print to the console
+        db_connection.getOrders()
+    except Exception as e:
+        logging.error(f"Error in main execution: {e}")
+    
+    # Получение проивдственного заказа из ерп
+    order_number = "ЗНП-0005747"
+    Module = "000-M"
+    Nomeclature = "ewfwf+66"
+    Value = 50
+    Version_Loader = "\\\\prosyst.ru@ssl\\davwwwroot\\1cfiles\\ERP\\20250224\\R050 DI 16 012-000-AAA_Автомаркировка.le"
+
+    # Запись данных по заказу в базу данных
+    db_connection.getOrders()
+
+
     modbus_provider = ModbusProvider()
     
     table1 = Table("Table 1", dict_Table1)
@@ -569,6 +593,7 @@ if __name__ == "__main__":
         table1.defence_cycle()
         flag1 = False
     
+
     
     
 
@@ -580,3 +605,8 @@ if __name__ == "__main__":
         flag = False
 
     table1.main()
+
+    try:
+        db_connection.close_connection()
+    except Exception as e:
+        logging.error(f"Error in main execution: {e}")

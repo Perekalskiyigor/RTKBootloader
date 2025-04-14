@@ -21,11 +21,7 @@ dict_Table1 = {
     'Reg_updown_Botloader': 0,
     'sub_Reg_updown_Botloader': 0,
     'Rob_Action': 0,
-    'sub_Rob_Action': 0,
-    
-    # Коробка и ячейка которая предается роботу
-    'Tray1': 0,
-    'Cell1': 0
+    'sub_Rob_Action': 0
     
 }
 
@@ -88,7 +84,7 @@ class ModbusProvider:
         context = ModbusServerContext(slaves=self.store, single=True)
         print("Starting Modbus TCP server on localhost:502")
         try:
-            StartTcpServer(context, address=("localhost", 502))
+            StartTcpServer(context, address=("192.168.1.100", 502))
         except Exception as e:
             print(f"Error starting Modbus server: {e}")
 
@@ -112,9 +108,6 @@ class ModbusProvider:
                     self.store.setValues(3, 0, [self.Reg_move_Table])
                     self.store.setValues(3, 2, [self.Reg_updown_Botloader])
                     self.store.setValues(3, 4, [self.Rob_Action])
-
-                    print (f"Tray1 {Tray1}")
-                    print (f"Cell1 {Cell1}")
 
                     self.store.setValues(3, 6, [Tray1])
                     self.store.setValues(3, 8, [Cell1])
@@ -225,7 +218,7 @@ class Table:
         # Передаем ящик из которого нужно забрать и номер ячейки
         Tray1 = 1
         Cell1 = Cell1 + 1
-
+        self.change_value('Rob_Action', 210)
         while True:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 210:
@@ -562,12 +555,14 @@ if __name__ == "__main__":
     
     
 
-    
+    """
     # Выполнение первого цикла
-    flag1 = True
-    if flag1 == True:
-        table1.defence_cycle()
-        flag1 = False
+        flag1 = True
+        if flag1 == True:
+            table1.defence_cycle()
+            flag1 = False
+        
+    """  
     
     
     

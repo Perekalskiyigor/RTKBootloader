@@ -166,9 +166,82 @@ class DatabaseConnection:
 
             print("Method 2")
     
+    
+    
+    def setTable(self, order_number):
+        """Поиск заказа и обновление одной записи в order_details."""
+        logging.info("Метод setTable вызван с order_number = %s", order_number)
+        print(f"Метод setTable вызван с order_number = {order_number}")
+
+        # Получаем ID заказа
+        self.cursor.execute('''
+            SELECT id
+            FROM orders
+            WHERE order_number = ?
+            ORDER BY id DESC
+            LIMIT 1
+        ''', (order_number,))
+        row = self.cursor.fetchone()
+
+        if not row:
+            logging.warning("Заказ с номером %s не найден.", order_number)
+            print(f"Заказ с номером {order_number} не найден.")
+            return None
+
+        order_id = row[0]
+        logging.info("Найден ID заказа: %s", order_id)
+        print(f"Найден ID заказа: {order_id}")
+
+        # Ищем свободную строку в order_details
+        self.cursor.execute('''
+            SELECT id
+            FROM order_details
+            WHERE order_id = ? AND (stand_id IS NULL OR stand_id = 0)
+            ORDER BY id ASC
+            LIMIT 1
+        ''', (order_id,))
+        row = self.cursor.fetchone()
+
+        if not row:
+            logging.warning("Нет свободных записей в order_details для order_id = %s", order_id)
+            print(f"Нет свободных записей в order_details для order_id = {order_id}")
+            return None
+
+        serial_id = row[0]
+        logging.info("Найдена свободная запись в order_details: id = %s", serial_id)
+        print(f"Найдена свободная запись в order_details: id = {serial_id}")
+
+        try:
+            self.conn.execute('BEGIN IMMEDIATE')  # Начинаем транзакцию с блокировкой
+            self.cursor.execute('''
+                UPDATE order_details
+                SET stand_id = 1
+                WHERE id = ?
+            ''', (serial_id,))
+
+            if self.cursor.rowcount > 0:
+                self.conn.commit()
+                logging.info("Запись успешно обновлена: order_details.id = %s", serial_id)
+                print(f"Заблокирована и обновлена запись order_details.id = {serial_id}")
+                return serial_id
+            else:
+                self.conn.rollback()
+                logging.warning("Обновление не затронуло ни одной строки.")
+                print("Свободных записей не найдено.")
+                return None
+
+        except Exception as e:
+            self.conn.rollback()
+            logging.exception("Ошибка при обновлении записи order_details: %s", e)
+            print(f"Ошибка при обновлении записи order_details: {e}")
+            return None
+
+    
+    
     def getBoard_id(self, order_number):
         """ Запрос заказов всех """
         logging.info("Method 2 called.")
+        # Делаем с блокировкой записи
         self.cursor.execute('''
                     SELECT 
                         O.order_number, 
@@ -184,14 +257,18 @@ class DatabaseConnection:
                     FROM orders AS O
                     JOIN order_details AS D ON O.id = D.order_id
                     WHERE D.test_result <> 200 OR D.test_result IS NULL AND O.order_number = ?
+                    ORDER BY id DESC
+                    LIMIT 1
+                    FOR UPDATE SKIP LOCKED
         ''', (order_number,))
 
         row = self.cursor.fetchone()
 
         if row:
-            record_id = row[1]  # D.id
-            print(f"Найдена запись для order_number '{order_number}', id: {record_id}")
-        return record_id
+            order_id = row[1]  # D.id
+            print(f"Запись {order_id} занята успешно.")
+        
+        
     
 
     def set_TableForBoard(self, new_stand_id ,record_id):
@@ -236,20 +313,10 @@ class DatabaseConnection:
 
 
 
-
+"""
 # Create an instance of DatabaseConnection
 db_connection = DatabaseConnection()
+Order = "ЗНП-0005747"
+record_id = db_connection.setTable(Order)
 
-# Connect to the database and create tables
-db_connection.db_connect()
-
-# Call the methods that print to the console
-record_id = db_connection.getBoard_id("ЗНП-0005747")
-
-# Назначаем стол плате по id записи
-new_stand_id = 1
-db_connection.set_TableForBoard(new_stand_id ,record_id)
-
-result = 500
-
-db_connection.set_BoardTest_Result(result, record_id)
+"""

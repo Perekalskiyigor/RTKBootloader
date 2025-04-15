@@ -14,7 +14,7 @@ import SQLite as SQL
 # Глобальные ящик и ясейка 
 Tray1 = 0
 Cell1 = 0
-Order = ""
+Order = "ЗНП-0005747"
 
 dict_Table1 = {
     'Reg_move_Table': 0,
@@ -84,7 +84,7 @@ class ModbusProvider:
         context = ModbusServerContext(slaves=self.store, single=True)
         print("Starting Modbus TCP server on localhost:502")
         try:
-            StartTcpServer(context, address=("192.168.1.100", 502))
+            StartTcpServer(context, address=("localhost", 502)) # "192.168.1.100"
         except Exception as e:
             print(f"Error starting Modbus server: {e}")
 
@@ -325,6 +325,8 @@ class Table:
         global Tray1
         global Cell1
         print("****ЦИКЛ MAIN")
+
+
     
         # 1. Регул <- Сдвинь плату освободив ложе2.
         print("1 Регул <- Сдвинь плату освободив ложе2")
@@ -362,6 +364,7 @@ class Table:
         result1 = 0
         result2 = 0
 
+
         # 3.1 Робот <- Уложи плату в тару # 3.2.1 Сервер <- Начни шить # 3.2.2 Сервер -> Ответ по прошивке (плохо, хорошо)
         print("3.1 Робот <- Уложи плату в тару.")
         print("3.2.1 Сервер <- Начни шить")
@@ -380,6 +383,19 @@ class Table:
         self.change_value('Rob_Action', 0)
         print("плата уложена в тару")
         result1 = 0
+
+        ############################# БД #########################
+        # если получен ответ об успешной прошивке то производим привязывание платы к штрихкоду иначе в брак
+        db_connection.db_connect()
+        # Берем свободный id в рамках заказа
+        record_id = db_connection.setTable(Order)
+        # выставить результат тестирования и привязать плату
+        # 200 - успешно
+        # 404 - возгникла ошибка/пишем лог ошибки в базу
+        # если 404 говорим роботу убери в брак
+        print(f"MAIN - Получил {record_id}")
+
+        ############################# БД #########################
 
         # 4.1 Робот <- Забери плату из тары # 4.2 Регул <- Подними прошивальщик.
         print("4.1 Робот <- забрать плату из тары # 4.2 Регул <- Подними прошивальщик")
@@ -552,26 +568,6 @@ class Table:
 
 if __name__ == "__main__":
 
-    try:
-        # Create an instance of DatabaseConnection
-        db_connection = SQL.DatabaseConnection()
-        # Connect to the database and create tables
-        db_connection.db_connect()
-        # Call the methods that print to the console
-        db_connection.getOrders()
-    except Exception as e:
-        logging.error(f"Error in main execution: {e}")
-    
-    # Получение проивдственного заказа из ерп
-    order_number = "ЗНП-0005747"
-    Module = "000-M"
-    Nomeclature = "ewfwf+66"
-    Value = 50
-    Version_Loader = "\\\\prosyst.ru@ssl\\davwwwroot\\1cfiles\\ERP\\20250224\\R050 DI 16 012-000-AAA_Автомаркировка.le"
-
-    # Запись данных по заказу в базу данных
-    db_connection.getOrders()
-
 
     modbus_provider = ModbusProvider()
     
@@ -590,14 +586,16 @@ if __name__ == "__main__":
     
 
     
-    
-
-    
+    """
     # Выполнение первого цикла
     flag = True
     if flag == True:
         table1.setup_cycle()
         flag = False
+    """
+
+    
+    
 
     table1.main()
 

@@ -1,33 +1,67 @@
-"""Связь с камерой по ТСП"""
 import socket
+import logging
+
+# Set up basic logging configuration
+logging.basicConfig(
+    filename='RTK.log',
+    level=logging.INFO,
+    format='%(asctime)s - CAM - %(levelname)s - %(message)s'
+)
+
+
+def get_qr_result():
+    camera_ip = '192.168.1.50'
+    trigger_port = 2001
+    camera_port = 2002
+
+    try:
+        # Отправка команды "start"
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as trigger_socket:
+            trigger_socket.connect((camera_ip, trigger_port))
+            trigger_socket.sendall(b'start')
+            logging.info("Команда 'start' отправлена на порт %d.", trigger_port)
+
+        # Получение QR-результата
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as receive_socket:
+            receive_socket.connect((camera_ip, camera_port))
+            logging.info("Ожидание результата от камеры на порту %d...", camera_port)
+            data = receive_socket.recv(1024)  # QR код вряд ли больше
+            result = data.decode('utf-8').strip()
+            logging.info("Получен QR результат: %s", result)
+            return result if result else None
+
+    except Exception as e:
+        logging.error("Ошибка при получении QR: %s", str(e))
+        return None
 
 def photo():
-    # Адрес и порт камеры
-    camera_ip = '192.168.1.50'
-    trigger_port = 2001  # Порт для отправки команды "start"
-    camera_port = 2002   # Порт для получения результата
+    attempts = 3
+    results = []
 
-    # Создаем TCP-сокет для отправки команды "start"
-    trigger_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    trigger_socket.connect((camera_ip, trigger_port))
+    for i in range(attempts):
+        logging.info("Попытка №%d получения QR-кода...", i + 1)
+        result = get_qr_result()
+        if result:
+            results.append(result)
 
-    # Отправляем команду "start"
-    trigger_socket.sendall(b'start')
-    print("Команда 'start' отправлена на порт 2001.")
+    if not results:
+        logging.error("QR-код не получен ни в одной из попыток.")
+        QRresult = 404
+        return QRresult, None
 
-    # Закрываем сокет для отправки команды
-    trigger_socket.close()
+    unique_results = list(set(results))
+    if len(unique_results) == 1:
+        logging.info("QR-код стабильно считан: %s", unique_results[0])
+        QRresult = 200
+        data = unique_results[0]
 
-    # Создаем TCP-сокет для получения результата от камеры
-    receive_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    receive_socket.connect((camera_ip, camera_port))
+        return QRresult, data 
+    else:
+        logging.warning("QR-коды отличаются между попытками: %s", unique_results)
+        QRresult = 404
+        return QRresult, None
+    
 
-    print(f"Ожидание результата от камеры на порту {camera_port}...")
 
-    # Получаем данные от камеры
-    data = receive_socket.recv(4096)  # Размер буфера можно увеличить, если ожидается большой объем данных
-    print(f"Получены данные: {data}")
-
-    # Закрываем сокет для получения данных
-    receive_socket.close()
-    return data
+res,data = photo()
+print (f"Result={res}  Data = {data}")

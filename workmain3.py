@@ -30,7 +30,7 @@ dict_Table1 = {
 logging.basicConfig(
     filename='RTK.log',
     level=logging.INFO,
-    format='MAIN - %(asctime)s - %(levelname)s - %(message)s'
+    format=' %(asctime)s - MAIN - %(levelname)s - %(message)s'
 )
 
 ################################################# START CAMERA Communication class ###################################

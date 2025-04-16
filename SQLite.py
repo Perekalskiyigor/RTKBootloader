@@ -54,7 +54,7 @@ class DatabaseConnection:
             raise
 
     
-    def camera_photo(self, QRresult, serial_number_8):
+    def camera_photo(self, QRresult, serial_id):
         """Добавление данных по штрих коду с камеры в базу"""
     
         logging.info("Method camera_photo called.")
@@ -64,15 +64,15 @@ class DatabaseConnection:
             UPDATE order_details 
             SET data_matrix = ? 
             WHERE serial_number_8 = ?
-        ''', (QRresult, serial_number_8))
+        ''', (QRresult, serial_id))
 
         # Check if any row was updated
         if self.cursor.rowcount == 0:
-            print(f"Error: No record found with Serial = {serial_number_8}")
+            print(f"Error: No record found with Serial = {serial_id}")
         else:
             # Commit changes if the update was successful
             self.conn.commit()
-            print(f"Successfully updated record with Serial = {serial_number_8}")
+            print(f"Successfully updated record with Serial = {serial_id}")
 
     
     def setOrder(self, order_number, Module, Nomeclature, Value, Version_Loader, QRresult, serial_number_8):

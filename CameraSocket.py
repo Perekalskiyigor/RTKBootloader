@@ -26,7 +26,7 @@ def get_qr_result():
             receive_socket.connect((camera_ip, camera_port))
             logging.info("Ожидание результата от камеры на порту %d...", camera_port)
             data = receive_socket.recv(1024)  # QR код вряд ли больше
-            result = data.decode('utf-8').strip()
+            result = result = data.decode('utf-8').strip().strip(';')  # Удаляет пробелы и ';'
             logging.info("Получен QR результат: %s", result)
             return result if result else None
 

@@ -53,21 +53,27 @@ class IgleTable:
     # Запрос на прошивку
     def control_igle_table(self):
         """Метод для отправки команд иглостэнду.""" 
-        headers = {
-            'Content-Type': 'application/json',
-            'Cookie': 'session=.eJwljjkSwjAMAP_imkKHJUv5DGPZ8kCbkIrh74Sh2i222He5rz2PR9le-5m3cn_OspVkcmNTmU7elQWsTjBwkBZmyOag2ldSuA6vQ5NHG7N1c-pTAeuaaOsqL0ZHot7F62RaHhawEseqrQrEgErRlIMd00QCxMs1ch65_29-huXzBfFZL8A.Z8fMxg.3sF5O_20LPF__XrEzVAMgQoU0Wk'
-        }
-
+        logging.info("Method control_igle_table called.")
+        logging.debug(f"Input parameters: stand_id=, module_type=, data_matrix=  serial_number_8 = firmwares = ")
+        
         payload = json.dumps({
-            "module_type": self.module_type,
-            "stand_id": self.stand_id,
-            "serial_number_8": self.serial_number_8,
-            "data_matrix": self.data_matrix,
-            "firmwares": {
-                "fw_type": self.fw_type,
-                "fw_path": self.fw_path
+        "stand_id": "nt_kto_rtk_1",
+        "module_type": "R050 DI 16 012-000-AAA",
+        "data_matrix": [
+            "11"
+        ],
+        "serial_number_8": "1",
+        "firmwares": [
+            {
+            "fw_type": "MCU",
+            "fw_path": "C:\\nails_table_bridge\\plc050_di16012-full.hex",
+            "fw_version": "1.0.36.0"
             }
+        ]
         })
+        headers = {
+        'Content-Type': 'application/json'
+        }
 
         try:
             logging.info("Отправка запроса на %s", self.urlIgleTabeControl)
@@ -131,7 +137,7 @@ class IgleTable:
 
 if __name__ == "__main__":
     igle_table = IgleTable(
-        urlIgleTabeControl="http://127.0.0.1:5000/start_test_board_with_rtk",
+        urlIgleTabeControl="http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
         urlStatusFromIgleTabe="http://127.0.0.1:5000/get_stand_status",
         urlStopgleTabe="http://127.0.0.1:5000/stop_test_board_with_rtk",
         module_type="R050 DI 16 011-000-AAA",
@@ -156,11 +162,11 @@ if __name__ == "__main__":
     print(response)
     """
 
-    #"""
+    """
     # Стоп иглостола
     response = igle_table.stop_igle_table()
     print(response)
-    #"""
+    """
     
     """
     igle_table.db_connect()

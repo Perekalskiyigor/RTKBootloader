@@ -11,6 +11,9 @@ import CameraSocket
  # Пользовательский класс БД
 import SQLite as SQL
 
+# Поьзовательский класс провайдера Иглостола
+import ProviderIgleTable as Igable
+
 # Глобальные ящик и ясейка 
 Tray1 = 0
 Cell1 = 0
@@ -32,6 +35,22 @@ logging.basicConfig(
     level=logging.INFO,
     format=' %(asctime)s - MAIN - %(levelname)s - %(message)s'
 )
+
+################################################# IgleTable Communication Class ###################################
+igle_table = Igable.IgleTable(
+        urlIgleTabeControl="http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
+        urlStatusFromIgleTabe="http://127.0.0.1:5000/get_stand_status",
+        urlStopgleTabe="http://127.0.0.1:5000/stop_test_board_with_rtk",
+        module_type="R050 DI 16 011-000-AAA",
+        stand_id="123",
+        serial_number_8="1234578",
+        data_matrix="Z12323434",
+        fw_type="MCU",
+        fw_path="path/test_fw1.hex",
+        username="admin",
+        password="password123"
+    )
+################################################# IgleTable Communication Class ###################################
 
 ################################################# START CAMERA Communication class ###################################
 
@@ -384,18 +403,12 @@ class Table:
         print("плата уложена в тару")
         result1 = 0
 
-        ############################# БД #########################
+        ############################# БД Блок нааначения стола #########################
         # если получен ответ об успешной прошивке то производим привязывание платы к штрихкоду иначе в брак
         db_connection.db_connect()
         # Берем свободный id в рамках заказа
         record_id = db_connection.setTable(Order)
-        # выставить результат тестирования и привязать плату
-        # 200 - успешно
-        # 404 - возгникла ошибка/пишем лог ошибки в базу
-        # если 404 говорим роботу убери в брак
-        print(f"MAIN - Получил {record_id}")
-
-        ############################# БД #########################
+        ############################# БД Блок нааначения стола #########################
 
         # 4.1 Робот <- Забери плату из тары # 4.2 Регул <- Подними прошивальщик.
         print("4.1 Робот <- забрать плату из тары # 4.2 Регул <- Подними прошивальщик")
@@ -422,13 +435,17 @@ class Table:
         
         # 5 Делаем фото платы
         print("5 Камера <- сделай фото")
-        for i in range(3):
-            try:
-                a = CameraSocket.photo()
-                print(a)
-            except Exception as e:
+        try:
+            res,photodata = CameraSocket.photo()
+            if res == 200 and photodata is not None:
+                print(f"Recieve datamatrixcode {photodata}")
+                # Сохраняем в бд с привязкой к плате
+            else:
+                print("Error Recieve datamatrixcode")
+        except Exception as e:
                 print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
-            time.sleep(1)
+        time.sleep(1)
+
         
         # 6 Робот <- Уложи плату в ложемент тетситрования 2
         print("6 Робот <- Уложи плату в ложемент тетситрования 2")
@@ -480,6 +497,27 @@ class Table:
         self.change_value('Reg_updown_Botloader', 0)
         result1 = 0
         result2 = 0
+
+        ############################# БД Блок связываания серийника и платы  ####################
+        # 
+        # если получен ответ об успешной прошивке то производим привязывание платы к штрихкоду иначе в брак
+        db_connection.db_connect()
+        loadresult = 200
+        if loadresult ==200:
+            loadresult = igle_table.control_igle_table()
+            # выставить результат тестирования и привязать плату
+            # 200 - успешно
+            # 404 - возгникла ошибка/пишем лог ошибки в базу
+            # если 404 говорим роботу убери в брак
+            db_connection.ConnectPhotoSerial(record_id, photodata, loadresult)
+        else:
+            print ("Плата не прошита уводим в брак и проставляем причину")
+        
+        # Очищаем перменные результата
+        photodata = None
+        record_id = 0
+        loadresult = 0
+        ############################# БД  Блок связываания серийника и платы #########################
 
         # 9.1 Робот <- Уложи плату в тару # 9.2.1 Сервер <- Начни шить # 9.2.2 Сервер -> Ответ по прошивке (плохо, хорошо)
         print("9.1 Робот <- Уложи плату в тару.")

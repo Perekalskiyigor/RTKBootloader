@@ -235,6 +235,43 @@ class DatabaseConnection:
             logging.exception("Ошибка при обновлении записи order_details: %s", e)
             print(f"Ошибка при обновлении записи order_details: {e}")
             return None
+        
+    def ConnectPhotoSerial(self, record_id, photodata, loadresult):
+        """ Связываем серийный номер и штрихкод на плате с результатом теста и фото """
+        try:
+            logging.info("Method ConnectPhotoSerial called.")
+            print("Method ConnectPhotoSerial called.")
+            
+            logging.debug(f"Input parameters: record_id={record_id}, loadresult={loadresult}, photodata=[{len(photodata)} bytes]")
+            print(f"Input parameters: record_id={record_id}, loadresult={loadresult}, photodata={photodata}")
+
+            update_query = """
+            UPDATE order_details
+            SET test_result = ?,
+                data_matrix = ?
+            WHERE id = ?
+            """
+            logging.debug(f"Executing SQL with values: ({loadresult}, [photodata], {record_id})")
+            print(f"Executing SQL with values: ({loadresult}, [photodata], {record_id})")
+            
+            self.cursor.execute(update_query, (loadresult, photodata, record_id))
+            self.conn.commit()
+
+            if self.cursor.rowcount == 0:
+                logging.warning(f"No record found with id={record_id}.")
+                print(f"No record found with id={record_id}.")
+                return 404  # Запись не найдена
+
+            logging.info(f"Record {record_id} successfully updated.")
+            print(f"Record {record_id} successfully updated.")
+            return 200  # Успех
+
+        except Exception as e:
+            logging.error(f"Failed to update record {record_id}: {e}", exc_info=True)
+            print(f"Failed to update record {record_id}: {e}")
+            return 404  # Ошибка выполнения
+
+
 
     
     
@@ -271,17 +308,7 @@ class DatabaseConnection:
         
     
 
-    def set_TableForBoard(self, new_stand_id ,record_id):
-        """ Запрос заказов всех """
-        logging.info("Method 2 called.")
-        update_query = """
-        UPDATE order_details
-        SET test_result = 0,
-            stand_id = ?
-        WHERE id = ?
-        """
-        self.cursor.execute(update_query, (new_stand_id, record_id))
-        self.conn.commit()
+    
 
     def set_BoardTest_Result(self, result, record_id):
         """ Запрос заказов всех """
@@ -320,3 +347,6 @@ Order = "ЗНП-0005747"
 record_id = db_connection.setTable(Order)
 
 """
+
+db_connection = DatabaseConnection()
+db_connection.ConnectPhotoSerial(1, "VD4454564646", 200)

@@ -11,9 +11,6 @@ import CameraSocket
  # Пользовательский класс БД
 import SQLite as SQL
 
-# Поьзовательский класс провайдера Иглостола
-import ProviderIgleTable as Igable
-
 # Глобальные ящик и ясейка 
 Tray1 = 0
 Cell1 = 0
@@ -35,22 +32,6 @@ logging.basicConfig(
     level=logging.INFO,
     format=' %(asctime)s - MAIN - %(levelname)s - %(message)s'
 )
-
-################################################# IgleTable Communication Class ###################################
-igle_table = Igable.IgleTable(
-        urlIgleTabeControl="http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
-        urlStatusFromIgleTabe="http://127.0.0.1:5000/get_stand_status",
-        urlStopgleTabe="http://127.0.0.1:5000/stop_test_board_with_rtk",
-        module_type="R050 DI 16 011-000-AAA",
-        stand_id="123",
-        serial_number_8="1234578",
-        data_matrix="Z12323434",
-        fw_type="MCU",
-        fw_path="path/test_fw1.hex",
-        username="admin",
-        password="password123"
-    )
-################################################# IgleTable Communication Class ###################################
 
 ################################################# START CAMERA Communication class ###################################
 
@@ -234,8 +215,8 @@ class Table:
         global Cell1
         global Order
 
-        # 5 Робот <- Забери плату из тары
-        print("5 Робот <- забрать плату из тары")
+        # 1 Робот <- Забери плату из тары
+        print("1 Робот <- забрать плату из тары")
         # Передаем ящик из которого нужно забрать и номер ячейки
         Tray1 = 1
         Cell1 = Cell1 + 1
@@ -251,7 +232,7 @@ class Table:
             time.sleep(1)
         self.change_value('Rob_Action', 0)
 
-        # 6 Делаем фото платы
+        # 2 Делаем фото платы
         for i in range(3):
             try:
                 a = CameraSocket.photo()
@@ -261,8 +242,8 @@ class Table:
             time.sleep(1)
 
 
-        # 7 Робот <- Уложи плату в ложемент тетситрования
-        print("7 Робот <- Уложи плату в ложемент тетситрования 2")
+        # 3 Робот <- Уложи плату в ложемент тетситрования
+        print("3 Робот <- Уложи плату в ложемент тетситрования 2")
         self.change_value('Rob_Action', 222)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -277,8 +258,8 @@ class Table:
 
 
 
-        # 8 Регул - Сдвигаем стол осовобождая ложе1
-        print("8 Регул <- Сдвинь плату освободив ложе1.")
+        # 4 Регул - Сдвигаем стол осовобождая ложе1
+        print("4 Регул <- Сдвинь плату освободив ложе1.")
         self.change_value('Reg_move_Table', 101)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
@@ -292,25 +273,28 @@ class Table:
         self.change_value('Reg_move_Table', 0)
 
 
-        # 9 Робот <- Забери плату из тары
-        print("9 Робот <- забрать плату из тары")
+        # 5.1 Робот <- Забери плату из тары # 5.2 Регул <- Опусти прошивальщик (плата на ложе1).
+        print("5.1 Робот <- забрать плату из тары 5.2. Регул <- Опусти прошивальщик (плата на ложе1).")
         # Передаем ящик из которого нужно забрать и номер ячейки
         Tray1 = 1
         Cell1 = Cell1 + 1
 
         self.change_value('Rob_Action', 210)
+        self.change_value('Reg_updown_Botloader', 103)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            if result1 != 210:
+            result2 = self.read_value("sub_Reg_updown_Botloader")
+            if result1 != 210 and result2 != 103:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
-            else:
+            elif result1 == 210 and result2 == 103:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
+        self.change_value('Reg_updown_Botloader', 0)
 
-        # 10 Делаем фото платы
+        # 6 Делаем фото платы
         print("10 Камера <- сделай фото")
         for i in range(3):
             try:
@@ -321,8 +305,10 @@ class Table:
             time.sleep(1)
         
 
-        # 11 Робот <- Уложи плату в ложемент тетситрования
-        print("11 Робот <- Уложи плату в ложемент тетситрования 1")
+        # 7 Робот <- Уложи плату в ложемент тетситрования# 7.2.1 Сервер <- Начни шить # 7.2.2 Сервер -> Ответ по прошивке (плохо, хорошо)
+        print("7 Робот <- Уложи плату в ложемент тетситрования 1")
+        print("7.2.1 Сервер <- Начни шить")
+        print("7.2.2. Сервер -> Ответ по прошивке (плохо, хорошо)")
         self.change_value('Rob_Action', 221)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -334,8 +320,7 @@ class Table:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
-        print("Стол 1ложе занято")
-        print("Стол 2ложе занято")
+        
         print("****ЦИКЛ SETUP Завершен******")
     ############# ****ЦИКЛ SETUP END ******"
 
@@ -384,31 +369,39 @@ class Table:
         result2 = 0
 
 
-        # 3.1 Робот <- Уложи плату в тару # 3.2.1 Сервер <- Начни шить # 3.2.2 Сервер -> Ответ по прошивке (плохо, хорошо)
+        # 3.1 Робот <- Уложи плату в тару # 3.2.1 Сервер <- Начни шить # 3.2.2 Сервер -> Ответ по прошивке (плохо, хорошо) # 3.2.3 Регул <- Подними прошивальщик.
         print("3.1 Робот <- Уложи плату в тару.")
         print("3.2.1 Сервер <- Начни шить")
         print("3.2.2. Сервер -> Ответ по прошивке (плохо, хорошо)")
+        print('3.2.3 Регул <- Подними прошивальщик.')
         self.change_value('Rob_Action', 241)
+        self.change_value('Reg_updown_Botloader', 104)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-
-            if result1 != 241:
+            result2 = self.read_value("sub_Reg_updown_Botloader")
+            if result1 != 241 and result2 != 104:
                 print(f"от робота = {result1}, от регула = {result2}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
-            else:
+            elif result1 == 241 and result2 == 104:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
         print("плата уложена в тару")
         result1 = 0
 
-        ############################# БД Блок нааначения стола #########################
+        ############################# БД #########################
         # если получен ответ об успешной прошивке то производим привязывание платы к штрихкоду иначе в брак
         db_connection.db_connect()
         # Берем свободный id в рамках заказа
         record_id = db_connection.setTable(Order)
-        ############################# БД Блок нааначения стола #########################
+        # выставить результат тестирования и привязать плату
+        # 200 - успешно
+        # 404 - возгникла ошибка/пишем лог ошибки в базу
+        # если 404 говорим роботу убери в брак
+        print(f"MAIN - Получил {record_id}")
+
+        ############################# БД #########################
 
         # 4.1 Робот <- Забери плату из тары # 4.2 Регул <- Подними прошивальщик.
         print("4.1 Робот <- забрать плату из тары # 4.2 Регул <- Подними прошивальщик")
@@ -435,17 +428,13 @@ class Table:
         
         # 5 Делаем фото платы
         print("5 Камера <- сделай фото")
-        try:
-            res,photodata = CameraSocket.photo()
-            if res == 200 and photodata is not None:
-                print(f"Recieve datamatrixcode {photodata}")
-                # Сохраняем в бд с привязкой к плате
-            else:
-                print("Error Recieve datamatrixcode")
-        except Exception as e:
+        for i in range(3):
+            try:
+                a = CameraSocket.photo()
+                print(a)
+            except Exception as e:
                 print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
-        time.sleep(1)
-
+            time.sleep(1)
         
         # 6 Робот <- Уложи плату в ложемент тетситрования 2
         print("6 Робот <- Уложи плату в ложемент тетситрования 2")
@@ -490,34 +479,13 @@ class Table:
                 print(f"от робота = {result1}, от регула = {result2}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
-            elif result1 == 231 and result2== 103:
+            elif result1 == 231 and result2 == 103:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
         self.change_value('Reg_updown_Botloader', 0)
         result1 = 0
         result2 = 0
-
-        ############################# БД Блок связываания серийника и платы  ####################
-        # 
-        # если получен ответ об успешной прошивке то производим привязывание платы к штрихкоду иначе в брак
-        db_connection.db_connect()
-        loadresult = 200
-        if loadresult ==200:
-            loadresult = igle_table.control_igle_table()
-            # выставить результат тестирования и привязать плату
-            # 200 - успешно
-            # 404 - возгникла ошибка/пишем лог ошибки в базу
-            # если 404 говорим роботу убери в брак
-            db_connection.ConnectPhotoSerial(record_id, photodata, loadresult)
-        else:
-            print ("Плата не прошита уводим в брак и проставляем причину")
-        
-        # Очищаем перменные результата
-        photodata = None
-        record_id = 0
-        loadresult = 0
-        ############################# БД  Блок связываания серийника и платы #########################
 
         # 9.1 Робот <- Уложи плату в тару # 9.2.1 Сервер <- Начни шить # 9.2.2 Сервер -> Ответ по прошивке (плохо, хорошо)
         print("9.1 Робот <- Уложи плату в тару.")
@@ -553,7 +521,7 @@ class Table:
                 print(f"от робота = {result1}, от регула = {result2}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
-            elif result1 == 210 and result2 ==104:
+            elif result1 == 210 and result2 == 104:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)

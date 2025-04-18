@@ -373,7 +373,7 @@ class Table:
                 print(f"от робота = {result1}, от регула = {result2}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
-            else:
+            elif result1 == 232 and result2 == 103:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
@@ -425,7 +425,7 @@ class Table:
                 print(f"от робота = {result1}, от регула = {result2}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
-            else:
+            elif result1 == 210 and result2 == 104:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
@@ -490,7 +490,7 @@ class Table:
                 print(f"от робота = {result1}, от регула = {result2}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
-            else:
+            elif result1 == 231 and result2== 103:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
@@ -553,7 +553,7 @@ class Table:
                 print(f"от робота = {result1}, от регула = {result2}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
-            else:
+            elif result1 == 210 and result2 ==104:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)

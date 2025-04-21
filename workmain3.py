@@ -14,6 +14,9 @@ import SQLite as SQL
 # Поьзовательский класс провайдера Иглостола
 import ProviderIgleTable as Igable
 
+# Сервер ртк
+import ServerRTK
+
 # Глобальные ящик и ясейка 
 Tray1 = 0
 Cell1 = 0
@@ -345,8 +348,64 @@ class Table:
         global Cell1
         print("****ЦИКЛ MAIN")
 
+        
 
-    
+        ############################# БД Блок нааначения стола #########################
+        # если получен ответ об успешной прошивке то производим привязывание платы к штрихкоду иначе в брак
+        db_connection.db_connect()
+        # Берем свободный id в рамках заказа
+        record_id = db_connection.setTable(Order)
+        ############################# БД Блок нааначения стола #########################
+        print(f"Получение id {record_id}")
+        ############################# БД Блок связываания серийника и платы  ####################
+        # 
+        time.sleep(5)
+        photodata = "FF494"
+        db_connection.db_connect()
+        # Ждем пока прошьется
+        loadresult = 200
+        if loadresult ==200:
+            loadresult = igle_table.control_igle_table()
+            # Получаем данные о результате от стола через сверер РТК
+            resultTest = igle_table.recentData()
+            print("Результат запроса:")
+            # Выводим все данные
+            for key, value in resultTest.items():
+                print(f"{key}: {value}")
+            # Проверяем, что ответ успешный
+            if resultTest.get("status_code") == 200:
+                # Извлекаем переменные
+                data_matrix = resultTest.get("data_matrix")
+                log_path = resultTest.get("log_path")
+                report_path = resultTest.get("report_path")
+                serial_number_8 = resultTest.get("serial_number_8")
+                stand_id = resultTest.get("stand_id")
+                test_result = resultTest.get("test_result")
+                # Запись в БД
+                db_connection.set_BoardTest_Result(record_id, stand_id, serial_number_8, data_matrix, test_result, log_path, report_path)
+
+                db_connection.ConnectPhotoSerial(record_id, photodata, loadresult)
+                db_connection.close_connection()
+            else:
+                print("Ошибка: не удалось получить данные, запись в БД не выполнена.")
+                # выставить результат тестирования и привязать плату
+                # 200 - успешно
+                # 404 - возгникла ошибка/пишем лог ошибки в базу
+                # если 404 говорим роботу убери в брак
+               
+        else:
+            print ("Плата не прошита уводим в брак и проставляем причину")
+        
+        # Очищаем перменные результата
+        photodata = None
+        record_id = 0
+        loadresult = 0
+        resultTest = None
+        # если получен ответ об успешной прошивке то производим привязывание платы к штрихкоду иначе в брак
+        # Получить данные с сервера
+
+
+
         # 1. Регул <- Сдвинь плату освободив ложе2.
         print("1 Регул <- Сдвинь плату освободив ложе2")
         self.change_value('Reg_move_Table', 102)
@@ -500,16 +559,40 @@ class Table:
 
         ############################# БД Блок связываания серийника и платы  ####################
         # 
-        # если получен ответ об успешной прошивке то производим привязывание платы к штрихкоду иначе в брак
+        time.sleep(5)
+        photodata = "FF494"
         db_connection.db_connect()
+        # Ждем пока прошьется
         loadresult = 200
         if loadresult ==200:
             loadresult = igle_table.control_igle_table()
-            # выставить результат тестирования и привязать плату
-            # 200 - успешно
-            # 404 - возгникла ошибка/пишем лог ошибки в базу
-            # если 404 говорим роботу убери в брак
-            db_connection.ConnectPhotoSerial(record_id, photodata, loadresult)
+            # Получаем данные о результате от стола через сверер РТК
+            resultTest = igle_table.recentData()
+            print("Результат запроса:")
+            # Выводим все данные
+            for key, value in resultTest.items():
+                print(f"{key}: {value}")
+            # Проверяем, что ответ успешный
+            if resultTest.get("status_code") == 200:
+                # Извлекаем переменные
+                data_matrix = resultTest.get("data_matrix")
+                log_path = resultTest.get("log_path")
+                report_path = resultTest.get("report_path")
+                serial_number_8 = resultTest.get("serial_number_8")
+                stand_id = resultTest.get("stand_id")
+                test_result = resultTest.get("test_result")
+                # Запись в БД
+                db_connection.set_BoardTest_Result(record_id, stand_id, serial_number_8, data_matrix, test_result, log_path, report_path)
+
+                db_connection.ConnectPhotoSerial(record_id, photodata, loadresult)
+                db_connection.close_connection()
+            else:
+                print("Ошибка: не удалось получить данные, запись в БД не выполнена.")
+                # выставить результат тестирования и привязать плату
+                # 200 - успешно
+                # 404 - возгникла ошибка/пишем лог ошибки в базу
+                # если 404 говорим роботу убери в брак
+               
         else:
             print ("Плата не прошита уводим в брак и проставляем причину")
         
@@ -517,6 +600,16 @@ class Table:
         photodata = None
         record_id = 0
         loadresult = 0
+        resultTest = None
+        # если получен ответ об успешной прошивке то производим привязывание платы к штрихкоду иначе в брак
+        # Получить данные с сервера
+        
+        
+
+
+
+
+        
         ############################# БД  Блок связываания серийника и платы #########################
 
         # 9.1 Робот <- Уложи плату в тару # 9.2.1 Сервер <- Начни шить # 9.2.2 Сервер -> Ответ по прошивке (плохо, хорошо)
@@ -637,7 +730,3 @@ if __name__ == "__main__":
 
     table1.main()
 
-    try:
-        db_connection.close_connection()
-    except Exception as e:
-        logging.error(f"Error in main execution: {e}")

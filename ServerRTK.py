@@ -1,59 +1,56 @@
-"""Действущий сервак. на него иглостол возвращает данные о прошивки"""
 from flask import Flask, request, jsonify
 import logging
 
+# Глобальная переменная для хранения последних данных
+latest_data = None
+
 # Настройка логирования
 logging.basicConfig(
-    filename='RTK.log',  # Лог будет записываться в этот файл
-    level=logging.INFO,  # Уровень логирования: INFO, WARNING, ERROR и т.д.
-    format='%(asctime)s - ServerRTK - %(levelname)s - %(message)s'  # Формат записи
+    filename='RTK.log',
+    level=logging.INFO,
+    format='%(asctime)s - ServerRTK - %(levelname)s - %(message)s'
 )
 
 app = Flask(__name__)
 
 @app.route('/set_test_results', methods=['POST'])
 def set_test_results():
+    global latest_data
     try:
-        # Получаем данные из запроса
         data = request.get_json()
 
-        # Логируем полученные данные
+        if not data:
+            logging.warning("No JSON data received.")
+            return jsonify({"error description": "No data received", "result": "FAIL"}), 404
+
         logging.info(f"Received data: {data}")
+        latest_data = data
 
-        # Обработка данных (например, сохранить в базу данных, выполнить тесты и т.д.)
-        stand_id = data.get("stand_id")
-        serial_number_8 = data.get("serial_number_8")
-        data_matrix = data.get("data_matrix")
-        test_result = data.get("test_result")
-        log_path = data.get("log_path")
-        report_path = data.get("report_path")
-
-        # Логируем полученные данные
-        logging.info(f"stand_id: {stand_id}")
-        logging.info(f"serial_number_8: {serial_number_8}")
-        logging.info(f"data_matrix: {data_matrix}")
-        logging.info(f"test_result: {test_result}")
-        logging.info(f"log_path: {log_path}")
-        logging.info(f"report_path: {report_path}")
-
-        # Формируем ответ
-        response = {
-            "error description": "All very Good",
-            "result": "OK"
-        }
-
-        # Логируем ответ
-        logging.info(f"Sending response: {response}")
-
-        # Возвращаем ответ клиенту
-        return jsonify(response)
+        return jsonify({"error description": "All very Good", "result": "OK"})
 
     except Exception as e:
-        # Логируем ошибку, если она произошла
         logging.error(f"Error occurred: {str(e)}")
-
-        # В случае ошибки возвращаем информацию о ней
         return jsonify({"error description": "FAIL", "result": str(e)}), 500
 
+
+@app.route('/get_test_results', methods=['GET'])
+def get_test_results():
+    global latest_data
+    try:
+        if latest_data is None:
+            logging.info("No data available to retrieve.")
+            return jsonify({"error description": "No data available", "result": "FAIL"}), 404
+
+        data_to_return = latest_data
+        latest_data = None  # очищаем после получения
+
+        logging.info("Data retrieved and cleared.")
+        return jsonify({"result": "OK", "data": data_to_return})
+
+    except Exception as e:
+        logging.error(f"Error retrieving data: {str(e)}")
+        return jsonify({"error description": "FAIL", "result": str(e)}), 500
+
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='127.0.0.1', port=5005)  # Можно менять порт/IP при необходимости

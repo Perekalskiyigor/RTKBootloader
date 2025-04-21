@@ -85,6 +85,32 @@ class IgleTable:
             logging.error("Ошибка запроса: %s", str(e))
             return None
         
+
+        
+    # Перепарвка данных от иглостола в сервер ртк
+    def recentData(self):
+        url = "http://localhost:5005/get_test_results"
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                data = response.json().get("data", {})
+                return {
+                    "data_matrix": data.get("data_matrix"),
+                    "log_path": data.get("log_path"),
+                    "report_path": data.get("report_path"),
+                    "serial_number_8": data.get("serial_number_8"),
+                    "stand_id": data.get("stand_id"),
+                    "test_result": data.get("test_result"),
+                    "status_code": 200
+                }
+            else:
+                return {"status_code": 404}
+        except Exception as e:
+            # Можно залогировать ошибку при необходимости
+            return {"status_code": 404}
+        
+
+
     # статус от иглостола
     def status_igle_table(self):
         """Метод для получения статуса стенда."""  
@@ -149,6 +175,8 @@ if __name__ == "__main__":
         username="admin",
         password="password123"
     )
+
+    
 
     """
     #Управление иглостолом

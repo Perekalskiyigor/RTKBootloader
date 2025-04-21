@@ -42,6 +42,8 @@ class DatabaseConnection:
                     desk_id INTEGER,
                     firmware_link TEXT NOT NULL,
                     test_result INTEGER,
+                    report_path  TEXT,
+                    log_path    TEXT,      
                     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
                 );
             ''')
@@ -240,10 +242,10 @@ class DatabaseConnection:
         """ Связываем серийный номер и штрихкод на плате с результатом теста и фото """
         try:
             logging.info("Method ConnectPhotoSerial called.")
-            print("Method ConnectPhotoSerial called.")
+            #print("Method ConnectPhotoSerial called.")
             
             logging.debug(f"Input parameters: record_id={record_id}, loadresult={loadresult}, photodata=[{len(photodata)} bytes]")
-            print(f"Input parameters: record_id={record_id}, loadresult={loadresult}, photodata={photodata}")
+            #print(f"Input parameters: record_id={record_id}, loadresult={loadresult}, photodata={photodata}")
 
             update_query = """
             UPDATE order_details
@@ -252,7 +254,7 @@ class DatabaseConnection:
             WHERE id = ?
             """
             logging.debug(f"Executing SQL with values: ({loadresult}, [photodata], {record_id})")
-            print(f"Executing SQL with values: ({loadresult}, [photodata], {record_id})")
+            #print(f"Executing SQL with values: ({loadresult}, [photodata], {record_id})")
             
             self.cursor.execute(update_query, (loadresult, photodata, record_id))
             self.conn.commit()
@@ -263,7 +265,7 @@ class DatabaseConnection:
                 return 404  # Запись не найдена
 
             logging.info(f"Record {record_id} successfully updated.")
-            print(f"Record {record_id} successfully updated.")
+            #print(f"Record {record_id} successfully updated.")
             return 200  # Успех
 
         except Exception as e:
@@ -310,16 +312,56 @@ class DatabaseConnection:
 
     
 
-    def set_BoardTest_Result(self, result, record_id):
-        """ Запрос заказов всех """
-        logging.info("Method 2 called.")
-        update_query = """
-        UPDATE order_details
-        SET test_result = ?
-        WHERE id = ?
-        """
-        self.cursor.execute(update_query, (result, record_id))
-        self.conn.commit()
+    def set_BoardTest_Result(self, record_id, stand_id, serial_number_8, data_matrix, test_result, log_path, report_path):
+        """ Установка результатов тестирования вызывается от Сервер РТК """
+        logging.info(f"[RTK] Вызов метода set_BoardTest_Result для записи ID: {record_id}")
+        print(f"[RTK] Установка результатов тестирования для записи ID: {record_id}")
+        
+        try:    
+            update_query = """
+            UPDATE order_details
+            SET stand_id = ?,
+                serial_number_8 = ?,
+                data_matrix = ?,
+                test_result = ?,
+                log_path = ?,
+                report_path = ?
+            WHERE id = ?
+            """
+            # Отладочная информация
+            logging.debug(f"SQL: {update_query.strip()}")
+            logging.debug(f"SQL values: ({stand_id}, {serial_number_8}, {data_matrix}, {test_result}, {log_path}, {report_path}, {record_id})")
+            print(f"[DB] Выполнение запроса с параметрами: ({stand_id}, {serial_number_8}, {data_matrix}, {test_result}, {log_path}, {report_path}, {record_id})")
+
+            # Выполнение запроса
+            self.cursor.execute(update_query, (stand_id, serial_number_8, data_matrix, test_result, log_path, report_path, record_id))
+            self.conn.commit()
+
+            # Консольный вывод
+            print("[DB]  Данные успешно сохранены:")
+            print(f"   - stand_id: {stand_id}")
+            print(f"   - serial_number_8: {serial_number_8}")
+            print(f"   - data_matrix: {data_matrix}")
+            print(f"   - test_result: {test_result}")
+            print(f"   - log_path: {log_path}")
+            print(f"   - report_path: {report_path}")
+
+            # Логирование
+            logging.info(" Данные успешно сохранены в базу:")
+            logging.info(f"   - stand_id: {stand_id}")
+            logging.info(f"   - serial_number_8: {serial_number_8}")
+            logging.info(f"   - data_matrix: {data_matrix}")
+            logging.info(f"   - test_result: {test_result}")
+            logging.info(f"   - log_path: {log_path}")
+            logging.info(f"   - report_path: {report_path}")
+
+        except Exception as e:
+            error_msg = f"[DB] Ошибка при сохранении в базу: {e}"
+            print(error_msg)
+            logging.error(error_msg)
+            raise
+
+
         
 
 
@@ -347,6 +389,3 @@ Order = "ЗНП-0005747"
 record_id = db_connection.setTable(Order)
 
 """
-
-db_connection = DatabaseConnection()
-db_connection.ConnectPhotoSerial(1, "VD4454564646", 200)

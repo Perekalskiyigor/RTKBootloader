@@ -111,7 +111,7 @@ class ModbusProvider:
         context = ModbusServerContext(slaves=self.store, single=True)
         print("Starting Modbus TCP server on localhost:502")
         try:
-            StartTcpServer(context, address=("localhost", 502)) # "192.168.1.100"  localhost
+            StartTcpServer(context, address=(f"{ip}", 502)) # "192.168.1.100"  localhost
         except Exception as e:
             print(f"Error starting Modbus server: {e}")
 
@@ -348,10 +348,16 @@ class Table:
         time.sleep(5)
         # Данные с камеры  
 
+        ##########################################################
         # Команда на прошивку
         print("7 Прошивальщик <- Команда на прошивку")
-        loadresult = igle_table.control_igle_table()
-
+        # БД Блок нааначения стола
+        db_connection.db_connect()
+        
+        # Берем свободный id в рамках заказа
+        record_id = db_connection.setTable(Order)
+        # БД Блок нааначения стола
+        print(f"БД - получили свободный заказ {record_id}")
         
 
         while True:

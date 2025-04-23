@@ -71,17 +71,19 @@ class IgleTable:
             response = requests.get(url)
             if response.status_code == 200:
                 data = response.json().get("data", {})
+                data2 = response.json()
+                result = data2.get("result")
                 test_result = data.get("test_result")
-                error_description = test_result.get("error_description")
-                result = test_result.get("result")
+                #error_description = test_result.get("error_description")
+                datamatrix = data.get("data_matrix")
 
                 return {
-                    "data_matrix": data.get("data_matrix"),
-                    "log_path": data.get("log_path"),
-                    "report_path": data.get("report_path"),
+                    "data_matrix": datamatrix[0],
+                    "log_path": data.get("log_file_path"),
+                    "report_path": data.get("report_file_path"),
                     "serial_number_8": data.get("serial_number_8"),
                     "stand_id": data.get("stand_id"),
-                    "error_description": error_description,
+                    "error_description": test_result,
                     "status_code": result
                 }
             else:
@@ -106,18 +108,22 @@ finally:
     s.close()
 print(f"Локальный IP-адрес: {ip}")
    
+
 igle_table = IgleTable(
-        urlIgleTabeControl=f"http://{ip}:5000/nails_table/start_test_board_with_rtk",
-        urlStatusFromIgleTabe=f"http://{ip}:5003/get_test_results",
+        urlIgleTabeControl=f"http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
+        urlStatusFromIgleTabe=f"http://192.168.1.100:5003/get_test_results",
 
         module_type="R050 DI 16 011-000-AAA",
-        stand_id="123",
-        serial_number_8="1234578",
-        data_matrix="Z12323434",
-        fw_type="MCU",
-        fw_path="path/test_fw1.hex",
-        username="admin",
-        password="password123"
+        stand_id="nt_kto_rtk_1",
+        serial_number_8="1",
+        data_matrix=["11"],
+        firmwares = [
+            {
+            "fw_type": "MCU",
+            "fw_path": "C:\\nails_table_bridge\\plc050_di16012-full.hex",
+            "fw_version": "1.0.36.0"
+            }
+        ]
     )
 resultTest = igle_table.recentData()
 print(f"Локальныйvvvv IP-адрес: {igle_table.urlStatusFromIgleTabe}")
@@ -126,5 +132,4 @@ print(f"Локальныйvvvv IP-адрес: {igle_table.urlStatusFromIgleTabe}
 for key, value in resultTest.items():
     print(f"{key}: {value}")
 # Проверяем, что ответ успешный
-
 """

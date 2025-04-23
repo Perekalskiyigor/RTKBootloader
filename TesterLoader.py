@@ -50,8 +50,8 @@ finally:
 print(f"Локальный IP-адрес: {ip}")
    
 igle_table = Igable.IgleTable(
-        urlIgleTabeControl=f"http://{ip}:5000/nails_table/start_test_board_with_rtk",
-        urlStatusFromIgleTabe=f"http://{ip}:5003/get_test_results",
+        urlIgleTabeControl=f"http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
+        urlStatusFromIgleTabe=f"http://192.168.1.100:5003/get_test_results",
 
         module_type="R050 DI 16 011-000-AAA",
         stand_id="nt_kto_rtk_1",
@@ -111,7 +111,7 @@ class ModbusProvider:
         context = ModbusServerContext(slaves=self.store, single=True)
         print("Starting Modbus TCP server on localhost:502")
         try:
-            StartTcpServer(context, address=(f"{ip}", 502)) # "192.168.1.100"  localhost
+            StartTcpServer(context, address=("192.168.1.100", 502)) # "192.168.1.100"  localhost
         except Exception as e:
             print(f"Error starting Modbus server: {e}")
 
@@ -196,6 +196,7 @@ class Table:
         for i in range(3):
             try:
                 photodata = CameraSocket.photo()
+                photodata = photodata[1]
                 print(f"С камеры получен ID {photodata}")
             except Exception as e:
                 print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
@@ -237,7 +238,7 @@ class Table:
         time.sleep(5)
 
         
-        loadresult = igle_table.control_igle_table()
+        igle_table.control_igle_table()
 
         
 
@@ -273,7 +274,6 @@ class Table:
             db_connection.set_BoardTest_Result(record_id, stand_id, serial_number_8, data_matrix, test_result, log_path, report_path, error_description)
             # Привязываем Data matrix к серийнику
             db_connection.ConnectPhotoSerial(record_id, photodata, loadresult)
-            db_connection.close_connection()
             # Рбот убери пллаиту в прошитые все успешно.
         else:
             print("Ошибка: не удалось получить данные, запись в БД не выполнена.")
@@ -342,22 +342,38 @@ class Table:
         for i in range(3):
             try:
                 photodata = CameraSocket.photo()
+                photodata = photodata[1]
                 print(f"С камеры получен ID {photodata}")
             except Exception as e:
                 print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
             time.sleep(1)
+        input("Нажми инпут")
 
         ##########################################################
+        # 7. Регул <- Опусти прошивальщик ложе 2.
+        print("7 Регул <- Опусти прошивальщик ложе 2")
+        self.change_value('Reg_updown_Botloader', 103)
+        while True:
+            result1 = self.read_value("sub_Reg_updown_Botloader")
+            if result1 != 103:
+                print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
+            elif result1 == 404:
+                print(f"От регула получен код 200 на на операции опустить прошивальщик")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_updown_Botloader', 0)
+        result1 = 0
 
         input("Нажми инпут")
         ## БД Блок ПРОШИВКИ 
         # 
-        time.sleep(5)
+        time.sleep(2)
         # Данные с камеры  
 
         ##########################################################
         # Команда на прошивку
-        print("7 Прошивальщик <- Команда на прошивку")
+        print("3 Прошивальщик <- Команда на прошивку")
         # БД Блок нааначения стола
         db_connection.db_connect()
         
@@ -365,6 +381,13 @@ class Table:
         record_id = db_connection.setTable(Order)
         # БД Блок нааначения стола
         print(f"БД - получили свободный заказ {record_id}")
+
+        # БД Блок ПРОШИВКИ
+        time.sleep(5)
+
+        
+        igle_table.control_igle_table()
+
         
 
         while True:
@@ -399,7 +422,6 @@ class Table:
             db_connection.set_BoardTest_Result(record_id, stand_id, serial_number_8, data_matrix, test_result, log_path, report_path, error_description)
             # Привязываем Data matrix к серийнику
             db_connection.ConnectPhotoSerial(record_id, photodata, loadresult)
-            db_connection.close_connection()
             # Рбот убери пллаиту в прошитые все успешно.
         else:
             print("Ошибка: не удалось получить данные, запись в БД не выполнена.")
@@ -419,11 +441,14 @@ class Table:
         resultTest = None
         # если получен ответ об успешной прошивке то производим привязывание платы к штрихкоду иначе в брак
         # Получить данные с сервера
-        ## БД Блок ПРОШИВКИ 
+
+        # БД Блок ПРОШИВКИ  ##
 
         input("Нажми инпут")
 
         ##########################################################
+
+
         # 8 Регул <- Подними прошивальщик.
         print("8. Регул <- Подними прошивальщик.")
         self.change_value('Reg_updown_Botloader', 104)

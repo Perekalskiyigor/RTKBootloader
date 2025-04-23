@@ -54,15 +54,7 @@ def get_test_results():
 
 
 if __name__ == '__main__':
-    
-    # Запускаем сервер для прослушивание ответов от иглостола на текущем хосте
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        # Подключаемся к "левому" адресу — не важно, доступен он или нет
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-    finally:
-        s.close()
+    app.run(host="192.168.1.100", port=5003)  # Можно менять порт/IP при необходимости
 
-    print(f"Локальный IP-адрес: {ip}")
-    app.run(host=ip, port=5003)  # Можно менять порт/IP при необходимости
+
+

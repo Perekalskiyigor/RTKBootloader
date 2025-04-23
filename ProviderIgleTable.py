@@ -1,5 +1,6 @@
 """Класс стола но буду вероятно использовать класс тэйбл там многопоточность"""
 
+import socket
 import requests
 import json
 import logging
@@ -7,18 +8,15 @@ import sqlite3
 from datetime import datetime
 
 class IgleTable:
-    def __init__(self, urlIgleTabeControl, urlStatusFromIgleTabe, urlStopgleTabe, module_type, stand_id, serial_number_8, data_matrix, fw_type, fw_path, username, password):
+    def __init__(self, urlIgleTabeControl, urlStatusFromIgleTabe, module_type, stand_id, serial_number_8, data_matrix, firmwares):
         self.urlIgleTabeControl = urlIgleTabeControl
         self.urlStatusFromIgleTabe = urlStatusFromIgleTabe
-        self.urlStopgleTabe = urlStopgleTabe
+
         self.module_type = module_type
         self.stand_id = stand_id
         self.serial_number_8 = serial_number_8
         self.data_matrix = data_matrix
-        self.fw_type = fw_type
-        self.fw_path = fw_path
-        self.username = username
-        self.password = password
+        self.firmwares = firmwares
         self.cookie = None
         
         # Настройка логирования
@@ -28,28 +26,7 @@ class IgleTable:
             format='%(asctime)s - ProviderIgleTable - %(levelname)s - %(message)s'
         )
 
-    
-    """
-    def login(self):
-        logging.info(f"Attempting login with username: {self.username}")
-        login_url = "http://127.0.0.1:5000/login"
-        payload = json.dumps({
-            "username": self.username,
-            "password": self.password
-        })
-        headers = {'Content-Type': 'application/json'}
-        
-        response = requests.post(login_url, headers=headers, data=payload)
-        
-        if response.status_code == 200:
-            logging.info(f"Login successful for username: {self.username}")
-            self.cookie = response.cookies.get('session')
-        else:
-            logging.error(f"Login failed for username: {self.username}. Response: {response.text}")
-    """
-    
-        
-    
+       
     # Запрос на прошивку
     def control_igle_table(self):
         """Метод для отправки команд иглостэнду.""" 
@@ -89,19 +66,23 @@ class IgleTable:
         
     # Перепарвка данных от иглостола в сервер ртк
     def recentData(self):
-        url = "http://localhost:5005/get_test_results"
+        url = self.urlStatusFromIgleTabe
         try:
             response = requests.get(url)
             if response.status_code == 200:
                 data = response.json().get("data", {})
+                test_result = data.get("test_result")
+                error_description = test_result.get("error_description")
+                result = test_result.get("result")
+
                 return {
                     "data_matrix": data.get("data_matrix"),
                     "log_path": data.get("log_path"),
                     "report_path": data.get("report_path"),
                     "serial_number_8": data.get("serial_number_8"),
                     "stand_id": data.get("stand_id"),
-                    "test_result": data.get("test_result"),
-                    "status_code": 200
+                    "error_description": error_description,
+                    "status_code": result
                 }
             else:
                 return {"status_code": 404}
@@ -111,61 +92,24 @@ class IgleTable:
         
 
 
-    # статус от иглостола
-    def status_igle_table(self):
-        """Метод для получения статуса стенда."""  
-        url = self.urlStatusFromIgleTabe
 
-        payload = json.dumps({
-            "stand_id": self.stand_id
-        })
-        
-        headers = {
-            'Content-Type': 'application/json',
-            'Cookie': 'session=.eJwljjkSwjAMAP_imkKHJUv5DGPZ8kCbkIrh74Sh2i222He5rz2PR9le-5m3cn_OspVkcmNTmU7elQWsTjBwkBZmyOag2ldSuA6vQ5NHG7N1c-pTAeuaaOsqL0ZHot7F62RaHhawEseqrQrEgErRlIMd00QCxMs1ch65_29-huXzBfFZL8A.Z8fMxg.3sF5O_20LPF__XrEzVAMgQoU0Wk'
-        }
 
-        try:
-            logging.info("Отправка запроса на получение статуса стенда %s", url)
-            response = requests.post(url, headers=headers, data=payload)
-            logging.info("Код ответа: %d", response.status_code)
-            logging.info("Ответ: %s", response.text)
-            return response.text
-        except requests.RequestException as e:
-            logging.error("Ошибка при получении статуса стенда: %s", str(e))
-            return None
-        
-    # статус от иглостола
-    def stop_igle_table(self):
-        """Метод для получения статуса стенда."""  
-        url = self.urlStopgleTabe
-
-        payload = json.dumps({
-            "stand_id": self.stand_id
-        })
-        
-        headers = {
-            'Content-Type': 'application/json',
-            'Cookie': 'session=.eJwljjkSwjAMAP_imkKHJUv5DGPZ8kCbkIrh74Sh2i222He5rz2PR9le-5m3cn_OspVkcmNTmU7elQWsTjBwkBZmyOag2ldSuA6vQ5NHG7N1c-pTAeuaaOsqL0ZHot7F62RaHhawEseqrQrEgErRlIMd00QCxMs1ch65_29-huXzBfFZL8A.Z8fMxg.3sF5O_20LPF__XrEzVAMgQoU0Wk'
-        }
-
-        try:
-            logging.info("Отправка запроса стоп на стенд %s", self.stand_id)
-            response = requests.post(url, headers=headers, data=payload)
-            logging.info("Код ответа: %d", response.status_code)
-            logging.info("Ответ: %s", response.text)
-            return response.text
-        except requests.RequestException as e:
-            logging.error("Ошибка отправки стоп на стенд: %s", str(e))
-            return None
     
 
+"""
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+try:
+    # Подключаемся к "левому" адресу — не важно, доступен он или нет
+    s.connect(("8.8.8.8", 80))
+    ip = s.getsockname()[0]
+finally:
+    s.close()
+print(f"Локальный IP-адрес: {ip}")
+   
+igle_table = IgleTable(
+        urlIgleTabeControl=f"http://{ip}:5000/nails_table/start_test_board_with_rtk",
+        urlStatusFromIgleTabe=f"http://{ip}:5003/get_test_results",
 
-if __name__ == "__main__":
-    igle_table = IgleTable(
-        urlIgleTabeControl="http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
-        urlStatusFromIgleTabe="http://127.0.0.1:5000/get_stand_status",
-        urlStopgleTabe="http://127.0.0.1:5000/stop_test_board_with_rtk",
         module_type="R050 DI 16 011-000-AAA",
         stand_id="123",
         serial_number_8="1234578",
@@ -175,30 +119,12 @@ if __name__ == "__main__":
         username="admin",
         password="password123"
     )
+resultTest = igle_table.recentData()
+print(f"Локальныйvvvv IP-адрес: {igle_table.urlStatusFromIgleTabe}")
 
-    
+# Выводим все данные
+for key, value in resultTest.items():
+    print(f"{key}: {value}")
+# Проверяем, что ответ успешный
 
-    """
-    #Управление иглостолом
-    response = igle_table.control_igle_table()
-    print(response)
-    """
-
-    """
-    # Статус иглостола
-    response = igle_table.status_igle_table()
-    print(response)
-    """
-
-    """
-    # Стоп иглостола
-    response = igle_table.stop_igle_table()
-    print(response)
-    """
-    
-    """
-    igle_table.db_connect()
-    igle_table.login()
-    
-    """
-    
+"""

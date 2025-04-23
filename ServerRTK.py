@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 import logging
+import socket
 
 # Глобальная переменная для хранения последних данных
 latest_data = None
@@ -53,4 +54,15 @@ def get_test_results():
 
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5005)  # Можно менять порт/IP при необходимости
+    
+    # Запускаем сервер для прослушивание ответов от иглостола на текущем хосте
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # Подключаемся к "левому" адресу — не важно, доступен он или нет
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+    finally:
+        s.close()
+
+    print(f"Локальный IP-адрес: {ip}")
+    app.run(host=ip, port=5003)  # Можно менять порт/IP при необходимости

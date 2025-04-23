@@ -3,6 +3,8 @@ import time
 from pymodbus.server import StartTcpServer
 from pymodbus.datastore import ModbusSequentialDataBlock, ModbusSlaveContext, ModbusServerContext
 import threading
+import socket
+
 
 # Пользовательский класс камеры
 # mport CameraClass as CAM
@@ -14,8 +16,6 @@ import SQLite as SQL
 # Поьзовательский класс провайдера Иглостола
 import ProviderIgleTable as Igable
 
-# Сервер ртк
-import ServerRTK
 
 # Глобальные ящик и ясейка 
 Tray1 = 0
@@ -40,28 +40,33 @@ logging.basicConfig(
 )
 
 ################################################# IgleTable Communication Class ###################################
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+try:
+    # Берем адрес текущего хоста
+    s.connect(("8.8.8.8", 80))
+    ip = s.getsockname()[0]
+finally:
+    s.close()
+print(f"Локальный IP-адрес: {ip}")
+   
 igle_table = Igable.IgleTable(
-        urlIgleTabeControl="http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
-        urlStatusFromIgleTabe="http://127.0.0.1:5000/get_stand_status",
-        urlStopgleTabe="http://127.0.0.1:5000/stop_test_board_with_rtk",
+        urlIgleTabeControl=f"http://{ip}:5000/nails_table/start_test_board_with_rtk",
+        urlStatusFromIgleTabe=f"http://{ip}:5003/get_test_results",
+
         module_type="R050 DI 16 011-000-AAA",
-        stand_id="123",
-        serial_number_8="1234578",
-        data_matrix="Z12323434",
-        fw_type="MCU",
-        fw_path="path/test_fw1.hex",
-        username="admin",
-        password="password123"
+        stand_id="nt_kto_rtk_1",
+        serial_number_8="1",
+        data_matrix=["11"],
+        firmwares = [
+            {
+            "fw_type": "MCU",
+            "fw_path": "C:\\nails_table_bridge\\plc050_di16012-full.hex",
+            "fw_version": "1.0.36.0"
+            }
+        ]
     )
 ################################################# IgleTable Communication Class ###################################
 
-################################################# START CAMERA Communication class ###################################
-
-# Пример использования
-# camera_ip = '192.168.1.50'
-# camera = CAM.CameraConnection(camera_ip)
-
-################################################# STOP CAMERA Communication class ###################################
 
 ################################################# START SQL Communication class ###################################
  
@@ -351,50 +356,73 @@ class Table:
         
 
         ############################# БД Блок нааначения стола #########################
-        # если получен ответ об успешной прошивке то производим привязывание платы к штрихкоду иначе в брак
         db_connection.db_connect()
+        
         # Берем свободный id в рамках заказа
         record_id = db_connection.setTable(Order)
         ############################# БД Блок нааначения стола #########################
         print(f"Получение id {record_id}")
-        ############################# БД Блок связываания серийника и платы  ####################
+
+
+        ############################# БД Блок ПРОШИВКИ  ####################
         # 
         time.sleep(5)
+        # Данные с камеры  
         photodata = "FF494"
+
         db_connection.db_connect()
         # Ждем пока прошьется
-        loadresult = 200
-        if loadresult ==200:
-            loadresult = igle_table.control_igle_table()
+
+        
+        # Команда на прошивку
+        loadresult = igle_table.control_igle_table()
+
+        
+
+        while True:
             # Получаем данные о результате от стола через сверер РТК
             resultTest = igle_table.recentData()
             print("Результат запроса:")
-            # Выводим все данные
-            for key, value in resultTest.items():
-                print(f"{key}: {value}")
-            # Проверяем, что ответ успешный
-            if resultTest.get("status_code") == 200:
-                # Извлекаем переменные
-                data_matrix = resultTest.get("data_matrix")
-                log_path = resultTest.get("log_path")
-                report_path = resultTest.get("report_path")
-                serial_number_8 = resultTest.get("serial_number_8")
-                stand_id = resultTest.get("stand_id")
-                test_result = resultTest.get("test_result")
-                # Запись в БД
-                db_connection.set_BoardTest_Result(record_id, stand_id, serial_number_8, data_matrix, test_result, log_path, report_path)
 
-                db_connection.ConnectPhotoSerial(record_id, photodata, loadresult)
-                db_connection.close_connection()
+            loadresult = resultTest['status_code']
+            print(f"Rresult from IgleTable {loadresult}")
+            
+            # Выводим все данные
+            if loadresult!= "OK":
+                print(f"Ждем ответ от прошивальщика")
             else:
-                print("Ошибка: не удалось получить данные, запись в БД не выполнена.")
-                # выставить результат тестирования и привязать плату
-                # 200 - успешно
-                # 404 - возгникла ошибка/пишем лог ошибки в базу
-                # если 404 говорим роботу убери в брак
-               
+                break
+            time.sleep(1)
+        
+        # Выводим все данные
+        for key, value in resultTest.items():
+            print(f"{key}: {value}")
+        # Проверяем, что ответ успешный
+        if resultTest.get("status_code") == "OK":
+            # Извлекаем переменные
+            data_matrix = resultTest.get("data_matrix")
+            log_path = resultTest.get("log_path")
+            report_path = resultTest.get("report_path")
+            serial_number_8 = resultTest.get("serial_number_8")
+            stand_id = resultTest.get("stand_id")
+            test_result = resultTest.get("status_code")
+            error_description = resultTest.get("error_description")
+            # Запись в БД результатов прошивки
+            db_connection.set_BoardTest_Result(record_id, stand_id, serial_number_8, data_matrix, test_result, log_path, report_path, error_description)
+            # Привязываем Data matrix к серийнику
+            db_connection.ConnectPhotoSerial(record_id, photodata, loadresult)
+            db_connection.close_connection()
+            # Рбот убери пллаиту в прошитые все успешно.
         else:
-            print ("Плата не прошита уводим в брак и проставляем причину")
+            print("Ошибка: не удалось получить данные, запись в БД не выполнена.")
+
+            # Роботу буери плату в прошитые не успешно
+
+            # выставить результат тестирования и привязать плату
+            # 200 - успешно
+            # 404 - возгникла ошибка/пишем лог ошибки в базу
+            # если 404 говорим роботу убери в брак
+               
         
         # Очищаем перменные результата
         photodata = None
@@ -403,6 +431,9 @@ class Table:
         resultTest = None
         # если получен ответ об успешной прошивке то производим привязывание платы к штрихкоду иначе в брак
         # Получить данные с сервера
+
+    ############################# БД Блок ПРОШИВКИ  ####################
+
 
 
 

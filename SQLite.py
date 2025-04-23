@@ -41,9 +41,10 @@ class DatabaseConnection:
                     status INTEGER,
                     desk_id INTEGER,
                     firmware_link TEXT NOT NULL,
-                    test_result INTEGER,
+                    test_result TEXT,
                     report_path  TEXT,
-                    log_path    TEXT,      
+                    log_path    TEXT,
+                    error_description TEXT,      
                     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
                 );
             ''')
@@ -238,6 +239,8 @@ class DatabaseConnection:
             print(f"Ошибка при обновлении записи order_details: {e}")
             return None
         
+    
+    
     def ConnectPhotoSerial(self, record_id, photodata, loadresult):
         """ Связываем серийный номер и штрихкод на плате с результатом теста и фото """
         try:
@@ -312,7 +315,7 @@ class DatabaseConnection:
 
     
 
-    def set_BoardTest_Result(self, record_id, stand_id, serial_number_8, data_matrix, test_result, log_path, report_path):
+    def set_BoardTest_Result(self, record_id, stand_id, serial_number_8, data_matrix, test_result, log_path, report_path, error_description):
         """ Установка результатов тестирования вызывается от Сервер РТК """
         logging.info(f"[RTK] Вызов метода set_BoardTest_Result для записи ID: {record_id}")
         print(f"[RTK] Установка результатов тестирования для записи ID: {record_id}")
@@ -325,16 +328,17 @@ class DatabaseConnection:
                 data_matrix = ?,
                 test_result = ?,
                 log_path = ?,
-                report_path = ?
+                report_path = ?,
+                error_description = ?
             WHERE id = ?
             """
             # Отладочная информация
             logging.debug(f"SQL: {update_query.strip()}")
-            logging.debug(f"SQL values: ({stand_id}, {serial_number_8}, {data_matrix}, {test_result}, {log_path}, {report_path}, {record_id})")
-            print(f"[DB] Выполнение запроса с параметрами: ({stand_id}, {serial_number_8}, {data_matrix}, {test_result}, {log_path}, {report_path}, {record_id})")
+            logging.debug(f"SQL values: ({stand_id}, {serial_number_8}, {data_matrix}, {test_result}, {log_path}, {report_path}, {record_id},{error_description})")
+            print(f"[DB] Выполнение запроса с параметрами: ({stand_id}, {serial_number_8}, {data_matrix}, {test_result}, {log_path}, {report_path}, {record_id},{error_description})")
 
             # Выполнение запроса
-            self.cursor.execute(update_query, (stand_id, serial_number_8, data_matrix, test_result, log_path, report_path, record_id))
+            self.cursor.execute(update_query, (stand_id, serial_number_8, data_matrix, test_result, log_path, report_path, error_description, record_id))
             self.conn.commit()
 
             # Консольный вывод

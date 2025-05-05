@@ -170,43 +170,65 @@ class Table:
     def defence_cycle(self):
         print("******ЦИКЛ DEFENCE*******")
         print("1 Регул <- Сдвинь плату освободив ложе1.")
+        logging.info(f"Отправка команды Reg_move_Table = 101")
         self.change_value('Reg_move_Table', 101)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
+            logging.debug(f"Текущее значение sub_Reg_move_Table: {result1}")
+
             if result1 != 101:
                 print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
+                logging.info(f"Ожидание ответа от стола... Текущее значение: {result1}")
             elif result1 == 404:
-                print(f"От регула получен код 200 на операции движения стола")
+                print(f"От регула получен код 404 на операции движения стола")
+                logging.info("От регула получен код 404 (успех операции движения стола)")
             else:
+                logging.info("Успешное завершение: стол сдвинут")
                 break
             time.sleep(1)
+        logging.info(f"Сброс команды Reg_move_Table = 0")
         self.change_value('Reg_move_Table', 0)
 
         print("2 Робот <- Забери плату с ложе 1.")
+        logging.info(f"Отправка команды Rob_Action = 231")
         self.change_value('Rob_Action', 231)
         while True:
             result1 = self.read_value("sub_Rob_Action")
+            logging.debug(f"Текущее значение sub_Rob_Action: {result1}")
 
             if result1 != 231:
                 print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
+                logging.info(f"Ожидание ответа от робота... Текущее значение: {result1}")
             elif result1 == 404:
-                print(f"От робота получен код 200 на на операции взять плату с ложа")
+                print(f"От робота получен код 404 на на операции взять плату с ложа")
+                logging.info("От робота получен код 404 (успех операции 'взять плату')")
             else:
+                logging.info("От робота получен код 200 (успех операции 'взять плату')")
                 break
             time.sleep(1)
+        logging.info(f"Сброс команды Rob_Action = 0")
         self.change_value('Rob_Action', 0)
 
         print("3 Регул <- Сдвинь плату освободив ложе2.")
+        logging.info("3 Регул <- Сдвинь плату освободив ложе2.")
+        logging.info(f"Отправка команды Reg_move_Table = 102")
         self.change_value('Reg_move_Table', 102)
         while True:
+            logging.debug(f"Текущее значение sub_Reg_move_Table: {result1}")
+
             result1 = self.read_value("sub_Reg_move_Table")
             if result1 != 102:
                 print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
+                logging.info(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
             elif result1 == 404:
-                print(f"От регула получен код 200 на операции движения стола")
+                print(f"От регула получен код 404 на операции движения стола")
+                logging.info(f"От регула получен код 404 на операции движения стола")
             else:
+                logging.info("Успешное завершение: стол сдвинут")
                 break
             time.sleep(1)
+
+        logging.info(f"Сброс команды Reg_move_Table = 0")
         self.change_value('Reg_move_Table', 0)
 
         print("4 Робот <- Забери плату с ложе 2.")
@@ -338,18 +360,27 @@ class Table:
         
         ######################################################
         # input("нажми ентер")
-        # 7 Робот <- Забери плату из тары
-        print("7 Робот <- забрать плату из тары")
+        # 1 Робот <- Забери плату из тары
+        print("1 Робот <- забрать плату из тары")
+        logging.info(f"[Команда] Установка Rob_Action = 210 (забор из тары)")
         self.change_value('Rob_Action', 210)
         while True:
+            logging.debug(f"[Статус] sub_Rob_Action = {result1}")
+
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 210:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
+                logging.info(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
             elif result1 == 404:
-                print(f"От робота получен код 200 на на операции забрать из тары плату")
+                print(f"От робота получен код 404 на на операции забрать из тары плату")
+                logging.info(f"От робота получен код 404 на на операции забрать из тары плату")
+                
             else:
+                logging.info("Операция забора из тары успешно завершена")
                 break
             time.sleep(1)
+
+        logging.info(f"[Завершение] Сброс Rob_Action = 0")
         self.change_value('Rob_Action', 0)
         result1=0
         ##########################################################
@@ -357,15 +388,21 @@ class Table:
 
         ################################################################
         # 5 Делаем фото платы
-        print("6 Камера <- сделай фото")
+        print("2 Камера <- сделай фото")
+        logging.info(f"НАЧАЛО: Камера <- сделай фото")
         for i in range(3):
             try:
-                photodata = CameraSocket.photo()
-                photodata = photodata[1]
+                logging.debug(f"Попытка {i}: запрос фото с камеры")
+                res,photodata = CameraSocket.photo()
                 print(f"С камеры получен ID {photodata}")
             except Exception as e:
                 print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
             time.sleep(1)
+        while True:
+            if res != 200:
+                print(f"Ошибка получения фото с камеры")
+            else:
+                break 
         time.sleep(1)
         ###########################################################################
 

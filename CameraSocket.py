@@ -63,5 +63,5 @@ def photo():
     
 
 
-# res,data = photo()
-# print (f"Result={res}  Data = {data}")
+res,data = photo()
+print (f"Result={res}  Data = {data}")

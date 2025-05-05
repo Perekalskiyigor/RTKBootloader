@@ -304,6 +304,7 @@ class Table:
     ############# ****ЦИКЛ MAIN ******"
     def main(self):
         print("****ЦИКЛ MAIN")
+        input("нажми ентер")
         # 1. Регул <- Опусти прошивальщик ложе 2.
         print("1 Регул <- Опусти прошивальщик ложе 2")
         self.change_value('Reg_updown_Botloader', 103)
@@ -318,13 +319,13 @@ class Table:
             time.sleep(1)
         self.change_value('Reg_updown_Botloader', 0)
         result1 = 0
-        
+        input("нажми ентер")
         
         # 2. Сервер <- Начни шить
         # 3. Сервер -> Ответ по прошивке (плохо, хорошо)
         print("2. Сервер <- Начни шить")
         print("3. Сервер -> Ответ по прошивке (плохо, хорошо)")
-        
+        input("нажми ентер")
         # 4. Регул <- Подними прошивальщик.
         print("4. Регул <- Подними прошивальщик.")
         self.change_value('Reg_updown_Botloader', 104)
@@ -340,7 +341,7 @@ class Table:
         self.change_value('Reg_updown_Botloader', 0)
         result1 = 0
 
-        
+        input("нажми ентер")
         # 5. Регул <- Сдвинь плату освободив ложе2.
         print("5 Регул <- Сдвинь плату освободив ложе2")
         self.change_value('Reg_move_Table', 102)
@@ -356,6 +357,7 @@ class Table:
         self.change_value('Reg_move_Table', 0)
         result1 = 0
 
+        input("нажми ентер")
         # 6. Робот <- Забери плату с ложе 2.
         print("6 Робот <- Забери плату с ложе 2.")
         self.change_value('Rob_Action', 232)
@@ -372,6 +374,8 @@ class Table:
         self.change_value('Rob_Action', 0)
         print("Стол 1ложе свободен")
         result1 = 0
+
+        input("нажми ентер")
         # 7 Робот <- Уложи плату в тару
         print("# 7 Робот <- Уложи плату в тару.")
         self.change_value('Rob_Action', 241)
@@ -389,6 +393,7 @@ class Table:
         print("плата уложена в тару")
         result1 = 0
 
+        input("нажми ентер")
         # 7 Робот <- Забери плату из тары
         print("7 Робот <- забрать плату из тары")
         self.change_value('Rob_Action', 210)
@@ -404,6 +409,7 @@ class Table:
         self.change_value('Rob_Action', 0)
         result1=0
         
+        input("нажми ентер")
         # 8 Делаем фото платы
         print("8 Камера <- сделай фото")
         a = CameraSocket.photo()
@@ -416,7 +422,7 @@ class Table:
         print (a)
         time.sleep(1)
         
-
+        input("нажми ентер")
         # 9 Робот <- Уложи плату в ложемент тетситрования 2
         print("9 Робот <- Уложи плату в ложемент тетситрования 2")
         self.change_value('Rob_Action', 222)

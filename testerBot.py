@@ -90,8 +90,6 @@ except Exception as e:
 
 class ModbusProvider:
     """Class MODBUS Communication with Modbus regul"""
-    global Tray1
-    global Cell1
     def __init__(self):
         self.store = ModbusSlaveContext(
             hr=ModbusSequentialDataBlock(0, [0] * 100)
@@ -101,7 +99,6 @@ class ModbusProvider:
         self.Reg_move_Table = 0             # Move Table
         self.Reg_updown_Botloader = 0        # Move botloader
         self.Rob_Action = 0                 # Action to Robot
-
 
         self.server_thread = threading.Thread(target=self.run_modbus_server, daemon=True)
         self.server_thread.start()
@@ -113,7 +110,7 @@ class ModbusProvider:
         context = ModbusServerContext(slaves=self.store, single=True)
         print("Starting Modbus TCP server on localhost:502")
         try:
-            StartTcpServer(context, address=("192.168.1.100", 502)) # "192.168.1.100"
+            StartTcpServer(context, address=("192.168.1.100", 502))
         except Exception as e:
             print(f"Error starting Modbus server: {e}")
 
@@ -121,7 +118,6 @@ class ModbusProvider:
     # Modbus registers read/write
     def update_registers(self):
         global dict_Table1
-
         while True:
             try:
                 with self.lock:
@@ -133,13 +129,9 @@ class ModbusProvider:
                     self.Reg_updown_Botloader = dict_Table1["Reg_updown_Botloader"]
                     self.Rob_Action = dict_Table1["Rob_Action"]
 
-
                     self.store.setValues(3, 0, [self.Reg_move_Table])
                     self.store.setValues(3, 2, [self.Reg_updown_Botloader])
                     self.store.setValues(3, 4, [self.Rob_Action])
-
-                    self.store.setValues(3, 6, [Tray1])
-                    self.store.setValues(3, 8, [Cell1])
             except Exception as e:
                 print(f"Error updating registers: {e}")
             time.sleep(1)
@@ -150,10 +142,6 @@ class ModbusProvider:
 ################################################# START TABLE CLASS #####################################################################
 class Table:
     """ TABLE CLASS"""
-    global Tray1
-    global Cell1
-    global Order
-
     def __init__(self, name, initial_dict):
         self.name = name
         self.data = initial_dict
@@ -240,15 +228,9 @@ class Table:
     ############# ****ЦИКЛ SETUP ******"
     def setup_cycle(self):
         print("****ЦИКЛ SETUP******")
-        global Tray1
-        global Cell1
-        global Order
 
         # 5 Робот <- Забери плату из тары
         print("5 Робот <- забрать плату из тары")
-        # Передаем ящик из которого нужно забрать и номер ячейки
-        Tray1 = 1
-        Cell1 = Cell1 + 1
         self.change_value('Rob_Action', 210)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -262,14 +244,17 @@ class Table:
         self.change_value('Rob_Action', 0)
 
         # 6 Делаем фото платы
-        for i in range(3):
-            try:
-                a = CameraSocket.photo()
-                print(a)
-            except Exception as e:
-                print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
-            time.sleep(1)
-
+        print("6 Камера <- сделай фото")
+        a = CameraSocket.photo()
+        print (a)
+        time.sleep(1)
+        a = CameraSocket.photo()
+        print (a)
+        time.sleep(1)
+        a = CameraSocket.photo()
+        print (a)
+        time.sleep(1)
+        
 
         # 7 Робот <- Уложи плату в ложемент тетситрования
         print("7 Робот <- Уложи плату в ложемент тетситрования 2")
@@ -304,10 +289,6 @@ class Table:
 
         # 9 Робот <- Забери плату из тары
         print("9 Робот <- забрать плату из тары")
-        # Передаем ящик из которого нужно забрать и номер ячейки
-        Tray1 = 1
-        Cell1 = Cell1 + 1
-
         self.change_value('Rob_Action', 210)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -322,13 +303,15 @@ class Table:
 
         # 10 Делаем фото платы
         print("10 Камера <- сделай фото")
-        for i in range(3):
-            try:
-                a = CameraSocket.photo()
-                print(a)
-            except Exception as e:
-                print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
-            time.sleep(1)
+        a = CameraSocket.photo()
+        print (a)
+        time.sleep(1)
+        a = CameraSocket.photo()
+        print (a)
+        time.sleep(1)
+        a = CameraSocket.photo()
+        print (a)
+        time.sleep(1)
         
 
         # 11 Робот <- Уложи плату в ложемент тетситрования
@@ -351,11 +334,29 @@ class Table:
 
     ############# ****ЦИКЛ MAIN ******"
     def main(self):
-        global Tray1
-        global Cell1
         print("****ЦИКЛ MAIN")
-        input("нажми ентер")
+        
+        ######################################################
+        # input("нажми ентер")
+        # 7 Робот <- Забери плату из тары
+        print("7 Робот <- забрать плату из тары")
+        self.change_value('Rob_Action', 210)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+            if result1 != 210:
+                print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
+            elif result1 == 404:
+                print(f"От робота получен код 200 на на операции забрать из тары плату")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        result1=0
+        ##########################################################
+        #input("нажми ентер")
 
+        ################################################################
+        # 5 Делаем фото платы
         print("6 Камера <- сделай фото")
         for i in range(3):
             try:
@@ -365,30 +366,122 @@ class Table:
             except Exception as e:
                 print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
             time.sleep(1)
+        time.sleep(1)
+        ###########################################################################
 
-        input("нажми ентер")
 
-        #1#############################################################################
-        # Регул <- Опусти прошивальщик (плата на ложе1).
+
+        ############################################################
+        # 7 Робот <- Уложи плату в ложемент тетситрования
+        print("7 Робот <- Уложи плату в ложемент тетситрования 1")
+        self.change_value('Rob_Action', 221)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+            if result1 != 221:
+                print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
+            elif result1 == 404:
+                print(f"От робота получен код 200 на на операции забрать из тары плату")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        ####################################################################
+        #input("нажми ентер")
+
+        ######################################################################
+        # 8 Регул - Сдвигаем стол осовобождая ложе1
+        print("8 Регул <- Сдвинь плату освободив ложе2.")
+        self.change_value('Reg_move_Table', 102)
+        while True:
+            result1 = self.read_value("sub_Reg_move_Table")
+            if result1 != 102:
+                print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
+            elif result1 == 404:
+                print(f"От регула получен код 200 на операции движения стола")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_move_Table', 0)
+        ############################################################################
+        #input("нажми ентер")
+        #############################################################################
+        # 9 Робот <- Забери плату из тары
+        print("9 Робот <- забрать плату из тары")
+        self.change_value('Rob_Action', 210)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+            if result1 != 210:
+                print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
+            elif result1 == 404:
+                print(f"От робота получен код 200 на на операции забрать из тары плату")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        ##################################################################################
+
+        ######################################################################################
+        # 5 Делаем фото платы
+        print("6 Камера <- сделай фото")
+        for i in range(3):
+            try:
+                photodata = CameraSocket.photo()
+                photodata = photodata[1]
+                print(f"С камеры получен ID {photodata}")
+            except Exception as e:
+                print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
+            time.sleep(1)
+        time.sleep(1)
+        #########################################################################################
+
+
+        #input("нажми ентер")
+        ###################################################################################
+        # 11 Робот <- Уложи плату в ложемент тетситрования
+        print("11 Робот <- Уложи плату в ложемент тетситрования 1")
+        self.change_value('Rob_Action', 222)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+            if result1 != 222:
+                print(f"Ждем ответ от робота, что плату уложили = {result1}")
+            elif result1 == 404:
+                print(f"От робота получен код 200 на на операции уложить плату")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        ######################################################################################
+        #input("нажми ентер")
+
+
+        ########################################################################################
+        # 1. Регул <- Опусти прошивальщик ложе 2.
+        print("1 Регул <- Опусти прошивальщик ложе 2")
         self.change_value('Reg_updown_Botloader', 103)
         while True:
             result1 = self.read_value("sub_Reg_updown_Botloader")
-            if  result1 != 103:
-                print(f" от регула = {result1}")
+            if result1 != 103:
+                print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
+            elif result1 == 404:
+                print(f"От регула получен код 200 на на операции опустить прошивальщик")
             else:
                 break
             time.sleep(1)
         self.change_value('Reg_updown_Botloader', 0)
-        print("Стол 2ложе свободен, прошивальщик опущен")
         result1 = 0
-        ###############################################################################
-        input("нажми ентер")
-        #2#############################################################################
+        #############################################################################################
+        #input("нажми ентер")
+
+
+        ##############################################################################################
+        # 2. Сервер <- Начни шить
+        # 3. Сервер -> Ответ по прошивке (плохо, хорошо)
+        print("2. Сервер <- Начни шить")
+        print("3. Сервер -> Ответ по прошивке (плохо, хорошо)")
+        # photodata = "Z45564564645"
         firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata)
-        input("нажми ентер")
         while True:
-            result1 = 200
-            # result1 = firmware_loader.loader()
+            result1 = firmware_loader.loader()
             if result1 != 200:
                 print(f"Ждем ответ прошивальщка {result1}")
             else:
@@ -396,11 +489,13 @@ class Table:
             time.sleep(1)
         print (f"Ответ от прошивальщика получен {result1}")
         # Очищаем перменные результата
-        # photodata = None
+        photodata = None
         result1 = 0
-        ###############################################################################
-        input("нажми ентер")
-        ################################################################################
+        ###############################################################################################
+        #input("нажми ентер")
+
+
+        ################################################################################################
         # 4. Регул <- Подними прошивальщик.
         print("4. Регул <- Подними прошивальщик.")
         self.change_value('Reg_updown_Botloader', 104)
@@ -415,13 +510,186 @@ class Table:
             time.sleep(1)
         self.change_value('Reg_updown_Botloader', 0)
         result1 = 0
+        ################################################################################################
+        #input("нажми ентер")
 
-        ##############################################################################
 
-        input("нажми ентер")
-        #3#############################################################################
-        # 1. Регул <- Сдвинь плату освободив ложе2.
-        print("1 Регул <- Сдвинь плату освободив ложе2")
+        ################################################################################################
+        # 5. Регул <- Сдвинь плату освободив ложе2.
+        print("5 Регул <- Сдвинь плату освободив ложе2")
+        self.change_value('Reg_move_Table', 101)
+        while True:
+            result1 = self.read_value("sub_Reg_move_Table")
+            if result1 != 101:
+                print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
+            elif result1 == 404:
+                print(f"От регула получен код 200 на операции движения стола")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_move_Table', 0)
+        result1 = 0
+        ###################################################################################################
+        #input("нажми ентер")
+
+
+        ###################################################################################################
+        # 6. Робот <- Забери плату с ложе 2.
+        print("6 Робот <- Забери плату с ложе 2.")
+        self.change_value('Rob_Action', 231)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+
+            if result1 != 231:
+                print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
+            elif result1 == 404:
+                print(f"От робота получен код 200 на на операции взять плату с ложа")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        print("Стол 1ложе свободен")
+        result1 = 0
+        #######################################################################################################
+        # input("нажми ентер")
+
+
+        #########################################################################################################
+        # 7 Робот <- Уложи плату в тару
+        print("# 7 Робот <- Уложи плату в тару.")
+        self.change_value('Rob_Action', 241)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+
+            if result1 != 241:
+                print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
+            elif result1 == 404:
+                print(f"От робота получен код 200 на на операции взять плату с ложа")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        print("плата уложена в тару")
+        result1 = 0
+        ##########################################################################################################
+        # input("нажми ентер")
+
+
+        ##########################################################################################################
+        # 7 Робот <- Забери плату из тары
+        print("7 Робот <- забрать плату из тары")
+        self.change_value('Rob_Action', 210)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+            if result1 != 210:
+                print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
+            elif result1 == 404:
+                print(f"От робота получен код 200 на на операции забрать из тары плату")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        result1=0
+        ###############################################################################################################
+        #input("нажми ентер")
+
+        #################################################################################################################
+        # 5 Делаем фото платы
+        print("6 Камера <- сделай фото")
+        for i in range(3):
+            try:
+                photodata = CameraSocket.photo()
+                photodata = photodata[1]
+                print(f"С камеры получен ID {photodata}")
+            except Exception as e:
+                print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
+            time.sleep(1)
+        time.sleep(1)
+        ################################################################################################################
+
+
+        ################################################################################################################
+        # 9 Робот <- Уложи плату в ложемент тетситрования 2
+        print("9 Робот <- Уложи плату в ложемент тетситрования 2")
+        self.change_value('Rob_Action', 221)
+        while True:
+            result1 = self.read_value("sub_Rob_Action")
+            if result1 != 221:
+                print(f"Ждем ответ от робота, что плату уложили = {result1}")
+            elif result1 == 404:
+                print(f"От робота получен код 200 на на операции уложить плату")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Rob_Action', 0)
+        print("Стол 1ложе занято")
+        result1=0
+        ######################################################################################################################
+        #input("нажми ентер")
+
+
+        #######################################################################################################################
+        # 10. Регул <- Опусти прошивальщик (плата на ложе1).
+        print("10. Регул <- Опусти прошивальщик (плата на ложе1).")
+        self.change_value('Reg_updown_Botloader', 103)
+        while True:
+            result1 = self.read_value("sub_Reg_updown_Botloader")
+            if result1 != 103:
+                print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
+            elif result1 == 404:
+                print(f"От регула получен код 200 на на операции опустить прошивальщик")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_updown_Botloader', 0)
+        result1 = 0
+        ########################################################################################################################
+        #input("нажми ентер")
+
+
+        #########################################################################################################################
+        # 2. Сервер <- Начни шить
+        # 3. Сервер -> Ответ по прошивке (плохо, хорошо)
+        print("2. Сервер <- Начни шить")
+        print("3. Сервер -> Ответ по прошивке (плохо, хорошо)")
+        #photodata = "Z45564564645"
+        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata)
+        while True:
+            result1 = firmware_loader.loader()
+            if result1 != 200:
+                print(f"Ждем ответ прошивальщка {result1}")
+            else:
+                break
+            time.sleep(1)
+        print (f"Ответ от прошивальщика получен {result1}")
+        # Очищаем перменные результата
+        photodata = None
+        result1 = 0
+        ##########################################################################################################################
+        #input("нажми ентер")
+
+
+        ##########################################################################################################################
+        # 13 Регул <- Подними прошивальщик.
+        print("13. Регул <- Подними прошивальщик.")
+        self.change_value('Reg_updown_Botloader', 104)
+        while True:
+            result1 = self.read_value("sub_Reg_updown_Botloader")
+            if result1 != 104:
+                print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
+            elif result1 == 404:
+                print(f"От регула получен код 200 на на операции поднять прошивальщик")
+            else:
+                break
+            time.sleep(1)
+        self.change_value('Reg_updown_Botloader', 0)
+        result1 = 0
+        ###########################################################################################################################
+        #input("нажми ентер")
+
+        ###########################################################################################################################
+        # 14. Регул <- Сдвинь плату освободив ложе1.
+        print("14 Регул <- Сдвинь плату освободив ложе1")
         self.change_value('Reg_move_Table', 102)
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
@@ -434,48 +702,37 @@ class Table:
             time.sleep(1)
         self.change_value('Reg_move_Table', 0)
         result1 = 0
-        ###############################################################################
-        input("нажми ентер")
-        #4#############################################################################
-        # 2.1. Робот <- Забери плату с ложе 2. # 2.2 Регул <- Опусти прошивальщик (плата на ложе1).
-        print("2.1 Робот <- Забери плату с ложе 2.  2.2. Регул <- Опусти прошивальщик (плата на ложе1).")
+        print("Стол 1ложе свободен")
+        ##############################################################################################################################
+        #input("нажми ентер")
+
+        ###############################################################################################################################
+        print("15 Робот <- Забери плату с ложе 1.")
         self.change_value('Rob_Action', 232)
-        self.change_value('Reg_updown_Botloader', 103)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            result2 = self.read_value("sub_Reg_updown_Botloader")
-            if result1 != 232 and result2 != 103:
-                print(f"от робота = {result1}, от регула = {result2}")
+
+            if result1 != 232:
+                print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
             else:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
-        self.change_value('Reg_updown_Botloader', 0)
-        print("Стол 2ложе свободен, прошивальщик опущен")
-
         result1 = 0
-        result2 = 0
-        ###############################################################################
+        ###############################################################################################################################
 
-        input("нажми ентер")
-
-        #5#############################################################################
-        # 3.1 Робот <- Уложи плату в тару # 3.2.1 Сервер <- Начни шить # 3.2.2 Сервер -> Ответ по прошивке (плохо, хорошо)
-        print("3.1 Робот <- Уложи плату в тару.")
-        print("3.2.1 Сервер <- Начни шить")
-        print("3.2.2. Сервер -> Ответ по прошивке (плохо, хорошо)")
+        #input("нажми ентер")
+        ###############################################################################################################################
+        # 15 Робот <- Уложи плату в тару
+        print("# 7 Робот <- Уложи плату в тару.")
         self.change_value('Rob_Action', 241)
-        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata)
-
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            result2 = 200
-            #result2 = firmware_loader.loader()
 
-            if result1 != 241 and result2 != 200:
-                print(f"от робота = {result1}, от прошивальщика = {result2}")
+            if result1 != 241:
+                print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
             else:
@@ -484,36 +741,29 @@ class Table:
         self.change_value('Rob_Action', 0)
         print("плата уложена в тару")
         result1 = 0
-        result2 = 0
-        ###############################################################################
-        input("нажми ентер")
-        #6#############################################################################
-        # 4.1 Робот <- Забери плату из тары # 4.2 Регул <- Подними прошивальщик.
-        print("4.1 Робот <- забрать плату из тары # 4.2 Регул <- Подними прошивальщик")
-        # Передаем ящик из которого нужно забрать и номер ячейки
-        Tray1 = 1
-        Cell1 = Cell1 + 1
+        #############################################################################################################################
+        #input("нажми ентер")
+        ##############################################################################################################################
 
+        # 16 Робот <- Забери плату из тары
+        print("16 Робот <- забрать плату из тары")
         self.change_value('Rob_Action', 210)
-        self.change_value('Reg_updown_Botloader', 104)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            result2 = self.read_value("sub_Reg_updown_Botloader")
-            if result1 != 210 and result2 != 104:
-                print(f"от робота = {result1}, от регула = {result2}")
+            if result1 != 210:
+                print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции забрать из тары плату")
             else:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
-        self.change_value('Reg_updown_Botloader', 0)
         result1=0
-        result2=0
-        ###############################################################################
+        ##################################################################################################################################
 
-        input("нажми ентер")
-        #7#############################################################################
+
+        ########################################################################################################################################
+
         # 5 Делаем фото платы
         print("6 Камера <- сделай фото")
         for i in range(3):
@@ -525,12 +775,11 @@ class Table:
                 print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
             time.sleep(1)
         time.sleep(1)
-        ###############################################################################
+        #######################################################################################################################
 
-        input("нажми ентер")     
-        #8#############################################################################
-        # 6 Робот <- Уложи плату в ложемент тетситрования 2
-        print("6 Робот <- Уложи плату в ложемент тетситрования 2")
+        #input("нажми ентер")
+        ##################################################################################################################################
+        print("18 Робот <- Уложи плату в ложемент тетситрования 1")
         self.change_value('Rob_Action', 222)
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -542,140 +791,11 @@ class Table:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
-        print("Стол 1ложе занято")
         result1=0
-        ###############################################################################
-        input("нажми ентер")
-        #9#############################################################################
-        # 7. Регул <- Сдвинь плату освободив ложе1.
-        print("7 Регул <- Сдвинь плату освободив ложе1")
-        self.change_value('Reg_move_Table', 101)
-        while True:
-            result1 = self.read_value("sub_Reg_move_Table")
-            if result1 != 101:
-                print(f"от робота = {result1}, от регула = {result2}")
-            elif result1 == 404:
-                print(f"От регула получен код 200 на операции движения стола")
-            else:
-                break
-            time.sleep(1)
-        self.change_value('Reg_move_Table', 0)
-        result1 = 0
-        print("Стол 1ложе свободен")
-        ###############################################################################
 
-        input("нажми ентер")
-        #10#############################################################################
-        # 8.1 Робот <- Забери плату с ложе 1. # 8.2 Регул <- Опусти прошивальщик (плата на ложе2).
-        print("# 8.1 Робот <- Забери плату с ложе 1. # 8.2 Регул <- Опусти прошивальщик (плата на ложе2).")
-        self.change_value('Reg_updown_Botloader', 103)
-        self.change_value('Rob_Action', 231)
-        while True:
-            result1 = self.read_value("sub_Rob_Action")
-            result2 = self.read_value("sub_Reg_updown_Botloader")
-            if result1 != 231 and result2!= 103:
-                print(f"от робота = {result1}, от регула = {result2}")
-            elif result1 == 404:
-                print(f"От робота получен код 200 на на операции взять плату с ложа")
-            else:
-                break
-            time.sleep(1)
-        self.change_value('Rob_Action', 0)
-        self.change_value('Reg_updown_Botloader', 0)
-        result1 = 0
-        result2 = 0
-        ###############################################################################
+##########################################################################################################################################
 
-        input("нажми ентер")       
-
-        #11#############################################################################
-        # 9.1 Робот <- Уложи плату в тару # 9.2.1 Сервер <- Начни шить # 9.2.2 Сервер -> Ответ по прошивке (плохо, хорошо)
-        print("9.1 Робот <- Уложи плату в тару.")
-        print("9.2.1 Сервер <- Начни шить")
-        print("9.2.2. Сервер -> Ответ по прошивке (плохо, хорошо)")
-        self.change_value('Rob_Action', 241)
-        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata)
-
-        while True:
-            result1 = self.read_value("sub_Rob_Action")
-            result2 = 200
-            # result2 = firmware_loader.loader()
-
-            if result1 != 241 and result2 != 200:
-                print(f"от робота = {result1}, от прошивальщика = {result2}")
-            elif result1 == 404:
-                print(f"От робота получен код 200 на на операции взять плату с ложа")
-            else:
-                break
-            time.sleep(1)
-        self.change_value('Rob_Action', 0)
-        print("плата уложена в тару")
-        result1 = 0
-        result2 = 0
-        ###############################################################################
-
-        input("нажми ентер")       
-
-        #12#############################################################################
-        # 10.1 Робот <- Забери плату из тары # 10.2 Регул <- Подними прошивальщик.
-        print("10.1 Робот <- забрать плату из тары # 10.2 Регул <- Подними прошивальщик")
-        # Передаем ящик из которого нужно забрать и номер ячейки
-        Tray1 = 1
-        Cell1 = Cell1 + 1
-
-        self.change_value('Rob_Action', 210)
-        self.change_value('Reg_updown_Botloader', 104)
-        while True:
-            result1 = self.read_value("sub_Rob_Action")
-            result2 = self.read_value("sub_Reg_updown_Botloader")
-            if result1 != 210 and result2 !=104:
-                print(f"от робота = {result1}, от регула = {result2}")
-            elif result1 == 404:
-                print(f"От робота получен код 200 на на операции забрать из тары плату")
-            else:
-                break
-            time.sleep(1)
-        self.change_value('Rob_Action', 0)
-        self.change_value('Reg_updown_Botloader', 0)
-        result1=0
-        result2 = 0
-        ###############################################################################
-
-        input("нажми ентер")
-
-        #13#############################################################################
-        # 5 Делаем фото платы
-        print("5 Камера <- сделай фото")
-        try:
-            res,photodata = CameraSocket.photo()
-            if res == 200 and photodata is not None:
-                print(f"Recieve datamatrixcode {photodata}")
-                # Сохраняем в бд с привязкой к плате
-            else:
-                print("Error Recieve datamatrixcode")
-        except Exception as e:
-                print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
-        time.sleep(1)
-        ###############################################################################
-
-        input("нажми ентер")
-        
-        #14#############################################################################
-        # 12 Робот <- Уложи плату в ложемент тетситрования 1
-        print("12 Робот <- Уложи плату в ложемент тетситрования 1")
-        self.change_value('Rob_Action', 221)
-        while True:
-            result1 = self.read_value("sub_Rob_Action")
-            if result1 != 221:
-                print(f"Ждем ответ от робота, что плату уложили = {result1}")
-            elif result1 == 404:
-                print(f"От робота получен код 200 на на операции уложить плату")
-            else:
-                break
-            time.sleep(1)
-        self.change_value('Rob_Action', 0)
-        result1=0
-        ###############################################################################
+        #input("нажми ентер")
 
         print("****ЦИКЛ MAIN END")
 
@@ -695,35 +815,16 @@ class Table:
 
 
 if __name__ == "__main__":
-
-
     modbus_provider = ModbusProvider()
     
+    
+    
+
+    ################################################# START OPC Communication class l ###################################
+    
     table1 = Table("Table 1", dict_Table1)
-    
-    
-
-    """
-    # Выполнение первого цикла
-        flag1 = True
-        if flag1 == True:
-            table1.defence_cycle()
-            flag1 = False
-        
-    """  
+   
     
 
-    
-    """
-    # Выполнение первого цикла
-    flag = True
-    if flag == True:
-        table1.setup_cycle()
-        flag = False
-    """
-
-    
-    
 
     table1.main()
-

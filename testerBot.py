@@ -399,11 +399,14 @@ class Table:
                 print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
             time.sleep(1)
         while True:
-            if res != 200:
+            res,photodata = CameraSocket.photo()
+            if res != 200 or photodata == "NoRead":
                 print(f"Ошибка получения фото с камеры")
+                time.sleep(1)
             else:
-                break 
-        time.sleep(1)
+                print(f"С камеры получено фото {photodata}")
+                break
+            time.sleep(1)
         ###########################################################################
 
 

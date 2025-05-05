@@ -1,5 +1,6 @@
 import socket
 import logging
+import time
 
 # Set up basic logging configuration
 logging.basicConfig(
@@ -63,5 +64,24 @@ def photo():
     
 
 
-res,data = photo()
-print (f"Result={res}  Data = {data}")
+# res,data = photo()
+# print (f"Result={res}  Data = {data}")
+
+
+
+# for i in range(3):
+#     try:
+#         logging.debug(f"Попытка {i}: запрос фото с камеры")
+#         res,photodata = photo()
+#         print(f"С камеры получен ID {photodata}")
+#     except Exception as e:
+#         print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
+#     time.sleep(1)
+# while True:
+#     res,photodata = photo()
+#     if res != 200 or photodata == "NoRead":
+#         print(f"Ошибка получения фото с камеры")
+#         time.sleep(1)
+#     else:
+#         print(f"С камеры получено фото {photodata}")
+#         break 

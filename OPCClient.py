@@ -56,8 +56,8 @@ class OPCClient:
                 with self.lock:
 
                     ################### Пишем ###################
-                    mes = 1
-                    data_value1 = ua.DataValue(ua.Variant(mes, ua.VariantType.Float))
+                    mes = ['ЗНП015250', 'ЗНП015251', 'ЗНП015252', 'ЗНП015253', 'ЗНП015254', 'ЗНП015255', 'ЗНП015256', 'ЗНП015257', 'ЗНП015258', 'ЗНП015259', 'ЗНП015260', 'ЗНП015261', 'ЗНП015262', 'ЗНП015263', 'ЗНП015264', 'ЗНП015265', 'ЗНП015266', 'ЗНП015267', 'ЗНП015268', 'ЗНП015269', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']
+                    data_value1 = ua.DataValue(ua.Variant(mes, ua.VariantType.String))
                     # Записываем новое значение в узел
                     node2 = self.client.get_node("ns=2;s=Application.PLC_PRG.VAL1")
                     node2.set_value(data_value1)
@@ -70,8 +70,8 @@ class OPCClient:
 
                     node4 = self.client.get_node("ns=2;s=Application.PLC_PRG.VAL2")
                     value3 = node4.get_value()
-                    dict_OPC["ns=2;s=Application.PLC_PRG.VAL1"] = value3
-                    print(f"*******: {dict_OPC["ns=2;s=Application.PLC_PRG.VAL1"]}")
+                    dict_OPC["ns=2;s=Application.PLC_PRG.VAL2"] = value3
+                    print(f"**VAL2**: {dict_OPC["ns=2;s=Application.PLC_PRG.VAL2"]}")
 
                     node5 = self.client.get_node("ns=2;s=Application.PLC_PRG.orderNode")
                     value4 = node5.get_value()
@@ -101,3 +101,13 @@ if __name__ == "__main__":
     opc_client.disconnect()
 
 """
+
+if __name__ == "__main__":
+    url = "opc.tcp://172.21.10.39:48010"
+    opc_client = OPCClient(url)
+
+    # Graceful shutdown after some time
+    time.sleep(10)  # Let the program run for 10 seconds
+    opc_client.stop()  # Signal the threads to stop
+    time.sleep(2)  # Wait a little for threads to finish
+    opc_client.disconnect()

@@ -371,18 +371,61 @@ class DatabaseConnection:
 
         
 
-    def get_order_detail(self):
-        """ Запрос информации по заказам """
-        logging.info("Method 3 called.")
-        print("Method 3")
-    
-    
-    
-    def close_connection(self):
-        """ Close the connection to the database """
-        logging.info("Closing database connection.")
-        self.conn.close()
-        logging.info("Database connection closed.")
+    def get_order_insert_orders_frm1C(self, order_id, board_name, firmware, batch):
+        """ Запрос информации по заказам и вставка данных в таблицы Orders и order_details """
+        logging.info("Метод get_order_insert_orders_frm1C вызван.")
+        logging.info(f"Входные данные - order_id: '{order_id}', board_name: '{board_name}', firmware: '{firmware}'")
+
+        # Валидация входных данных
+        if not order_id or not board_name or not firmware:
+            logging.warning("Отсутствуют обязательные данные: order_id, board_name или firmware.")
+            print("Ошибка: Отсутствуют обязательные данные.")
+            return
+
+        if not isinstance(batch, dict) or not batch:
+            logging.warning("Некорректные или пустые данные batch.")
+            print("Ошибка: Некорректные или пустые данные batch.")
+            return
+
+        try:
+            # Шаг 1: Вставка данных заказа в таблицу Orders
+            logging.info("Вставка данных заказа в таблицу Orders.")
+            self.cursor.execute('''
+                INSERT INTO Orders (order_number, module, VersionLoadFile)
+                VALUES (?, ?, ?)
+            ''', (order_id, board_name, firmware))
+            self.conn.commit()
+
+            # Получение ID вставленного заказа
+            self.cursor.execute('SELECT last_insert_rowid()')
+            inserted_order_id = self.cursor.fetchone()[0]
+            logging.info(f"Заказ вставлен с ID: {inserted_order_id}")
+
+            # Шаг 2: Вставка деталей заказа
+            logging.info("Вставка серийных номеров в таблицу order_details.")
+            for key in batch.keys():
+                serial_8 = key[:8]  # Первые 8 символов серийного номера
+                self.cursor.execute('''
+                    INSERT INTO order_details (order_id, serial_number_8)
+                    VALUES (?, ?)
+                ''', (inserted_order_id, serial_8))
+            self.conn.commit()
+
+            logging.info("Заказ и его детали успешно вставлены.")
+            print("Заказ и его детали успешно вставлены.")
+
+        except sqlite3.Error as e:
+            logging.error(f"Ошибка SQLite при вставке данных: {e}")
+            print(f"Ошибка SQLite: {e}")
+            self.conn.rollback()
+
+        
+        
+        def close_connection(self):
+            """ Close the connection to the database """
+            logging.info("Closing database connection.")
+            self.conn.close()
+            logging.info("Database connection closed.")
 
 
 

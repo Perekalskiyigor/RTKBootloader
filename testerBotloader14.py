@@ -54,18 +54,6 @@ print(f"Локальный IP-адрес: {ip}")
 igle_table = Igable.IgleTable(
         urlIgleTabeControl=f"http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
         urlStatusFromIgleTabe=f"http://192.168.1.100:5003/get_test_results",
-
-        module_type="R050 DI 16 011-000-AAA",
-        stand_id="nt_kto_rtk_1",
-        serial_number_8="1",
-        data_matrix=["11"],
-        firmwares = [
-            {
-            "fw_type": "MCU",
-            "fw_path": "C:\\nails_table_bridge\\plc050_di16012-full.hex",
-            "fw_version": "1.0.36.0"
-            }
-        ]
     )
 ################################################# IgleTable Communication Class ###################################
 
@@ -204,7 +192,7 @@ class Table:
         ###########################################################################
 
 
-
+        input("нажми ентер")
 
         ########################################################################################
         # 8. Регул <- Опусти прошивальщик ложе 1.
@@ -229,34 +217,55 @@ class Table:
         self.change_value('Reg_updown_Botloader', 0)
         result1 = 0
         #############################################################################################
-        #input("нажми ентер")
+        input("нажми ентер")
+
+
 
 
         ##############################################################################################
+        print("7 Робот <- Уложи плату в ложемент тетситрования 2")
+        logging.info(f"[НАЧАЛО] Робот <- Уложи плату в ложемент тетситрования 2")
+        self.change_value('Rob_Action', 222)
+        logging.debug("Отправлена команда 'Rob_Action', 222")
         # 9. Сервер <- Начни шить
         # 10. Сервер -> Ответ по прошивке (плохо, хорошо)
         print("9. Сервер <- Начни шить")
         print("10. Сервер -> Ответ по прошивке (плохо, хорошо)")
         logging.info(f"[НАЧАЛО] Прошивка")
+        result1 = 0
         # photodata = "Z45564564645"
         # Данные по прошивке для этого серийника
         firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata)
+        result2 = None  # Инициализируем перед циклом
         while True:
-            result1 = firmware_loader.loader()
-            if result1 != 200:
-                print(f"Ждем ответ прошивальщка {result1}")
+            result1 = self.read_value("sub_Rob_Action")
+            print(f" result1 -- {result1}")
+            # Обновляем result2 только если он еще не имеет нужного значения (200)
+            if result2 != 200:
+                result2 = firmware_loader.loader(photodata)
+                print(f" result2 -- {result2}")
+
+            # Обновляем result1 только если он еще не имеет нужного значения (222)
+            if result2 != 222:
+                result1 = self.read_value("sub_Rob_Action")
+                print(f" result2 -- {result2}")
+            
+            if result1 != 222 and result2 != 200:
+                print(f"Ждем ответ прошивальщика {result1}")
                 logging.info(f"Ждем ответ от прошивальщика= {result1}")
-            else:
+            elif result1 == 222 and result2 == 200:
                 print(f"Ответ от прошивальщика {result1}")
                 break
             time.sleep(1)
-        print (f"Ответ от прошивальщика получен {result1}")
+
+        self.change_value('Rob_Action', 0)
+        print(f"Ответ от прошивальщика получен {result1}")
         logging.info(f"[Завершение] Прошивка")
-        # Очищаем перменные результата
+        # Очищаем переменные результата
         photodata = None
         result1 = 0
         ###############################################################################################
-        #input("нажми ентер")
+        input("нажми ентер")
 
 
         ################################################################################################
@@ -280,7 +289,7 @@ class Table:
         self.change_value('Reg_updown_Botloader', 0)
         result1 = 0
         ################################################################################################
-        #input("нажми ентер")
+        input("нажми ентер")
 
 
 

@@ -57,3 +57,6 @@ db_connection.get_order_insert_orders_frm1C(order_id, board_name, firmware, batc
 """
 
 
+order_id, board_name, firmware, batch, count, version, components = fetch_data()
+db_connection = SQLite.DatabaseConnection()
+db_connection.get_order_insert_orders_frm1C(order_id, board_name, firmware, batch, count, version, components)

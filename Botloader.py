@@ -43,7 +43,7 @@ class FirmwareLoader:
         self.Order = Order
         self.photodata = photodata
 
-    def loader(self):
+    def loader(self, photodata):
         print("3 Прошивальщик <- Команда на прошивку")
         
         # Блок начала работы с БД: получаем свободный id для заказа
@@ -74,7 +74,7 @@ class FirmwareLoader:
         # Блок прошивки
         time.sleep(2)
         try:
-            self.igle_table.control_igle_table(data)
+            self.igle_table.control_igle_table(data, photodata)
         except Exception as e:
             logging.error(f"Ошибка при контроле через Иглостол: {e}")
             print("Ошибка при контроле через Иглостол")
@@ -184,38 +184,12 @@ if __name__ == "__main__":
     print (f"***************{res}")
 """
 
-################################################# IgleTable Communication Class ###################################
-    
-igle_table = Igable.IgleTable(
-        urlIgleTabeControl=f"http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
-        urlStatusFromIgleTabe=f"http://192.168.1.100:5003/get_test_results",
 
-        module_type="R050 DI 16 011-000-AAA",
-        stand_id="nt_kto_rtk_1",
-        serial_number_8="1",
-        data_matrix=["11"],
-        firmwares = [
-            {
-            "fw_type": "MCU",
-            "fw_path": "C:\\nails_table_bridge\\plc050_di16012-full.hex",
-            "fw_version": "1.0.36.0"
-            }
-        ]
-    )
-    ################################################# IgleTable Communication Class ###################################
-
-
-    ################################################# START SQL Communication class ###################################
-    
-try:
-        # Create an instance of DatabaseConnection
-        db_connection = SQL.DatabaseConnection()
-except Exception as e:
-        logging.error(f"Error Create an instance of DatabaseConnection: {e}")
-################################################# STOP SQL Communication class ###################################
-
+"""
 Order = "ЗНП-9087.2.1"
 photodata = "45654465"
 firmware_loader = FirmwareLoader(db_connection,igle_table,1, Order, photodata)
 res = firmware_loader.loader()
 print (f"***************{res}")
+"""
+

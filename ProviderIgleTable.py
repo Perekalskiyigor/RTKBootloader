@@ -8,16 +8,10 @@ import sqlite3
 from datetime import datetime
 
 class IgleTable:
-    def __init__(self, urlIgleTabeControl, urlStatusFromIgleTabe, module_type, stand_id, serial_number_8, data_matrix, firmwares):
+    def __init__(self, urlIgleTabeControl, urlStatusFromIgleTabe):
         self.urlIgleTabeControl = urlIgleTabeControl
         self.urlStatusFromIgleTabe = urlStatusFromIgleTabe
 
-        self.module_type = module_type
-        self.stand_id = stand_id
-        self.serial_number_8 = serial_number_8
-        self.data_matrix = data_matrix
-        self.firmwares = firmwares
-        self.cookie = None
         
         # Настройка логирования
         logging.basicConfig(
@@ -28,7 +22,7 @@ class IgleTable:
 
        
     # Запрос на прошивку
-    def control_igle_table(self,data):
+    def control_igle_table(self,data, photodata):
         """Метод для отправки команд иглостэнду."""
         logging.info("Method control_igle_table called.")
         
@@ -38,7 +32,7 @@ class IgleTable:
                 # Извлекаем параметры из данных
                 stand_id = data.get('stand_id')
                 module_type = data.get('module_type')
-                data_matrix = data.get('data_matrix')
+                data_matrix = photodata
                 serial_number_8 = data.get('serial_number_8')
                 fw_type = data.get('fw_type')
                 fw_path = data.get('fw_path')
@@ -71,7 +65,7 @@ class IgleTable:
             "serial_number_8": serial_number_8,
             "firmwares": [
                 {
-                    "fw_type": fw_type,
+                    "fw_type": "MCU",
                     "fw_path": fw_path,
                     "fw_version": fw_version
                 }

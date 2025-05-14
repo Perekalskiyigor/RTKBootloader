@@ -218,7 +218,7 @@ class DatabaseConnection:
             self.conn.execute('BEGIN IMMEDIATE')  # Начинаем транзакцию с блокировкой
             self.cursor.execute('''
                 UPDATE order_details
-                SET stand_id = 1
+                SET stand_id = "nt_kto_rtk_1"
                 WHERE id = ?
             ''', (serial_id,))
 

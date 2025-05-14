@@ -589,6 +589,7 @@ class Table:
         print("10. Сервер -> Ответ по прошивке (плохо, хорошо)")
         logging.info(f"[НАЧАЛО] Прошивка")
         # photodata = "Z45564564645"
+        # Данные по прошивке для этого серийника
         firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata)
         while True:
             result1 = firmware_loader.loader()

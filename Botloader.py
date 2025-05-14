@@ -49,8 +49,23 @@ class FirmwareLoader:
         # Блок начала работы с БД: получаем свободный id для заказа
         try:
             self.db_connection.db_connect()
+            # Берем свовобоный заказ
             record_id = self.db_connection.setTable(self.Order)
             print(f"БД - получили свободный заказ {record_id}")
+            #  получаем для него данные из бд для прошивки
+            data = self.db_connection.recievedata(record_id)
+            # Если данные были получены, напечатаем их
+            # if data:
+            #     print(f"ID: {data['id']}")
+            #     print(f"Stand ID: {data['stand_id']}")
+            #     print(f"Module Type: {data['module_type']}")
+            #     print(f"Data Matrix: {data['data_matrix']}")
+            #     print(f"Serial Number: {data['serial_number_8']}")
+            #     print(f"Firmware Type: {data['fw_type']}")
+            #     print(f"Firmware Path: {data['fw_path']}")
+            #     print(f"Firmware Version: {data['fw_version']}")
+            # else:
+            #     print(f"Не удалось получить данные для прошивки")
         except Exception as e:
             logging.error(f"Ошибка при работе с базой данных: {e}")
             print("Ошибка при подключении или получении записи из БД")
@@ -59,7 +74,7 @@ class FirmwareLoader:
         # Блок прошивки
         time.sleep(2)
         try:
-            self.igle_table.control_igle_table()
+            self.igle_table.control_igle_table(data)
         except Exception as e:
             logging.error(f"Ошибка при контроле через Иглостол: {e}")
             print("Ошибка при контроле через Иглостол")
@@ -168,3 +183,39 @@ if __name__ == "__main__":
     res = firmware_loader.loader()
     print (f"***************{res}")
 """
+
+################################################# IgleTable Communication Class ###################################
+    
+igle_table = Igable.IgleTable(
+        urlIgleTabeControl=f"http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
+        urlStatusFromIgleTabe=f"http://192.168.1.100:5003/get_test_results",
+
+        module_type="R050 DI 16 011-000-AAA",
+        stand_id="nt_kto_rtk_1",
+        serial_number_8="1",
+        data_matrix=["11"],
+        firmwares = [
+            {
+            "fw_type": "MCU",
+            "fw_path": "C:\\nails_table_bridge\\plc050_di16012-full.hex",
+            "fw_version": "1.0.36.0"
+            }
+        ]
+    )
+    ################################################# IgleTable Communication Class ###################################
+
+
+    ################################################# START SQL Communication class ###################################
+    
+try:
+        # Create an instance of DatabaseConnection
+        db_connection = SQL.DatabaseConnection()
+except Exception as e:
+        logging.error(f"Error Create an instance of DatabaseConnection: {e}")
+################################################# STOP SQL Communication class ###################################
+
+Order = "ЗНП-9087.2.1"
+photodata = "45654465"
+firmware_loader = FirmwareLoader(db_connection,igle_table,1, Order, photodata)
+res = firmware_loader.loader()
+print (f"***************{res}")

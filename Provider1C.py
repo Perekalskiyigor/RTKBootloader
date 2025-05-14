@@ -15,47 +15,45 @@ logging.basicConfig(
 
 
 
-class RTKRequest:
-    def __init__(self, url, headers):
-        self.url = url
-        self.headers = headers
-        self.data = None
-
-    def fetch_data(self):
-        try:
-            response = requests.get(self.url, headers=self.headers, verify=False)
-            response.raise_for_status()
-            self.data = response.json()
-
-            order_id = self.data.get('order')
-            components = self.data.get('components', {})
-            products = self.data.get('products', {})
-            firmware = products.get('firmware', '')
-            board_name = products.get('product', None)
-            batch = products.get('batch', {})
-
-            # Вывод в консоль
-            #print(f"Order ID: {order_id}")
-            #print(f"Board Name: {board_name}")
-            #print(f"Firmware: {firmware}")
-            #print(f"Total Serials: {batch}")
-            #print("\nComponents:")
-
-            logging.info("Data successfully fetched.")
-            return order_id, board_name, firmware, batch
-        except Exception as e:
-            logging.error(f"Error fetching data: {e}")
-            raise
-
-
-if __name__ == '__main__':
-    url = "https://black/erp_game_ivshin255/hs/rtk/order/RTK_R050/ЗНП-8372.1.1"
-    headers = {
+def fetch_data():
+    try:
+        url = "https://black/erp_game_ivshin255/hs/rtk/order/RTK_R050/ЗНП-9087.2.1"
+        payload = {}
+        headers = {
         'Authorization': 'Basic cnRrOnJ0azEyMw=='
-    }
+        }
+        response = requests.request("GET", url, headers=headers, data=payload, verify=False)
+        print(response.text)
+        data = response.json()
 
-    rtk = RTKRequest(url, headers)
-    order_id, board_name, firmware, batch = rtk.fetch_data()
-    db_connection = SQLite.DatabaseConnection()
+        order_id = data.get('order')
+        components = data.get('components', {})
+        components = ", ".join(f"{key}: {value}" for key, value in components.items())
+        products = data.get('products', {})
+        firmware = products.get('firmware', '')
+        board_name = products.get('product', None)
+        batch = products.get('batch', {})
+        count = products.get('count', 0)
+        version = products.get('version', None)
 
-    db_connection.get_order_insert_orders_frm1C(order_id, board_name, firmware, batch)
+        # Вывод в консоль
+        print(f"Order ID: {order_id}")
+        print(f"Board Name: {board_name}")
+        print(f"Firmware: {firmware}")
+        print(f"Total Serials: {batch}")
+        print("\nComponents:")
+
+        logging.info("Data successfully fetched.")
+        return order_id, board_name, firmware, batch, count, version, components
+    except Exception as e:
+        logging.error(f"Error fetching data: {e}")
+        raise
+
+
+"""
+order_id, board_name, firmware, batch, count, version, components = fetch_data()
+db_connection = SQLite.DatabaseConnection()
+db_connection.get_order_insert_orders_frm1C(order_id, board_name, firmware, batch, count, version, components)
+"""
+
+

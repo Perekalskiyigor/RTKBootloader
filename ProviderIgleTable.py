@@ -28,30 +28,66 @@ class IgleTable:
 
        
     # Запрос на прошивку
-    def control_igle_table(self):
-        """Метод для отправки команд иглостэнду.""" 
+    def control_igle_table(self,data):
+        """Метод для отправки команд иглостэнду."""
         logging.info("Method control_igle_table called.")
-        logging.debug(f"Input parameters: stand_id=, module_type=, data_matrix=  serial_number_8 = firmwares = ")
         
+        # Проверим, что данные переданы
+        if data:
+            try:
+                # Извлекаем параметры из данных
+                stand_id = data.get('stand_id')
+                module_type = data.get('module_type')
+                data_matrix = data.get('data_matrix')
+                serial_number_8 = data.get('serial_number_8')
+                fw_type = data.get('fw_type')
+                fw_path = data.get('fw_path')
+                fw_version = data.get('fw_version')
+
+                print(f"ID: {data['id']}")
+                print(f"Stand ID: {data['stand_id']}")
+                print(f"Module Type: {data['module_type']}")
+                print(f"Data Matrix: {data['data_matrix']}")
+                print(f"Serial Number: {data['serial_number_8']}")
+                print(f"Firmware Type: {data['fw_type']}")
+                print(f"Firmware Path: {data['fw_path']}")
+                print(f"Firmware Version: {data['fw_version']}")
+
+                # Логируем полученные параметры
+                logging.debug(f"Input parameters: stand_id={stand_id}, module_type={module_type}, "
+                            f"data_matrix={data_matrix}, serial_number_8={serial_number_8}, "
+                            f"fw_type={fw_type}, fw_path={fw_path}, fw_version={fw_version}")
+            except KeyError as e:
+                # Логируем ошибку, если какой-то из параметров отсутствует
+                logging.error(f"Missing parameter: {e}")
+        else:
+            logging.error("No data received for firmware.")
+        
+        # Формируем payload с использованием данных, полученных из data
         payload = json.dumps({
-        "stand_id": "nt_kto_rtk_1",
-        "module_type": "R050 DI 16 012-000-AAA",
-        "data_matrix": [
-            "11"
-        ],
-        "serial_number_8": "1",
-        "firmwares": [
-            {
-            "fw_type": "MCU",
-            "fw_path": "C:\\nails_table_bridge\\plc050_di16012-full.hex",
-            "fw_version": "1.0.36.0"
-            }
-        ]
+            "stand_id": stand_id,
+            "module_type": module_type,
+            "data_matrix": [data_matrix],
+            "serial_number_8": serial_number_8,
+            "firmwares": [
+                {
+                    "fw_type": fw_type,
+                    "fw_path": fw_path,
+                    "fw_version": fw_version
+                }
+            ]
         })
+
+        # Напечатаем JSON, который будет отправлен
+        print("Payload JSON that will be sent:")
+        print(payload)
+
+        
         headers = {
-        'Content-Type': 'application/json'
+            'Content-Type': 'application/json'
         }
 
+        # Отправляем POST запрос с сформированным JSON
         try:
             logging.info("Отправка запроса на %s", self.urlIgleTabeControl)
             response = requests.post(self.urlIgleTabeControl, headers=headers, data=payload)

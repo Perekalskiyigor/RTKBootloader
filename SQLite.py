@@ -371,10 +371,10 @@ class DatabaseConnection:
 
         
 
-    def get_order_insert_orders_frm1C(self, order_id, board_name, firmware, batch):
+    def get_order_insert_orders_frm1C(self, order_id, board_name, firmware, batch, count, version, components):
         """ Запрос информации по заказам и вставка данных в таблицы Orders и order_details """
         logging.info("Метод get_order_insert_orders_frm1C вызван.")
-        logging.info(f"Входные данные - order_id: '{order_id}', board_name: '{board_name}', firmware: '{firmware}'")
+        logging.info(f"Входные данные - order_id: '{order_id}', board_name: '{board_name}', firmware: '{firmware}' count {count} version {version} components {components}")
 
         # Валидация входных данных
         if not order_id or not board_name or not firmware:
@@ -391,9 +391,9 @@ class DatabaseConnection:
             # Шаг 1: Вставка данных заказа в таблицу Orders
             logging.info("Вставка данных заказа в таблицу Orders.")
             self.cursor.execute('''
-                INSERT INTO Orders (order_number, module, VersionLoadFile)
-                VALUES (?, ?, ?)
-            ''', (order_id, board_name, firmware))
+                INSERT INTO Orders (order_number, module, Nomenclature, Value, VersionLoadFile, fw_version)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (order_id, board_name, components, count, firmware, version))
             self.conn.commit()
 
             # Получение ID вставленного заказа
@@ -419,13 +419,67 @@ class DatabaseConnection:
             print(f"Ошибка SQLite: {e}")
             self.conn.rollback()
 
+    
+    def recievedata(self, id):
+        """Запрос данных для прошивки по ID"""
+        logging.info("Вызван метод recievedata: запрос данных для прошивки из базы данных")
+
+        query = """
+            SELECT 
+                S.id,
+                S.stand_id,
+                O.module AS module_type,
+                S.data_matrix,
+                S.serial_number_8,
+                S.fw_type,
+                O.VersionLoadFile AS fw_path,
+                O.fw_version
+            FROM order_details AS S
+            JOIN Orders AS O ON O.id = S.order_id
+            WHERE S.id = ?
+        """
+
+        try:
+            cur = self.conn.cursor()
+            logging.debug("Выполняется SQL-запрос получения данных для ID: %s", id)
+            cur.execute(query, (id,))
+            result = cur.fetchone()
+
+            if result is None:
+                logging.warning("Данные по ID %s не найдены", id)
+                return None
+
+            (order_id, stand_id, module_type, data_matrix, serial_number_8,
+            fw_type, fw_path, fw_version) = result
+
+            logging.info("Данные успешно получены для ID: %s", id)
+            logging.debug("Результаты: stand_id=%s, module_type=%s, fw_path=%s",
+                        stand_id, module_type, fw_path)
+
+            return {
+                'id': order_id,
+                'stand_id': stand_id,
+                'module_type': module_type,
+                'data_matrix': data_matrix,
+                'serial_number_8': serial_number_8,
+                'fw_type': fw_type,
+                'fw_path': fw_path,
+                'fw_version': fw_version
+            }
+
+        except sqlite3.Error as e:
+            logging.error("SQLite ошибка в recievedata: %s", str(e))
+            return None
         
-        
-        def close_connection(self):
-            """ Close the connection to the database """
-            logging.info("Closing database connection.")
-            self.conn.close()
-            logging.info("Database connection closed.")
+    def close_connection(self):
+        """ Close the connection to the database """
+        logging.info("Closing database connection.")
+        self.conn.close()
+        logging.info("Database connection closed.")
+
+
+    
+
 
 
 
@@ -435,4 +489,11 @@ db_connection = DatabaseConnection()
 Order = "ЗНП-0005747"
 record_id = db_connection.setTable(Order)
 
+"""
+
+"""
+# Create an instance of DatabaseConnection
+db_connection = DatabaseConnection()
+res = db_connection.recievedata(464)
+print(res)
 """

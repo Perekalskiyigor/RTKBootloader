@@ -22,7 +22,10 @@ import Botloader as Bot
 # Глобальные ящик и ясейка 
 Tray1 = 0
 Cell1 = 0
-Order = "ЗНП-0005747"
+Order = "ЗНП-9087.2.1"
+# данные с платы для цикла main и сетапа
+photodata = None
+
 
 dict_Table1 = {
     'Reg_move_Table': 0,
@@ -53,19 +56,7 @@ print(f"Локальный IP-адрес: {ip}")
    
 igle_table = Igable.IgleTable(
         urlIgleTabeControl=f"http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
-        urlStatusFromIgleTabe=f"http://192.168.1.100:5003/get_test_results",
-
-        module_type="R050 DI 16 011-000-AAA",
-        stand_id="nt_kto_rtk_1",
-        serial_number_8="1",
-        data_matrix=["11"],
-        firmwares = [
-            {
-            "fw_type": "MCU",
-            "fw_path": "C:\\nails_table_bridge\\plc050_di16012-full.hex",
-            "fw_version": "1.0.36.0"
-            }
-        ]
+        urlStatusFromIgleTabe=f"http://192.168.1.100:5003/get_test_results"
     )
 ################################################# IgleTable Communication Class ###################################
 
@@ -249,17 +240,19 @@ class Table:
 
     ############# ****ЦИКЛ SETUP ******"
     def setup_cycle(self):
+        global photodata
         print("****ЦИКЛ SETUP******")
         ######################################################
-        # input("нажми ентер")
+        input("нажми ентер")
         # 1 Робот <- Забери плату из тары
         print("1 Робот <- забрать плату из тары")
         logging.info(f"[НАЧАЛО] Робот <- забрать плату из тары")
         self.change_value('Rob_Action', 210)
         while True:
+            result1 = self.read_value("sub_Rob_Action")
             logging.debug(f"[Статус] sub_Rob_Action = {result1}")
 
-            result1 = self.read_value("sub_Rob_Action")
+            
             if result1 != 210:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
                 logging.info(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
@@ -276,7 +269,7 @@ class Table:
         self.change_value('Rob_Action', 0)
         result1=0
         ##########################################################
-        #input("нажми ентер")
+        input("нажми ентер")
 
         ################################################################
         # 2 Делаем фото платы
@@ -285,23 +278,23 @@ class Table:
         for i in range(3):
             try:
                 logging.debug(f"Попытка {i}: запрос фото с камеры")
-                res,photodata = CameraSocket.photo()
-                print(f"С камеры получен ID {photodata}")
-                logging.info(f"Успех: получен ID фото {photodata}")
+                res,photodata1= CameraSocket.photo()
+                print(f"С камеры получен ID {photodata1}")
+                logging.info(f"Успех: получен ID фото {photodata1}")
             except Exception as e:
                 print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
-                logging.warning(f"Попытка {i}: неверный ответ (код: {res}, данные: {photodata})")
+                logging.warning(f"Попытка {i}: неверный ответ (код: {res}, данные: {photodata1})")
             time.sleep(1)
         while True:
-            res,photodata = CameraSocket.photo()
-            logging.debug(f"Ожидание фото.код {res}, данные {photodata}")
-            if res != 200 or photodata == "NoRead":
+            res,photodata1= CameraSocket.photo()
+            logging.debug(f"Ожидание фото.код {res}, данные {photodata1}")
+            if res != 200 or photodata1== "NoRead":
                 print(f"Ошибка получения фото с камеры")
                 logging.warning(f"Ошибка получения фото с камеры")
                 time.sleep(1)
             else:
-                print(f"Фото успешно получено: {photodata}")
-                logging.info(f"[Завершение] Камера <- сделай фото: {photodata}")
+                print(f"Фото успешно получено: {photodata1}")
+                logging.info(f"[Завершение] Камера <- сделай фото: {photodata1}")
                 break
             time.sleep(1)
         ###########################################################################
@@ -335,7 +328,7 @@ class Table:
         self.change_value('Rob_Action', 0)
         result1 = 0
         ####################################################################
-        #input("нажми ентер")
+        input("нажми ентер")
 
 
 
@@ -364,7 +357,7 @@ class Table:
         self.change_value('Reg_move_Table', 0)
         result1 = 0
         ############################################################################
-        #input("нажми ентер")
+        input("нажми ентер")
 
 
         
@@ -407,7 +400,7 @@ class Table:
         result1 = 0
         result2 = 0
         ##################################################################################
-        #input("нажми ентер")
+        input("нажми ентер")
 
         ################################################################
         # 6 Делаем фото платы
@@ -416,7 +409,7 @@ class Table:
         for i in range(3):
             try:
                 logging.debug(f"Попытка {i}: запрос фото с камеры")
-                res,photodata = CameraSocket.photo()
+                res,photodata= CameraSocket.photo()
                 print(f"С камеры получен ID {photodata}")
                 logging.info(f"Успех: получен ID фото {photodata}")
             except Exception as e:
@@ -424,9 +417,9 @@ class Table:
                 logging.warning(f"Попытка {i}: неверный ответ (код: {res}, данные: {photodata})")
             time.sleep(1)
         while True:
-            res,photodata = CameraSocket.photo()
+            res,photodata= CameraSocket.photo()
             logging.debug(f"Ожидание фото.код {res}, данные {photodata}")
-            if res != 200 or photodata == "NoRead":
+            if res != 200 or photodata== "NoRead":
                 print(f"Ошибка получения фото с камеры")
                 logging.warning(f"Ошибка получения фото с камеры")
                 time.sleep(1)
@@ -435,10 +428,11 @@ class Table:
                 logging.info(f"[Завершение] Камера <- сделай фото: {photodata}")
                 break
             time.sleep(1)
+        print(photodata)
         ###########################################################################
 
 
-        #input("нажми ентер")
+        input("нажми ентер")
         ###################################################################################
         # 7 Робот <- Уложи плату в ложемент тетситрования
         # 7. Сервер <- Начни шить
@@ -447,40 +441,45 @@ class Table:
         logging.info(f"[НАЧАЛО] Робот <- Уложи плату в ложемент тетситрования 2")
         self.change_value('Rob_Action', 222)
         logging.debug("Отправлена команда 'Rob_Action', 222")
-
-        print("7. Сервер <- Начни шить")
-        print("7. Сервер -> Ответ по прошивке (плохо, хорошо)")
+        # 9. Сервер <- Начни шить
+        # 10. Сервер -> Ответ по прошивке (плохо, хорошо)
+        print("9. Сервер <- Начни шить")
+        print("10. Сервер -> Ответ по прошивке (плохо, хорошо)")
         logging.info(f"[НАЧАЛО] Прошивка")
+        result1 = 0
         # photodata = "Z45564564645"
-        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata)
-
+        # Данные по прошивке для этого серийника
+        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata1)
+        result2 = None  # Инициализируем перед циклом
         while True:
-            result1 = self.read_value("sub_Rob_Action")
-            logging.debug(f"[Статус] sub_Rob_Action = {result1}")
-            result2 = firmware_loader.loader()
-            if result1 != 222 and result1 != 200:
-                print(f"Ждем ответ от робота, что плату уложили = {result1}")
-                logging.info(f"Ждем ответ от робота, что плату уложили = {result1}")
+            print(f" result1 -- {result1}")
+            # Обновляем result2 только если он еще не имеет нужного значения (200)
+            if result2 != 200:
+                result2 = firmware_loader.loader(photodata1)
+                print(f" result2 -- {result2}")
 
-                print(f"Ждем ответ прошивальщка {result2}")
-                logging.info(f"Ждем ответ от прошивальщика= {result2}")
-            elif result1 == 404:
-                print(f"От робота получен код 404 на на операции уложить плату")
-                logging.info(f"От робота получен код 404 на на операции уложить плату")
-            elif result1 == 222 and result1 == 200:
+            # Обновляем result1 только если он еще не имеет нужного значения (222)
+            if result1 != 222:
+                result1 = self.read_value("sub_Rob_Action")
+                print(f" result2 -- {result2}")
+            
+            if result1 != 222 and result2 != 200:
+                print(f"Ждем ответ прошивальщика {result1}")
+                logging.info(f"Ждем ответ от прошивальщика= {result1}")
+            elif result1 == 222 and result2 == 200:
                 print(f"Ответ от прошивальщика {result1}")
                 break
             time.sleep(1)
-        logging.info(f"[Завершение] Робот <- Уложи плату в ложемент тетситрования 2")
+
         self.change_value('Rob_Action', 0)
-        result1 = 0
-        print (f"Ответ от прошивальщика получен {result1}")
+        print(f"Ответ от прошивальщика получен {result1}")
         logging.info(f"[Завершение] Прошивка")
-        # Очищаем перменные результата
-        photodata = None
-        result2 = 0
+        # Очищаем переменные результата
+        photodata1 = None
+        result1 = 0
         ###############################################################################################
-        #input("нажми ентер")
+        input("нажми ентер")
+        print(photodata)
 
 
         ################################################################################################
@@ -504,15 +503,14 @@ class Table:
         self.change_value('Reg_updown_Botloader', 0)
         result1 = 0
         ################################################################################################
-        #input("нажми ентер")
+        input("нажми ентер")
         
     ############# ****ЦИКЛ SETUP END ******"
 
     ############# ****ЦИКЛ MAIN ******"
     def main(self):
+        global photodata
         print("****ЦИКЛ MAIN")
-        
-    
         ################################################################################################
         # 1. Регул <- Сдвинь плату освободив ложе1.
         print("1 Регул <- Сдвинь плату освободив ложе1")
@@ -534,8 +532,10 @@ class Table:
         self.change_value('Reg_move_Table', 0)
         logging.info(f"[Завершение] Регул <- Сдвинь плату освободив ложе1")
         result1 = 0
+        print(photodata)
+
         ###################################################################################################
-        #input("нажми ентер")
+        input("нажми ентер")
 
 
         ###################################################################################################
@@ -576,8 +576,10 @@ class Table:
         logging.info(f"[Завершение] Регул <- Опусти прошивальщик ложе 2")
         self.change_value('Reg_updown_Botloader', 0)
         result2 = 0
+        print(photodata)
+
         #######################################################################################################
-        # input("нажми ентер")
+        input("нажми ентер")
 
 
         #########################################################################################################
@@ -591,10 +593,20 @@ class Table:
         print("3. Сервер -> Ответ по прошивке (плохо, хорошо)")
         logging.info(f"[НАЧАЛО] Прошивка")
         # photodata = "Z45564564645"
+        result1 = 0
+        print(photodata)
         firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata)
         while True:
-            result1 = self.read_value("sub_Rob_Action")
-            result2 = firmware_loader.loader()
+            # Обновляем result2 только если он еще не имеет нужного значения (200)
+            if result2 != 200:
+                result2 = firmware_loader.loader(photodata)
+                print(f" result2 -- {result2}")
+
+            # Обновляем result1 только если он еще не имеет нужного значения (241)
+            if result1 != 241:
+                result1 = self.read_value("sub_Rob_Action")
+                print(f" result2 -- {result2}")
+            
             if result1 != 241 and result2 != 200:
                 print(f"Ждем ответ от робота, что плату уложил получено от робота = {result1}")
                 logging.info(f"Ждем ответ от робота, что плату уложил получено от робота = {result1}")
@@ -611,13 +623,14 @@ class Table:
         self.change_value('Rob_Action', 0)
         logging.info(f"[Завершение]  Робот <- Уложи плату в тару.")
         result1 = 0
-        ##########################################################################################################
-        # input("нажми ентер")
         print (f"Ответ от прошивальщика получен {result1}")
         logging.info(f"[Завершение] Прошивка")
         # Очищаем перменные результата
         photodata = None
         result2 = 0
+        ##########################################################################################################
+        input("нажми ентер")
+      
 
         ##########################################################################################################
         # 4 Робот <- Забери плату из тары   # Регул <- Подними прошивальщик.
@@ -656,7 +669,7 @@ class Table:
         self.change_value('Reg_updown_Botloader', 0)
         result2 = 0
         ###############################################################################################################
-        #input("нажми ентер")
+        input("нажми ентер")
 
 
         ################################################################
@@ -686,7 +699,7 @@ class Table:
                 break
             time.sleep(1)
         ###########################################################################
-        #input("нажми ентер")
+        input("нажми ентер")
 
 
         ################################################################################################################
@@ -710,7 +723,7 @@ class Table:
         logging.info(f"[Завершение] Робот <- Уложи плату в ложемент тетситрования 1")
         result1=0
         ######################################################################################################################
-        #input("нажми ентер")
+        input("нажми ентер")
 
         ######################################################################
         # 7 Регул - Сдвигаем стол осовобождая ложе2
@@ -736,7 +749,7 @@ class Table:
         self.change_value('Reg_move_Table', 0)
         result1 = 0
         ############################################################################
-        #input("нажми ентер")
+        input("нажми ентер")
 
 
 
@@ -783,15 +796,24 @@ class Table:
         logging.info(f"[НАЧАЛО] Робот <- Уложи плату в тару.")
         self.change_value('Rob_Action', 241)
         logging.debug("Отправлена команда 'Rob_Action', 241")
-
-        print("19. Сервер <- Начни шить")
-        print("20. Сервер -> Ответ по прошивке (плохо, хорошо)")
+        print("9. Сервер <- Начни шить")
+        print("9. Сервер -> Ответ по прошивке (плохо, хорошо)")
         logging.info(f"[НАЧАЛО] Прошивка")
         # photodata = "Z45564564645"
         firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata)
+        result1 = 0
+        result2 = None  # Инициализируем перед циклом
         while True:
-            result1 = self.read_value("sub_Rob_Action")
-            result2 = firmware_loader.loader()
+               # Обновляем result2 только если он еще не имеет нужного значения (200)
+            if result2 != 200:
+                result2 = firmware_loader.loader(photodata)
+                print(f" result2 -- {result2}")
+
+            # Обновляем result1 только если он еще не имеет нужного значения (222)
+            if result1 != 241:
+                result1 = self.read_value("sub_Rob_Action")
+                print(f" result2 -- {result2}")
+            
             if result1 != 241 and result2 != 200:
                 print(f"Ждем ответ от робота, что плату уложил получено от робота = {result1}")
                 logging.info(f"Ждем ответ от робота, что плату уложил получено от робота = {result1}")
@@ -808,16 +830,14 @@ class Table:
         self.change_value('Rob_Action', 0)
         logging.info(f"[Завершение]  Робот <- Уложи плату в тару.")
         result1 = 0
-        ##########################################################################################################
-        # input("нажми ентер")
         print (f"Ответ от прошивальщика получен {result1}")
         logging.info(f"[Завершение] Прошивка")
         # Очищаем перменные результата
         photodata = None
         result2 = 0
-
         ##########################################################################################################
-        # input("нажми ентер")
+        input("нажми ентер")
+       
 
 
         ##########################################################################################################
@@ -857,7 +877,7 @@ class Table:
         self.change_value('Reg_updown_Botloader', 0)
         result2 = 0
         ###############################################################################################################
-        #input("нажми ентер")
+        input("нажми ентер")
 
 
         ################################################################
@@ -887,7 +907,7 @@ class Table:
                 break
             time.sleep(1)
         ###########################################################################
-        #input("нажми ентер")
+        input("нажми ентер")
 
 
 
@@ -914,7 +934,7 @@ class Table:
         self.change_value('Rob_Action', 0)
         result1 = 0
         ######################################################################################
-        #input("нажми ентер")
+        input("нажми ентер")
 
         print("****ЦИКЛ MAIN END")
 
@@ -943,7 +963,10 @@ if __name__ == "__main__":
     
     table1 = Table("Table 1", dict_Table1)
    
-    
-
+# Выполнение первого цикла
+    flag = True
+    if flag == True:
+        table1.setup_cycle()
+        flag = False
 
     table1.main()

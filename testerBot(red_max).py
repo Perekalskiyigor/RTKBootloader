@@ -166,7 +166,6 @@ class Table:
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
             logging.debug(f"Текущее значение sub_Reg_move_Table: {result1}")
-
             if result1 != 101:
                 print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
                 logging.info(f"Ожидание ответа от стола... Текущее значение: {result1}")
@@ -246,32 +245,31 @@ class Table:
         input("нажми ентер")
         # 1 Робот <- Забери плату из тары
         print("1 Робот <- забрать плату из тары")
-        logging.info(f"[НАЧАЛО] Робот <- забрать плату из тары")
+        logging.info(f"[START] Робот <- забрать плату из тары")
         self.change_value('Rob_Action', 210)
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            logging.debug(f"[Статус] sub_Rob_Action = {result1}")
+            logging.debug(f"sub_Rob_Action = {result1}")
 
-            
             if result1 != 210:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
-                logging.info(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
+                logging.debug(f"ответ от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 404 на на операции забрать из тары плату")
-                logging.info(f"От робота получен код 404 на на операции забрать из тары плату")
+                logging.info(f"ошибка 404")
                 
             else:
-                logging.info("Операция забора из тары успешно завершена")
+                logging.info("ОК")
                 break
             time.sleep(1)
-
-        logging.info(f"[Завершение] Робот <- забрать плату из тары")
+        logging.info(f"[END] Робот <- забрать плату из тары")
         self.change_value('Rob_Action', 0)
         result1=0
         ##########################################################
+        
         input("нажми ентер")
 
-        ################################################################
+        ##########################################################
         # 2 Делаем фото платы
         print("2 Камера <- сделай фото")
         logging.info(f"[НАЧАЛО] Камера <- сделай фото")

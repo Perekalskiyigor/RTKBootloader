@@ -168,10 +168,10 @@ class Table:
             logging.debug(f"Текущее значение sub_Reg_move_Table: {result1}")
             if result1 != 101:
                 print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-                logging.info(f"Ожидание ответа от стола... Текущее значение: {result1}")
+                logging.debug(f"Ожидание ответа от стола... Текущее значение: {result1}")
             elif result1 == 404:
                 print(f"От регула получен код 404 на операции движения стола")
-                logging.info("От регула получен код 404 (успех операции движения стола)")
+                logging.warning("От регула получен код 404 (успех операции движения стола)")
             else:
                 logging.info("Успешное завершение: стол сдвинут")
                 break
@@ -187,11 +187,11 @@ class Table:
             logging.debug(f"Текущее значение sub_Rob_Action: {result1}")
 
             if result1 != 231:
-                print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
-                logging.info(f"Ожидание ответа от робота... Текущее значение: {result1}")
+                print(f"ответ от робота = {result1}")
+                logging.debug(f"Ожидание ответа от робота... Текущее значение: {result1}")
             elif result1 == 404:
-                print(f"От робота получен код 404 на на операции взять плату с ложа")
-                logging.info("От робота получен код 404 (успех операции 'взять плату')")
+                print(f"от робота ошибка 404")
+                logging.warning("От робота получен код 404 (успех операции 'взять плату')")
             else:
                 logging.info("От робота получен код 200 (успех операции 'взять плату')")
                 break
@@ -209,10 +209,10 @@ class Table:
             result1 = self.read_value("sub_Reg_move_Table")
             if result1 != 102:
                 print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-                logging.info(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
+                logging.debug(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
             elif result1 == 404:
                 print(f"От регула получен код 404 на операции движения стола")
-                logging.info(f"От регула получен код 404 на операции движения стола")
+                logging.warning(f"От регула получен код 404 на операции движения стола")
             else:
                 logging.info("Успешное завершение: стол сдвинут")
                 break
@@ -226,7 +226,7 @@ class Table:
         while True:
             result1 = self.read_value("sub_Rob_Action")
             if result1 != 232:
-                print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
+                print(f"ответ от робота = {result1}")
             elif result1 == 404:
                 print(f"От робота получен код 200 на на операции взять плату с ложа")
             else:
@@ -255,14 +255,13 @@ class Table:
                 print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
                 logging.debug(f"ответ от робота = {result1}")
             elif result1 == 404:
-                print(f"От робота получен код 404 на на операции забрать из тары плату")
-                logging.info(f"ошибка 404")
+                print(f"ошибка 404")
+                logging.warning(f"ошибка 404")
                 
             else:
-                logging.info("ОК")
+                logging.info(f"[END] Робот <- забрать плату из тары")
                 break
             time.sleep(1)
-        logging.info(f"[END] Робот <- забрать плату из тары")
         self.change_value('Rob_Action', 0)
         result1=0
         ##########################################################
@@ -272,15 +271,15 @@ class Table:
         ##########################################################
         # 2 Делаем фото платы
         print("2 Камера <- сделай фото")
-        logging.info(f"[НАЧАЛО] Камера <- сделай фото")
+        logging.info(f"[START] Камера <- сделай фото")
         for i in range(3):
             try:
                 logging.debug(f"Попытка {i}: запрос фото с камеры")
                 res,photodata1= CameraSocket.photo()
                 print(f"С камеры получен ID {photodata1}")
-                logging.info(f"Успех: получен ID фото {photodata1}")
+                logging.debug(f"Успех: получен ID фото {photodata1}")
             except Exception as e:
-                print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
+                print(f"Ошибка: камера недоступна. Детали: {e}")
                 logging.warning(f"Попытка {i}: неверный ответ (код: {res}, данные: {photodata1})")
             time.sleep(1)
         while True:
@@ -292,36 +291,31 @@ class Table:
                 time.sleep(1)
             else:
                 print(f"Фото успешно получено: {photodata1}")
-                logging.info(f"[Завершение] Камера <- сделай фото: {photodata1}")
+                logging.debug(f"[END] Камера <- сделай фото: {photodata1}")
                 break
             time.sleep(1)
-        ###########################################################################
-
-
 
         ############################################################
         # 3 Робот <- Уложи плату в ложемент тетситрования
         print("3 Робот <- Уложи плату в ложемент тетситрования 1")
-        logging.info(f"[НАЧАЛО] Робот <- Уложи плату в ложемент тетситрования 1")
-        
+        logging.info(f"[START] Робот <- Уложи плату в ложемент тетситрования 1")
         self.change_value('Rob_Action', 221)
         logging.debug("Отправлена команда Rob_Action=221")
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            logging.debug(f"[Статус] sub_Rob_Action = {result1}")
+            logging.debug(f"sub_Rob_Action = {result1}")
 
             if result1 != 221:
-
-                logging.info(f"Ждем ответ от робота, что плата уложена в ложемент, получено от робота = {result1}")
-                print(f"Ждем ответ от робота, что плата уложена в ложемент, получено от робота = {result1}")
+                logging.debug(f"Получено от робота = {result1}")
+                print(f"Получено от робота = {result1}")
                 time.sleep(1)
             elif result1 == 404:
-                print(f"От робота получен код 404 на на операции уложить плату в ложемент")
-                logging.info(f"От робота получен код 404 на на операции уложить плату в ложемент")
+                print(f"ошибка 404")
+                logging.warning(f"ошибка 404")
                 time.sleep(1)
             else:
                 break
-            logging.info(f"[Завершение] Робот <- Уложи плату в ложемент тетситрования 1")
+            logging.info(f"[END] Робот <- Уложи плату в ложемент тетситрования 1")
             time.sleep(1)
         self.change_value('Rob_Action', 0)
         result1 = 0
@@ -333,69 +327,70 @@ class Table:
         ######################################################################
         # 4 Регул - Сдвигаем стол осовобождая ложе2
         print("4 Регул <- Сдвинь плату освободив ложе2.")
-        logging.info(f"[НАЧАЛО] Регул <- Сдвинь плату освободив ложе2")
+        logging.info(f"[START] Регул <- Сдвинь плату освободив ложе2")
 
         self.change_value('Reg_move_Table', 102)
         logging.debug("Отправлена команда Reg_move_Table', 102")
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
-            logging.debug(f"[Статус] sub_Reg_move_Table = {result1}")
+            logging.debug(f"sub_Reg_move_Table = {result1}")
 
             if result1 != 102:
-                logging.info(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-                print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
+                logging.debug(f"получено от регула = {result1}")
+                print(f"получено от регула = {result1}")
                 time.sleep(1)
             elif result1 == 404:
-                print(f"От регула получен код 404 на операции движения стола")
-                logging.info(f"От регула получен код 404 на операции движения стола")
+                print(f"ошибка 404")
+                logging.warning(f"ошибка 404")
             else:
                 break
             time.sleep(1)
-        logging.info(f"[Завершение] Регул <- Сдвинь плату освободив ложе2")
+        logging.info(f"[END] Регул <- Сдвинь плату освободив ложе2")
         self.change_value('Reg_move_Table', 0)
         result1 = 0
         ############################################################################
         input("нажми ентер")
-
-
         
         #############################################################################
         # 5 Робот <- Забери плату из тары # Регул <- Опусти прошивальщик (плата на ложе1).
-        print("5 Робот <- Забери плату из тары")
-        print("5 Регул <- Опусти прошивальщик ложе 1")
-        logging.info(f"[НАЧАЛО] Робот <- Забери плату из тары")
+        print("5.1 Робот <- Забери плату из тары")
+        print("5.2 Регул <- Опусти прошивальщик ложе 1")
+
+        logging.info(f"[START1] Робот <- Забери плату из тары")
         self.change_value('Rob_Action', 210)
         logging.debug("Отправлена команда Rob_Action', 210")
 
-        logging.info(f"[НАЧАЛО] Регул <- Опусти прошивальщик ложе 1")
+        logging.info(f"[START2] Регул <- Опусти прошивальщик ложе 1")
         self.change_value('Reg_updown_Botloader', 103)
         logging.debug("Отправлена команда 'Reg_updown_Botloader', 103")
+
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            logging.debug(f"[Статус] sub_Reg_move_Table = {result1}")
+            logging.debug(f"sub_Reg_move_Table = {result1}")
 
             result2 = self.read_value("sub_Reg_updown_Botloader")
-            logging.debug(f"[Статус] sub_Reg_updown_Botloader = {result1}")
+            logging.debug(f"sub_Reg_updown_Botloader = {result1}")
 
             if result1 != 210 and result2 != 103:
-                print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
-                logging.info(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
+                print(f"получено от робота = {result1}")
+                logging.debug(f"получено от робота = {result1}")
 
-                print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
-                logging.info(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
+                print(f"получено от регула = {result1}")
+                logging.debug(f"получено от регула = {result1}")
             elif result1 == 404:
-                print(f"От робота получен код 404 на на операции забрать из тары плату")
-                print(f"От регула получен код 404 на на операции опустить прошивальщик")
-                logging.info(f"От регула получен код 404 на на операции опустить прошивальщик")
+                print(f"От робота ошибка 404")
+                logging.warning(f"От робота ошибка 404")
+            elif result2 == 404:
+                print(f"От регула ошибка 404")
+                logging.warning(f"От регула ошибка 404")
             elif result1 == 210 and result2 == 103:
                 break
             time.sleep(1)
-        logging.info(f"[Завершение] Робот <- Забери плату из тары")
+        logging.info(f"[END1] Робот <- Забери плату из тары")
         self.change_value('Rob_Action', 0)
-
-        logging.info(f"[Завершение] Регул <- Опусти прошивальщик ложе 1")
-        self.change_value('Reg_updown_Botloader', 0)
         result1 = 0
+        logging.info(f"[END2] Регул <- Опусти прошивальщик ложе 1")
+        self.change_value('Reg_updown_Botloader', 0)
         result2 = 0
         ##################################################################################
         input("нажми ентер")
@@ -403,15 +398,15 @@ class Table:
         ################################################################
         # 6 Делаем фото платы
         print("6 Камера <- сделай фото")
-        logging.info(f"[НАЧАЛО] Камера <- сделай фото")
+        logging.info(f"[START] Камера <- сделай фото")
         for i in range(3):
             try:
                 logging.debug(f"Попытка {i}: запрос фото с камеры")
                 res,photodata= CameraSocket.photo()
                 print(f"С камеры получен ID {photodata}")
-                logging.info(f"Успех: получен ID фото {photodata}")
+                logging.debug(f"Успех: получен ID фото {photodata}")
             except Exception as e:
-                print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
+                print(f"Ошибка: камера недоступна. Детали: {e}")
                 logging.warning(f"Попытка {i}: неверный ответ (код: {res}, данные: {photodata})")
             time.sleep(1)
         while True:
@@ -423,34 +418,28 @@ class Table:
                 time.sleep(1)
             else:
                 print(f"Фото успешно получено: {photodata}")
-                logging.info(f"[Завершение] Камера <- сделай фото: {photodata}")
+                logging.debug(f"[END] Камера <- сделай фото: {photodata}")
                 break
             time.sleep(1)
-        print(photodata)
         ###########################################################################
 
 
         input("нажми ентер")
         ###################################################################################
-        # 7 Робот <- Уложи плату в ложемент тетситрования
-        # 7. Сервер <- Начни шить
-        # 7. Сервер -> Ответ по прошивке (плохо, хорошо)
-        print("7 Робот <- Уложи плату в ложемент тетситрования 2")
-        logging.info(f"[НАЧАЛО] Робот <- Уложи плату в ложемент тетситрования 2")
+        # 7 Робот <- Уложи плату в ложемент тетситрования 2 # Сервер <- Начни шить 
+        print("7.1 Робот <- Уложи плату в ложемент тетситрования 2")
+        logging.info(f"[START1] Робот <- Уложи плату в ложемент тетситрования 2")
         self.change_value('Rob_Action', 222)
         logging.debug("Отправлена команда 'Rob_Action', 222")
-        # 9. Сервер <- Начни шить
-        # 10. Сервер -> Ответ по прошивке (плохо, хорошо)
-        print("9. Сервер <- Начни шить")
-        print("10. Сервер -> Ответ по прошивке (плохо, хорошо)")
-        logging.info(f"[НАЧАЛО] Прошивка")
+        
+        print("7.2 Сервер <- Начни шить")
+        logging.info(f"[START2] Прошивка")
         result1 = 0
-        # photodata = "Z45564564645"
+
         # Данные по прошивке для этого серийника
         firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata1)
         result2 = None  # Инициализируем перед циклом
         while True:
-            print(f" result1 -- {result1}")
             # Обновляем result2 только если он еще не имеет нужного значения (200)
             if result2 != 200:
                 result2 = firmware_loader.loader(photodata1)
@@ -459,45 +448,54 @@ class Table:
             # Обновляем result1 только если он еще не имеет нужного значения (222)
             if result1 != 222:
                 result1 = self.read_value("sub_Rob_Action")
-                print(f" result2 -- {result2}")
+                print(f" result1 -- {result1}")
             
             if result1 != 222 and result2 != 200:
-                print(f"Ждем ответ прошивальщика {result1}")
-                logging.info(f"Ждем ответ от прошивальщика= {result1}")
-            elif result1 == 222 and result2 == 200:
                 print(f"Ответ от прошивальщика {result1}")
+                logging.debug(f"Ответ от прошивальщика= {result1}")
+
+                print(f"Ответ от робота {result2}")
+                logging.debug(f"Ответ от робота= {result2}")
+            elif result1 == 404:
+                print(f"От робота ошибка 404")
+                logging.warning(f"От робота ошибка 404")
+            elif result2 == 404:
+                print(f"От регула ошибка 404")
+                logging.warning(f"От регула ошибка 404")
+            elif result1 == 222 and result2 == 200:
                 break
+            
             time.sleep(1)
 
         self.change_value('Rob_Action', 0)
-        print(f"Ответ от прошивальщика получен {result1}")
-        logging.info(f"[Завершение] Прошивка")
-        # Очищаем переменные результата
+        logging.info(f"[END1] Прошивка")
+        logging.info(f"[END2] Робот <- Уложи плату в ложемент тетситрования 2")
+
         photodata1 = None
         result1 = 0
+        result2 = 0
+
         ###############################################################################################
         input("нажми ентер")
-        print(photodata)
-
 
         ################################################################################################
         # 8. Регул <- Подними прошивальщик.
         print("8. Регул <- Подними прошивальщик.")
-        logging.info(f"[НАЧАЛО] Регул <- Подними прошивальщик.")
+        logging.info(f"[START] Регул <- Подними прошивальщик.")
         self.change_value('Reg_updown_Botloader', 104)
         logging.debug("Отправлена команда 'Reg_updown_Botloader', 104")
         while True:
             result1 = self.read_value("sub_Reg_updown_Botloader")
             if result1 != 104:
-                print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
-                logging.info(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
+                print(f"ответ от регула= {result1}")
+                logging.debug(f"ответ от регула= {result1}")
             elif result1 == 404:
-                print(f"От регула получен код 404 на на операции поднять прошивальщик")
-                logging.info(f"От регула получен код 404 на на операции поднять прошивальщик")
+                print(f"ошибка 404")
+                logging.warning(f"ошибка 404")
             else:
                 break
             time.sleep(1)
-        logging.info(f"[Завершение] Регул <- Подними прошивальщик.")
+        logging.info(f"[END] Регул <- Подними прошивальщик.")
         self.change_value('Reg_updown_Botloader', 0)
         result1 = 0
         ################################################################################################
@@ -508,91 +506,85 @@ class Table:
     ############# ****ЦИКЛ MAIN ******"
     def main(self):
         global photodata
-        print("****ЦИКЛ MAIN")
+        print("ЦИКЛ MAIN _ START")
         ################################################################################################
         # 1. Регул <- Сдвинь плату освободив ложе1.
         print("1 Регул <- Сдвинь плату освободив ложе1")
-        logging.info(f"[НАЧАЛО] Регул <- Сдвинь плату освободив ложе1")
+        logging.info(f"[START] Регул <- Сдвинь плату освободив ложе1")
         self.change_value('Reg_move_Table', 101)
         logging.debug("Отправлена команда 'Reg_move_Table', 101")
 
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
             if result1 != 101:
-                print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-                logging.info(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
+                print(f"ответ от регула = {result1}")
+                logging.debug(f"ответ от регула = {result1}")
             elif result1 == 404:
-                print(f"От регула получен код 404 на операции движения стола")
-                logging.info(f"От регула получен код 404 на операции движения стола")
+                print(f"ошибка 404")
+                logging.warning(f"ошибка 404")
             else:
                 break
             time.sleep(1)
         self.change_value('Reg_move_Table', 0)
-        logging.info(f"[Завершение] Регул <- Сдвинь плату освободив ложе1")
+        logging.info(f"[END] Регул <- Сдвинь плату освободив ложе1")
         result1 = 0
-        print(photodata)
 
         ###################################################################################################
         input("нажми ентер")
 
 
         ###################################################################################################
-        # 2. Робот <- Забери плату с ложе 1 # . Регул <- Опусти прошивальщик ложе 2.
-        print("2 Робот <- Забери плату с ложе 1.")
-        logging.info(f"[НАЧАЛО] Робот <- Забери плату с ложе 1.")
+        # 2. Робот <- Забери плату с ложе 1 # Регул <- Опусти прошивальщик ложе 2.
+        print("2.1 Робот <- Забери плату с ложе 1.")
+        logging.info(f"[START1] Робот <- Забери плату с ложе 1.")
         self.change_value('Rob_Action', 231)
         logging.debug("Отправлена команда 'Rob_Action', 231")
 
-        print("2 Регул <- Опусти прошивальщик ложе 2")
-        logging.info(f"[НАЧАЛО] Регул <- Опусти прошивальщик ложе 2")
-
+        print("2.2 Регул <- Опусти прошивальщик ложе 2")
+        logging.info(f"[START2] Регул <- Опусти прошивальщик ложе 2")
         self.change_value('Reg_updown_Botloader', 103)
         logging.debug("Отправлена команда 'Reg_updown_Botloader', 103")
+
         while True:
             result1 = self.read_value("sub_Rob_Action")
             result2 = self.read_value("sub_Reg_updown_Botloader")
-            logging.debug(f"[Статус] sub_Reg_updown_Botloader = {result2}")
             if result1 != 231 and result2 != 103:
-                print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
-                logging.info(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
+                print(f"ответ от робота = {result1}")
+                logging.debug(f" ответ от робота = {result1}")
 
-                print(f"Ждем ответ от регула, что прошивальщик опущен= {result2}")
-                logging.info(f"Ждем ответ от регула, что прошивальщик опущен= {result2}")
-            elif result1 == 404 or result2 == 404:
-                print(f"От робота получен код 404 на на операции взять плату с ложа")
-                logging.info(f"От робота получен код 404 на на операции взять плату с ложа")
-                print(f"От регула получен код 404 на на операции опустить прошивальщик")
-                logging.info(f"От регула получен код 404 на на операции опустить прошивальщик")
+                print(f"ответ от регула = {result2}")
+                logging.debug(f"ответ от регула = {result2}")
+            elif result1 == 404:
+                print(f"От робота ошибка 404 ")
+                logging.warning(f"От робота ошибка 404")
+            elif result2 == 404:   
+                print(f"От регула ошибка 404")
+                logging.warning(f"От регула ошибка 404")
             elif result1 == 231 and result2 == 103:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
-        logging.info(f"[Завершение] Робот <- Забери плату с ложе 1.")
+        logging.info(f"[END1] Робот <- Забери плату с ложе 1.")
         print("Стол 1ложе свободен")
         result1 = 0
 
-        logging.info(f"[Завершение] Регул <- Опусти прошивальщик ложе 2")
+        logging.info(f"[END2] Регул <- Опусти прошивальщик ложе 2")
         self.change_value('Reg_updown_Botloader', 0)
         result2 = 0
-        print(photodata)
 
         #######################################################################################################
         input("нажми ентер")
 
-
         #########################################################################################################
-        # 3 Робот <- Уложи плату в тару # Сервер <- Начни шить # Сервер -> Ответ по прошивке (плохо, хорошо)
-        print("# 3 Робот <- Уложи плату в тару.")
-        logging.info(f"[НАЧАЛО] Робот <- Уложи плату в тару.")
+        # 3 Робот <- Уложи плату в тару # Сервер <- Начни шить
+        print("#3.1 Робот <- Уложи плату в тару.")
+        logging.info(f"[START1] Робот <- Уложи плату в тару.")
         self.change_value('Rob_Action', 241)
         logging.debug("Отправлена команда 'Rob_Action', 241")
 
-        print("3. Сервер <- Начни шить")
-        print("3. Сервер -> Ответ по прошивке (плохо, хорошо)")
-        logging.info(f"[НАЧАЛО] Прошивка")
-        # photodata = "Z45564564645"
+        print("#3.2 Сервер <- Начни шить")
+        logging.info(f"[START2] Прошивка")
         result1 = 0
-        print(photodata)
         firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata)
         while True:
             # Обновляем result2 только если он еще не имеет нужного значения (200)
@@ -603,27 +595,25 @@ class Table:
             # Обновляем result1 только если он еще не имеет нужного значения (241)
             if result1 != 241:
                 result1 = self.read_value("sub_Rob_Action")
-                print(f" result2 -- {result2}")
+                print(f" result1 -- {result1}")
             
             if result1 != 241 and result2 != 200:
-                print(f"Ждем ответ от робота, что плату уложил получено от робота = {result1}")
-                logging.info(f"Ждем ответ от робота, что плату уложил получено от робота = {result1}")
+                print(f"ответ от робота= {result1}")
+                logging.debug(f"ответ от робота = {result1}")
 
-                print(f"Ждем ответ прошивальщка {result2}")
-                logging.info(f"Ждем ответ от прошивальщика= {result2}")
+                print(f"ответ прошивальщка {result2}")
+                logging.debug(f"ответ от прошивальщика= {result2}")
             elif result1 == 404:
                 print(f"От робота получен код 404 на на операции уложить плату")
-                logging.info(f"От робота получен код 404 на на операции уложить плату")
+                logging.warning(f"От робота получен код 404 на на операции уложить плату")
             elif result1 == 241 and result2 == 200:
-                print(f"Ответ от прошивальщика {result2}")
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
-        logging.info(f"[Завершение]  Робот <- Уложи плату в тару.")
+        logging.info(f"[END1]  Робот <- Уложи плату в тару.")
         result1 = 0
-        print (f"Ответ от прошивальщика получен {result1}")
-        logging.info(f"[Завершение] Прошивка")
-        # Очищаем перменные результата
+
+        logging.info(f"[END2] Прошивка")
         photodata = None
         result2 = 0
         ##########################################################################################################
@@ -631,14 +621,14 @@ class Table:
       
 
         ##########################################################################################################
-        # 4 Робот <- Забери плату из тары   # Регул <- Подними прошивальщик.
-        print("4 Робот <- забрать плату из тары")
-        logging.info(f"[НАЧАЛО] Робот <- забрать плату из тары")
+        # 4 Робот <- Забери плату из тары  # Регул <- Подними прошивальщик.
+        print("4.1 Робот <- забрать плату из тары")
+        logging.info(f"[START1] Робот <- забрать плату из тары")
         self.change_value('Rob_Action', 210)
         logging.debug("Отправлена команда 'Rob_Action', 210")
 
-        print("4. Регул <- Подними прошивальщик.")
-        logging.info(f"[НАЧАЛО] Регул <- Подними прошивальщик.")
+        print("4.2 Регул <- Подними прошивальщик.")
+        logging.info(f"[START2] Регул <- Подними прошивальщик.")
         self.change_value('Reg_updown_Botloader', 104)
         logging.debug("Отправлена команда 'Reg_updown_Botloader', 104")
 
@@ -646,24 +636,24 @@ class Table:
             result1 = self.read_value("sub_Rob_Action")
             result2 = self.read_value("sub_Reg_updown_Botloader")
             if result1 != 210 and result2 != 104:
-                print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
-                logging.info(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
+                print(f"получено от робота = {result1}")
+                logging.debug(f"получено от робота = {result1}")
 
-                print(f"Ждем ответ от регула, что прошивальщик поднят= {result2}")
-                logging.info(f"Ждем ответ от регула, что прошивальщик поднят= {result2}")
+                print(f"ответ от регула= {result2}")
+                logging.debug(f"ответ от регула {result2}")
             elif result1 == 404 or result2 == 404 :
-                print(f"От робота получен код 404 на на операции забрать из тары плату")
-                logging.info(f"От робота получен код 404 на на операции забрать из тары плату")
-
-                print(f"От регула получен код 404 на на операции поднять прошивальщик")
-                logging.info(f"От регула получен код 404 на на операции поднять прошивальщик")
+                print(f"От робота ошибка 404")
+                logging.warning(f"От робота ошибка 404")
+            elif result2 == 404 :
+                print(f"От регула ошибка 404")
+                logging.warning(f"От регула ошибка 404")
             else:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
-        logging.info(f"[Завершение]  Робот <- забрать плату из тары")
+        logging.info(f"[END1]  Робот <- забрать плату из тары")
         result1=0
-        logging.info(f"[Завершение] Регул <- Подними прошивальщик.")
+        logging.info(f"[END2] Регул <- Подними прошивальщик.")
         self.change_value('Reg_updown_Botloader', 0)
         result2 = 0
         ###############################################################################################################
@@ -673,27 +663,27 @@ class Table:
         ################################################################
         # 5 Делаем фото платы
         print("5 Камера <- сделай фото")
-        logging.info(f"[НАЧАЛО] Камера <- сделай фото")
+        logging.info(f"[START] Камера <- сделай фото")
         for i in range(3):
             try:
                 logging.debug(f"Попытка {i}: запрос фото с камеры")
-                res,photodata = CameraSocket.photo()
+                res,photodata= CameraSocket.photo()
                 print(f"С камеры получен ID {photodata}")
-                logging.info(f"Успех: получен ID фото {photodata}")
+                logging.debug(f"Успех: получен ID фото {photodata}")
             except Exception as e:
-                print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
+                print(f"Ошибка: камера недоступна. Детали: {e}")
                 logging.warning(f"Попытка {i}: неверный ответ (код: {res}, данные: {photodata})")
             time.sleep(1)
         while True:
-            res,photodata = CameraSocket.photo()
+            res,photodata= CameraSocket.photo()
             logging.debug(f"Ожидание фото.код {res}, данные {photodata}")
-            if res != 200 or photodata == "NoRead":
+            if res != 200 or photodata== "NoRead":
                 print(f"Ошибка получения фото с камеры")
                 logging.warning(f"Ошибка получения фото с камеры")
                 time.sleep(1)
             else:
                 print(f"Фото успешно получено: {photodata}")
-                logging.info(f"[Завершение] Камера <- сделай фото: {photodata}")
+                logging.debug(f"[END] Камера <- сделай фото: {photodata}")
                 break
             time.sleep(1)
         ###########################################################################
@@ -703,134 +693,135 @@ class Table:
         ################################################################################################################
         # 6 Робот <- Уложи плату в ложемент тетситрования 1
         print("6 Робот <- Уложи плату в ложемент тетситрования 1")
-        logging.info(f"[НАЧАЛО] Робот <- Уложи плату в ложемент тетситрования 1")
+        logging.info(f"[START] Робот <- Уложи плату в ложемент тетситрования 1")
         self.change_value('Rob_Action', 221)
-        logging.debug("Отправлена команда 'Rob_Action', 221")
+        logging.debug("Отправлена команда Rob_Action=221")
         while True:
             result1 = self.read_value("sub_Rob_Action")
+            logging.debug(f"sub_Rob_Action = {result1}")
+
             if result1 != 221:
-                print(f"Ждем ответ от робота, что плату уложили = {result1}")
-                logging.info(f"Ждем ответ от робота, что плату уложили = {result1}")
+                logging.debug(f"Получено от робота = {result1}")
+                print(f"Получено от робота = {result1}")
+                time.sleep(1)
             elif result1 == 404:
-                print(f"От робота получен код 404 на на операции уложить плату")
-                logging.info(f"От робота получен код 404 на на операции уложить плату")
+                print(f"ошибка 404")
+                logging.warning(f"ошибка 404")
+                time.sleep(1)
             else:
                 break
+            logging.info(f"[END] Робот <- Уложи плату в ложемент тетситрования 1")
             time.sleep(1)
         self.change_value('Rob_Action', 0)
-        logging.info(f"[Завершение] Робот <- Уложи плату в ложемент тетситрования 1")
-        result1=0
+        result1 = 0
         ######################################################################################################################
         input("нажми ентер")
 
         ######################################################################
         # 7 Регул - Сдвигаем стол осовобождая ложе2
         print("7 Регул <- Сдвинь плату освободив ложе2.")
-        logging.info(f"[НАЧАЛО] Регул <- Сдвинь плату освободив ложе2")
+        logging.info(f"[START] Регул <- Сдвинь плату освободив ложе2")
 
         self.change_value('Reg_move_Table', 102)
         logging.debug("Отправлена команда Reg_move_Table', 102")
         while True:
             result1 = self.read_value("sub_Reg_move_Table")
-            logging.debug(f"[Статус] sub_Reg_move_Table = {result1}")
+            logging.debug(f"sub_Reg_move_Table = {result1}")
 
             if result1 != 102:
-                logging.info(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-                print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
+                logging.debug(f"получено от регула = {result1}")
+                print(f"получено от регула = {result1}")
+                time.sleep(1)
             elif result1 == 404:
-                print(f"От регула получен код 404 на операции движения стола")
-                logging.info(f"От регула получен код 404 на операции движения стола")
+                print(f"ошибка 404")
+                logging.warning(f"ошибка 404")
             else:
                 break
             time.sleep(1)
-        logging.info(f"[Завершение] Регул <- Сдвинь плату освободив ложе2")
+        logging.info(f"[END] Регул <- Сдвинь плату освободив ложе2")
         self.change_value('Reg_move_Table', 0)
         result1 = 0
         ############################################################################
         input("нажми ентер")
 
 
-
         ###################################################################################################
-        # 8. Робот <- Забери плату с ложе 2. Регул <- Опусти прошивальщик ложе 1
+        # 8. Робот <- Забери плату с ложе # Регул <- Опусти прошивальщик ложе 1
         print("8 Робот <- Забери плату с ложе 2.")
-        logging.info(f"[НАЧАЛО] Робот <- Забери плату с ложе 2.")
+        logging.info(f"[START1] Робот <- Забери плату с ложе 2.")
         self.change_value('Rob_Action', 232)
         logging.debug("Отправлена команда 'Rob_Action', 232")
 
         print("8 Регул <- Опусти прошивальщик ложе 2")
-        logging.info(f"[НАЧАЛО] Регул <- Опусти прошивальщик ложе 1")
+        logging.info(f"[START2] Регул <- Опусти прошивальщик ложе 1")
         self.change_value('Reg_updown_Botloader', 103)
         logging.debug("Отправлена команда 'Reg_updown_Botloader', 103")
         while True:
             result1 = self.read_value("sub_Rob_Action")
             result2 = self.read_value("sub_Reg_updown_Botloader")
-            logging.debug(f"[Статус] sub_Reg_updown_Botloader = {result2}")
+            logging.debug(f"sub_Reg_updown_Botloader = {result2}")
             if result1 != 232 and result2 != 103:
-                print(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
-                logging.info(f"Ждем ответ от робота, что плату забрал получено от робота = {result1}")
+                print(f"ответ от робота = {result1}")
+                logging.debug(f"ответ от робота = {result1}")
 
-                print(f"Ждем ответ от регула, что прошивальщик опущен= {result2}")
-                logging.info(f"Ждем ответ от регула, что прошивальщик опущен= {result2}")
-            elif result1 == 404 or result2 == 404:
-                print(f"От робота получен код 404 на на операции взять плату с ложа")
-                logging.info(f"От робота получен код 404 на на операции взять плату с ложа")
-                print(f"От регула получен код 404 на на операции опустить прошивальщик")
-                logging.info(f"От регула получен код 404 на на операции опустить прошивальщик")
+                print(f"ответ от регула= {result2}")
+                logging.debug(f"ответ от регула= {result2}")
+            elif result1 == 404:
+                print(f"от робота ошибка 404")
+                logging.warning(f"от робота ошибка 404")
+            elif result2 == 404:
+                print(f"от регула ошибка 404")
+                logging.warning(f"от регула ошибка 404")
             elif result1 == 232 and result2 == 103:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
-        logging.info(f"[Завершение] Робот <- Забери плату с ложе 2.")
+        logging.info(f"[END1] Робот <- Забери плату с ложе 2.")
         result1 = 0
 
-        logging.info(f"[Завершение] Регул <- Опусти прошивальщик ложе 2")
+        logging.info(f"[END2] Регул <- Опусти прошивальщик ложе 2")
         self.change_value('Reg_updown_Botloader', 0)
         result2 = 0
 
         #########################################################################################################
-        # 9 Робот <- Уложи плату в тару # Сервер <- Начни шить # Сервер -> Ответ по прошивке (плохо, хорошо)
-        print("# 9 Робот <- Уложи плату в тару.")
-        logging.info(f"[НАЧАЛО] Робот <- Уложи плату в тару.")
+        # 9 Робот <- Уложи плату в тару # Сервер <- Начни шить
+        print("#9.1 Робот <- Уложи плату в тару.")
+        logging.info(f"[START1] Робот <- Уложи плату в тару.")
         self.change_value('Rob_Action', 241)
         logging.debug("Отправлена команда 'Rob_Action', 241")
-        print("9. Сервер <- Начни шить")
-        print("9. Сервер -> Ответ по прошивке (плохо, хорошо)")
-        logging.info(f"[НАЧАЛО] Прошивка")
-        # photodata = "Z45564564645"
-        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata)
+
+        print("#9.2 Сервер <- Начни шить")
+        logging.info(f"[START2] Прошивка")
         result1 = 0
-        result2 = None  # Инициализируем перед циклом
+        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata)
         while True:
-               # Обновляем result2 только если он еще не имеет нужного значения (200)
+            # Обновляем result2 только если он еще не имеет нужного значения (200)
             if result2 != 200:
                 result2 = firmware_loader.loader(photodata)
                 print(f" result2 -- {result2}")
 
-            # Обновляем result1 только если он еще не имеет нужного значения (222)
+            # Обновляем result1 только если он еще не имеет нужного значения (241)
             if result1 != 241:
                 result1 = self.read_value("sub_Rob_Action")
-                print(f" result2 -- {result2}")
+                print(f" result1 -- {result1}")
             
             if result1 != 241 and result2 != 200:
-                print(f"Ждем ответ от робота, что плату уложил получено от робота = {result1}")
-                logging.info(f"Ждем ответ от робота, что плату уложил получено от робота = {result1}")
+                print(f"ответ от робота= {result1}")
+                logging.debug(f"ответ от робота = {result1}")
 
-                print(f"Ждем ответ прошивальщка {result2}")
-                logging.info(f"Ждем ответ от прошивальщика= {result2}")
+                print(f"ответ прошивальщка {result2}")
+                logging.debug(f"ответ от прошивальщика= {result2}")
             elif result1 == 404:
                 print(f"От робота получен код 404 на на операции уложить плату")
-                logging.info(f"От робота получен код 404 на на операции уложить плату")
+                logging.warning(f"От робота получен код 404 на на операции уложить плату")
             elif result1 == 241 and result2 == 200:
-                print(f"Ответ от прошивальщика {result2}")
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
-        logging.info(f"[Завершение]  Робот <- Уложи плату в тару.")
+        logging.info(f"[END1]  Робот <- Уложи плату в тару.")
         result1 = 0
-        print (f"Ответ от прошивальщика получен {result1}")
-        logging.info(f"[Завершение] Прошивка")
-        # Очищаем перменные результата
+
+        logging.info(f"[END2] Прошивка")
         photodata = None
         result2 = 0
         ##########################################################################################################
@@ -840,13 +831,13 @@ class Table:
 
         ##########################################################################################################
         # 10 Робот <- Забери плату из тары   # Регул <- Подними прошивальщик.
-        print("10 Робот <- забрать плату из тары")
-        logging.info(f"[НАЧАЛО] Робот <- забрать плату из тары")
+        print("10.1 Робот <- забрать плату из тары")
+        logging.info(f"[START1] Робот <- забрать плату из тары")
         self.change_value('Rob_Action', 210)
         logging.debug("Отправлена команда 'Rob_Action', 210")
 
-        print("10. Регул <- Подними прошивальщик.")
-        logging.info(f"[НАЧАЛО] Регул <- Подними прошивальщик.")
+        print("10.2 Регул <- Подними прошивальщик.")
+        logging.info(f"[START2] Регул <- Подними прошивальщик.")
         self.change_value('Reg_updown_Botloader', 104)
         logging.debug("Отправлена команда 'Reg_updown_Botloader', 104")
 
@@ -854,24 +845,24 @@ class Table:
             result1 = self.read_value("sub_Rob_Action")
             result2 = self.read_value("sub_Reg_updown_Botloader")
             if result1 != 210 and result2 != 104:
-                print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
-                logging.info(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
+                print(f"получено от робота = {result1}")
+                logging.debug(f"получено от робота = {result1}")
 
-                print(f"Ждем ответ от регула, что прошивальщик поднят= {result2}")
-                logging.info(f"Ждем ответ от регула, что прошивальщик поднят= {result2}")
+                print(f"ответ от регула= {result2}")
+                logging.debug(f"ответ от регула {result2}")
             elif result1 == 404 or result2 == 404 :
-                print(f"От робота получен код 404 на на операции забрать из тары плату")
-                logging.info(f"От робота получен код 404 на на операции забрать из тары плату")
-
-                print(f"От регула получен код 404 на на операции поднять прошивальщик")
-                logging.info(f"От регула получен код 404 на на операции поднять прошивальщик")
+                print(f"От робота ошибка 404")
+                logging.warning(f"От робота ошибка 404")
+            elif result2 == 404 :
+                print(f"От регула ошибка 404")
+                logging.warning(f"От регула ошибка 404")
             else:
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
-        logging.info(f"[Завершение]  Робот <- забрать плату из тары")
+        logging.info(f"[END1]  Робот <- забрать плату из тары")
         result1=0
-        logging.info(f"[Завершение] Регул <- Подними прошивальщик.")
+        logging.info(f"[END2] Регул <- Подними прошивальщик.")
         self.change_value('Reg_updown_Botloader', 0)
         result2 = 0
         ###############################################################################################################
@@ -881,27 +872,27 @@ class Table:
         ################################################################
         # 11 Делаем фото платы
         print("11 Камера <- сделай фото")
-        logging.info(f"[НАЧАЛО] Камера <- сделай фото")
+        logging.info(f"[START] Камера <- сделай фото")
         for i in range(3):
             try:
                 logging.debug(f"Попытка {i}: запрос фото с камеры")
-                res,photodata = CameraSocket.photo()
+                res,photodata= CameraSocket.photo()
                 print(f"С камеры получен ID {photodata}")
-                logging.info(f"Успех: получен ID фото {photodata}")
+                logging.debug(f"Успех: получен ID фото {photodata}")
             except Exception as e:
-                print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
+                print(f"Ошибка: камера недоступна. Детали: {e}")
                 logging.warning(f"Попытка {i}: неверный ответ (код: {res}, данные: {photodata})")
             time.sleep(1)
         while True:
-            res,photodata = CameraSocket.photo()
+            res,photodata= CameraSocket.photo()
             logging.debug(f"Ожидание фото.код {res}, данные {photodata}")
-            if res != 200 or photodata == "NoRead":
+            if res != 200 or photodata== "NoRead":
                 print(f"Ошибка получения фото с камеры")
                 logging.warning(f"Ошибка получения фото с камеры")
                 time.sleep(1)
             else:
                 print(f"Фото успешно получено: {photodata}")
-                logging.info(f"[Завершение] Камера <- сделай фото: {photodata}")
+                logging.debug(f"[END] Камера <- сделай фото: {photodata}")
                 break
             time.sleep(1)
         ###########################################################################
@@ -912,23 +903,23 @@ class Table:
         ###################################################################################
         # 12 Робот <- Уложи плату в ложемент тетситрования
         print("12 Робот <- Уложи плату в ложемент тетситрования 2")
-        logging.info(f"[НАЧАЛО] Робот <- Уложи плату в ложемент тетситрования 2")
+        logging.info(f"[START] Робот <- Уложи плату в ложемент тетситрования 2")
         self.change_value('Rob_Action', 222)
         logging.debug("Отправлена команда 'Rob_Action', 222")
         while True:
             result1 = self.read_value("sub_Rob_Action")
-            logging.debug(f"[Статус] sub_Rob_Action = {result1}")
+            logging.debug(f" sub_Rob_Action = {result1}")
 
             if result1 != 222:
-                print(f"Ждем ответ от робота, что плату уложили = {result1}")
-                logging.info(f"Ждем ответ от робота, что плату уложили = {result1}")
+                print(f"ответ от робота = {result1}")
+                logging.debug(f"ответ от робота = {result1}")
             elif result1 == 404:
-                print(f"От робота получен код 404 на на операции уложить плату")
-                logging.info(f"От робота получен код 404 на на операции уложить плату")
+                print(f"От робота ошибка 404")
+                logging.warning(f"От робота ошибка 404")
             else:
                 break
             time.sleep(1)
-        logging.info(f"[Завершение] Робот <- Уложи плату в ложемент тетситрования 2")
+        logging.info(f"[END] Робот <- Уложи плату в ложемент тетситрования 2")
         self.change_value('Rob_Action', 0)
         result1 = 0
         ######################################################################################

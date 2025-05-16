@@ -81,6 +81,8 @@ except Exception as e:
 
 class ModbusProvider:
     """Class MODBUS Communication with Modbus regul"""
+    global Tray1
+    global Cell1
     def __init__(self):
         self.store = ModbusSlaveContext(
             hr=ModbusSequentialDataBlock(0, [0] * 100)
@@ -123,6 +125,9 @@ class ModbusProvider:
                     self.store.setValues(3, 0, [self.Reg_move_Table])
                     self.store.setValues(3, 2, [self.Reg_updown_Botloader])
                     self.store.setValues(3, 4, [self.Rob_Action])
+                    
+                    self.store.setValues(3, 6, [Tray1])
+                    self.store.setValues(3, 8, [Cell1])
             except Exception as e:
                 print(f"Error updating registers: {e}")
             time.sleep(1)
@@ -133,6 +138,9 @@ class ModbusProvider:
 ################################################# START TABLE CLASS #####################################################################
 class Table:
     """ TABLE CLASS"""
+    global Tray1
+    global Cell1
+    global Order
     def __init__(self, name, initial_dict):
         self.name = name
         self.data = initial_dict
@@ -240,10 +248,15 @@ class Table:
     ############# ****ЦИКЛ SETUP ******"
     def setup_cycle(self):
         global photodata
+        global Tray1
+        global Cell1
+        global Order
         print("****ЦИКЛ SETUP******")
         ######################################################
         input("нажми ентер")
         # 1 Робот <- Забери плату из тары
+        Tray1 = 1
+        Cell1 = Cell1 + 1
         print("1 Робот <- забрать плату из тары")
         logging.info(f"[START] Робот <- забрать плату из тары")
         self.change_value('Rob_Action', 210)
@@ -353,6 +366,9 @@ class Table:
         
         #############################################################################
         # 5 Робот <- Забери плату из тары # Регул <- Опусти прошивальщик (плата на ложе1).
+        Tray1 = 1
+        Cell1 = Cell1 + 1
+        
         print("5.1 Робот <- Забери плату из тары")
         print("5.2 Регул <- Опусти прошивальщик ложе 1")
 
@@ -505,6 +521,8 @@ class Table:
 
     ############# ****ЦИКЛ MAIN ******"
     def main(self):
+        global Tray1
+        global Cell1
         global photodata
         print("ЦИКЛ MAIN _ START")
         ################################################################################################
@@ -631,6 +649,9 @@ class Table:
         logging.info(f"[START2] Регул <- Подними прошивальщик.")
         self.change_value('Reg_updown_Botloader', 104)
         logging.debug("Отправлена команда 'Reg_updown_Botloader', 104")
+        
+        Tray1 = 1
+        Cell1 = Cell1 + 1
 
         while True:
             result1 = self.read_value("sub_Rob_Action")
@@ -831,6 +852,9 @@ class Table:
 
         ##########################################################################################################
         # 10 Робот <- Забери плату из тары   # Регул <- Подними прошивальщик.
+        Tray1 = 1
+        Cell1 = Cell1 + 1
+
         print("10.1 Робот <- забрать плату из тары")
         logging.info(f"[START1] Робот <- забрать плату из тары")
         self.change_value('Rob_Action', 210)

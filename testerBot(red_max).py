@@ -255,7 +255,6 @@ class Table:
         ######################################################
         input("нажми ентер")
         # 1 Робот <- Забери плату из тары
-        Tray1 = 1
         Cell1 = Cell1 + 1
         print("1 Робот <- забрать плату из тары")
         logging.info(f"[START] Робот <- забрать плату из тары")
@@ -272,6 +271,8 @@ class Table:
                 logging.warning(f"ошибка 404")
                 
             else:
+                print(f"ответ от робота = {result1}")
+                logging.debug(f"ответ от робота = {result1}")
                 logging.info(f"[END] Робот <- забрать плату из тары")
                 break
             time.sleep(1)
@@ -327,6 +328,8 @@ class Table:
                 logging.warning(f"ошибка 404")
                 time.sleep(1)
             else:
+                logging.debug(f"Получено от робота = {result1}")
+                print(f"Получено от робота = {result1}")
                 break
             logging.info(f"[END] Робот <- Уложи плату в ложемент тетситрования 1")
             time.sleep(1)
@@ -356,6 +359,8 @@ class Table:
                 print(f"ошибка 404")
                 logging.warning(f"ошибка 404")
             else:
+                logging.debug(f"получено от регула = {result1}")
+                print(f"получено от регула = {result1}")
                 break
             time.sleep(1)
         logging.info(f"[END] Регул <- Сдвинь плату освободив ложе2")
@@ -366,7 +371,6 @@ class Table:
         
         #############################################################################
         # 5 Робот <- Забери плату из тары # Регул <- Опусти прошивальщик (плата на ложе1).
-        Tray1 = 1
         Cell1 = Cell1 + 1
         
         print("5.1 Робот <- Забери плату из тары")
@@ -390,9 +394,9 @@ class Table:
             if result1 != 210 and result2 != 103:
                 print(f"получено от робота = {result1}")
                 logging.debug(f"получено от робота = {result1}")
-
-                print(f"получено от регула = {result1}")
-                logging.debug(f"получено от регула = {result1}")
+            
+                print(f"получено от регула = {result2}")
+                logging.debug(f"получено от регула = {result2}")
             elif result1 == 404:
                 print(f"От робота ошибка 404")
                 logging.warning(f"От робота ошибка 404")
@@ -400,6 +404,11 @@ class Table:
                 print(f"От регула ошибка 404")
                 logging.warning(f"От регула ошибка 404")
             elif result1 == 210 and result2 == 103:
+                print(f"получено от робота = {result1}")
+                logging.debug(f"получено от робота = {result1}")
+
+                print(f"получено от регула = {result2}")
+                logging.debug(f"получено от регула = {result2}")
                 break
             time.sleep(1)
         logging.info(f"[END1] Робот <- Забери плату из тары")
@@ -467,11 +476,11 @@ class Table:
                 print(f" result1 -- {result1}")
             
             if result1 != 222 and result2 != 200:
-                print(f"Ответ от прошивальщика {result1}")
-                logging.debug(f"Ответ от прошивальщика= {result1}")
-
-                print(f"Ответ от робота {result2}")
-                logging.debug(f"Ответ от робота= {result2}")
+                print(f"Ответ от прошивальщика {result2}")
+                logging.debug(f"Ответ от прошивальщика= {result2}")
+             
+                print(f"Ответ от робота {result1}")
+                logging.debug(f"Ответ от робота= {result1}")
             elif result1 == 404:
                 print(f"От робота ошибка 404")
                 logging.warning(f"От робота ошибка 404")
@@ -479,6 +488,11 @@ class Table:
                 print(f"От регула ошибка 404")
                 logging.warning(f"От регула ошибка 404")
             elif result1 == 222 and result2 == 200:
+                print(f"Ответ от прошивальщика {result2}")
+                logging.debug(f"Ответ от прошивальщика= {result2}")
+
+                print(f"Ответ от робота {result1}")
+                logging.debug(f"Ответ от робота= {result1}")
                 break
             
             time.sleep(1)
@@ -509,6 +523,8 @@ class Table:
                 print(f"ошибка 404")
                 logging.warning(f"ошибка 404")
             else:
+                print(f"ответ от регула= {result1}")
+                logging.debug(f"ответ от регула= {result1}")
                 break
             time.sleep(1)
         logging.info(f"[END] Регул <- Подними прошивальщик.")
@@ -541,7 +557,10 @@ class Table:
                 print(f"ошибка 404")
                 logging.warning(f"ошибка 404")
             else:
+                print(f"ответ от регула = {result1}")
+                logging.debug(f"ответ от регула = {result1}")
                 break
+                
             time.sleep(1)
         self.change_value('Reg_move_Table', 0)
         logging.info(f"[END] Регул <- Сдвинь плату освободив ложе1")
@@ -579,6 +598,11 @@ class Table:
                 print(f"От регула ошибка 404")
                 logging.warning(f"От регула ошибка 404")
             elif result1 == 231 and result2 == 103:
+                print(f"ответ от робота = {result1}")
+                logging.debug(f" ответ от робота = {result1}")
+
+                print(f"ответ от регула = {result2}")
+                logging.debug(f"ответ от регула = {result2}")
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
@@ -625,6 +649,11 @@ class Table:
                 print(f"От робота получен код 404 на на операции уложить плату")
                 logging.warning(f"От робота получен код 404 на на операции уложить плату")
             elif result1 == 241 and result2 == 200:
+                print(f"ответ от робота= {result1}")
+                logging.debug(f"ответ от робота = {result1}")
+
+                print(f"ответ прошивальщка {result2}")
+                logging.debug(f"ответ от прошивальщика= {result2}")
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
@@ -650,7 +679,6 @@ class Table:
         self.change_value('Reg_updown_Botloader', 104)
         logging.debug("Отправлена команда 'Reg_updown_Botloader', 104")
         
-        Tray1 = 1
         Cell1 = Cell1 + 1
 
         while True:
@@ -668,7 +696,12 @@ class Table:
             elif result2 == 404 :
                 print(f"От регула ошибка 404")
                 logging.warning(f"От регула ошибка 404")
-            else:
+            elif result1 == 210 and result2 == 104:
+                print(f"получено от робота = {result1}")
+                logging.debug(f"получено от робота = {result1}")
+
+                print(f"ответ от регула= {result2}")
+                logging.debug(f"ответ от регула {result2}")
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
@@ -730,6 +763,8 @@ class Table:
                 logging.warning(f"ошибка 404")
                 time.sleep(1)
             else:
+                logging.debug(f"Получено от робота = {result1}")
+                print(f"Получено от робота = {result1}")
                 break
             logging.info(f"[END] Робот <- Уложи плату в ложемент тетситрования 1")
             time.sleep(1)
@@ -757,6 +792,9 @@ class Table:
                 print(f"ошибка 404")
                 logging.warning(f"ошибка 404")
             else:
+                logging.debug(f"получено от регула = {result1}")
+                print(f"получено от регула = {result1}")
+                time.sleep(1)
                 break
             time.sleep(1)
         logging.info(f"[END] Регул <- Сдвинь плату освободив ложе2")
@@ -794,6 +832,11 @@ class Table:
                 print(f"от регула ошибка 404")
                 logging.warning(f"от регула ошибка 404")
             elif result1 == 232 and result2 == 103:
+                print(f"ответ от робота = {result1}")
+                logging.debug(f"ответ от робота = {result1}")
+
+                print(f"ответ от регула= {result2}")
+                logging.debug(f"ответ от регула= {result2}")
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
@@ -836,6 +879,11 @@ class Table:
                 print(f"От робота получен код 404 на на операции уложить плату")
                 logging.warning(f"От робота получен код 404 на на операции уложить плату")
             elif result1 == 241 and result2 == 200:
+                print(f"ответ от робота= {result1}")
+                logging.debug(f"ответ от робота = {result1}")
+
+                print(f"ответ прошивальщка {result2}")
+                logging.debug(f"ответ от прошивальщика= {result2}")
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
@@ -852,7 +900,6 @@ class Table:
 
         ##########################################################################################################
         # 10 Робот <- Забери плату из тары   # Регул <- Подними прошивальщик.
-        Tray1 = 1
         Cell1 = Cell1 + 1
 
         print("10.1 Робот <- забрать плату из тары")
@@ -880,7 +927,12 @@ class Table:
             elif result2 == 404 :
                 print(f"От регула ошибка 404")
                 logging.warning(f"От регула ошибка 404")
-            else:
+            elif result1 == 210 and result2 == 104:
+                print(f"получено от робота = {result1}")
+                logging.debug(f"получено от робота = {result1}")
+
+                print(f"ответ от регула= {result2}")
+                logging.debug(f"ответ от регула {result2}")
                 break
             time.sleep(1)
         self.change_value('Rob_Action', 0)
@@ -941,6 +993,8 @@ class Table:
                 print(f"От робота ошибка 404")
                 logging.warning(f"От робота ошибка 404")
             else:
+                print(f"ответ от робота = {result1}")
+                logging.debug(f"ответ от робота = {result1}")
                 break
             time.sleep(1)
         logging.info(f"[END] Робот <- Уложи плату в ложемент тетситрования 2")
@@ -976,10 +1030,16 @@ if __name__ == "__main__":
     
     table1 = Table("Table 1", dict_Table1)
    
-# Выполнение первого цикла
+    if Cell1 == 30:
+        Tray1 +=1
+        Cell1 = 0
+    if Tray1 == 2:
+        Tray1 = 0
+        print('смените тару')
+
     flag = True
     if flag == True:
         table1.setup_cycle()
         flag = False
-
-    table1.main()
+    if Tray1 < 3 and flag == False:
+        table1.main()

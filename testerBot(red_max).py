@@ -255,6 +255,7 @@ class Table:
         ######################################################
         input("нажми ентер")
         # 1 Робот <- Забери плату из тары
+        
         Cell1 = Cell1 + 1
         print("1 Робот <- забрать плату из тары")
         logging.info(f"[START] Робот <- забрать плату из тары")
@@ -279,6 +280,7 @@ class Table:
         self.change_value('Rob_Action', 0)
         result1=0
         ##########################################################
+        
         
         input("нажми ентер")
 
@@ -377,7 +379,7 @@ class Table:
         print("5.2 Регул <- Опусти прошивальщик ложе 1")
 
         logging.info(f"[START1] Робот <- Забери плату из тары")
-        self.change_value('Rob_Action', 210)
+        #self.change_value('Rob_Action', 210)
         logging.debug("Отправлена команда Rob_Action', 210")
 
         logging.info(f"[START2] Регул <- Опусти прошивальщик ложе 1")
@@ -671,7 +673,7 @@ class Table:
         # 4 Робот <- Забери плату из тары  # Регул <- Подними прошивальщик.
         print("4.1 Робот <- забрать плату из тары")
         logging.info(f"[START1] Робот <- забрать плату из тары")
-        self.change_value('Rob_Action', 210)
+        #self.change_value('Rob_Action', 210)
         logging.debug("Отправлена команда 'Rob_Action', 210")
 
         print("4.2 Регул <- Подними прошивальщик.")
@@ -904,7 +906,7 @@ class Table:
 
         print("10.1 Робот <- забрать плату из тары")
         logging.info(f"[START1] Робот <- забрать плату из тары")
-        self.change_value('Rob_Action', 210)
+        # self.change_value('Rob_Action', 210)
         logging.debug("Отправлена команда 'Rob_Action', 210")
 
         print("10.2 Регул <- Подними прошивальщик.")

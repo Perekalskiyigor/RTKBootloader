@@ -13,11 +13,38 @@ logging.basicConfig(
     format='SQLITE - %(asctime)s - %(levelname)s - %(message)s',  # Формат логов
 )
 
+def getOrders():
+    url = "https://black/erp_game_ivshin255/hs/rtk/orderlist/RTK_R050"
+    headers = {
+        'Authorization': 'Basic cnRrOnJ0azEyMw=='
+    }
 
-
-def fetch_data():
     try:
-        url = "https://black/erp_game_ivshin255/hs/rtk/order/RTK_R050/ЗНП-9087.2.1"
+        response = requests.get(url, headers=headers, verify=False)
+        response.raise_for_status()  # выбросит исключение для кода ответа != 200
+
+        data = response.json()  # преобразуем в словарь
+
+        keys = list(data.keys())  # получаем только ключи
+
+        if keys:
+            print("Найденные ключи:", keys)
+            return keys
+        else:
+            print("Ответ получен, но он пуст.")
+
+    except requests.exceptions.RequestException as e:
+        print("Ошибка при запросе:", e)
+    except ValueError:
+        print("Ошибка разбора JSON. Ответ не является допустимым JSON.")
+    except Exception as e:
+        print("Произошла неизвестная ошибка:", e)
+
+
+
+def fetch_data(order):
+    try:
+        url = f"https://black/erp_game_ivshin255/hs/rtk/order/RTK_R050/{order}"
         payload = {}
         headers = {
         'Authorization': 'Basic cnRrOnJ0azEyMw=='
@@ -54,9 +81,14 @@ def fetch_data():
 order_id, board_name, firmware, batch, count, version, components = fetch_data()
 db_connection = SQLite.DatabaseConnection()
 db_connection.get_order_insert_orders_frm1C(order_id, board_name, firmware, batch, count, version, components)
-"""
+
 
 
 order_id, board_name, firmware, batch, count, version, components = fetch_data()
 db_connection = SQLite.DatabaseConnection()
 db_connection.get_order_insert_orders_frm1C(order_id, board_name, firmware, batch, count, version, components)
+
+getOrders()
+
+fetch_data("ЗНП-5972.1.1")
+"""

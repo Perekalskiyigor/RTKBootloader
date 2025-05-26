@@ -11,15 +11,15 @@ logging.basicConfig(
     format='OPC - %(asctime)s - %(levelname)s - %(message)s'
 )
 
-# Словарь опс интерфейса глобальный
-dict_OPC = {
-    "ns=2;s=Application.PLC_PRG.VAL2": 0,
-    "ns=2;s=Application.PLC_PRG.VAL1": 0,
-    "ns=2;s=Application.PLC_PRG.orderNode":""
-}
+# # Словарь опс интерфейса глобальный
+# dict_OPC = {
+#     "ns=2;s=Application.PLC_PRG.VAL2": 0,
+#     "ns=2;s=Application.PLC_PRG.VAL1": 0,
+#     "ns=2;s=Application.PLC_PRG.orderNode":""
+# }
 
 class OPCClient:
-    def __init__(self, url):
+    def __init__(self, url, dict_OPC):
         self.url = url
         self.lock = threading.Lock()
 
@@ -48,20 +48,25 @@ class OPCClient:
         except Exception as e:
             print(f"Ошибка отключения: {e}")
 
-    def update_registers(self):
+    def update_registers(self,orders):
         """ Метод обгновления пременных опс и словаря"""
-        global dict_OPC
         while not self.stop_event.is_set():  # Check if the stop event is set
             try:
                 with self.lock:
 
                     ################### Пишем ###################
-                    mes = ['ЗНП015250', 'ЗНП015251', 'ЗНП015252', 'ЗНП015253', 'ЗНП015254', 'ЗНП015255', 'ЗНП015256', 'ЗНП015257', 'ЗНП015258', 'ЗНП015259', 'ЗНП015260', 'ЗНП015261', 'ЗНП015262', 'ЗНП015263', 'ЗНП015264', 'ЗНП015265', 'ЗНП015266', 'ЗНП015267', 'ЗНП015268', 'ЗНП015269', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']
-                    data_value1 = ua.DataValue(ua.Variant(mes, ua.VariantType.String))
+                    orders = ['dadadad', 'ЗНП015251', 'ЗНП015252', 'ЗНП015253', 'ЗНП015254', 'ЗНП015255', 'ЗНП015256', 'ЗНП015257', 'ЗНП015258', 'ЗНП015259', 'ЗНП015260', 'ЗНП015261', 'ЗНП015262', 'ЗНП015263', 'ЗНП015264', 'ЗНП015265', 'ЗНП015266', 'ЗНП015267', 'ЗНП015268', 'ЗНП015269', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']
+                    data_value1 = ua.DataValue(ua.Variant(orders, ua.VariantType.String))
                     # Записываем новое значение в узел
-                    node2 = self.client.get_node("ns=2;s=Application.PLC_PRG.VAL1")
+                    node2 = self.client.get_node("ns=2;s=Application.UserInterface.search_result")
                     node2.set_value(data_value1)
 
+                    # Кнопка запрос заказов
+                    node3 = self.client.get_node("ns=2;s=Application.UserInterface.ButtonLoadOrders")
+                    ButtonLoadOrders = node3.get_value()
+                    print(f"*********: {ButtonLoadOrders}") 
+
+                    """
                     ################### Читаем п ишемв словарь ###################
                     node3 = self.client.get_node("ns=2;s=Application.PLC_PRG.VAL1")
                     value2 = node3.get_value()
@@ -77,6 +82,8 @@ class OPCClient:
                     value4 = node5.get_value()
                     dict_OPC["ns=2;s=Application.PLC_PRG.orderNode"] = value4
                     print(f"******N*: {dict_OPC["ns=2;s=Application.PLC_PRG.orderNode"]}")
+                    """
+                    
 
             except Exception as e:
                 print(f"Error updating registers: {e}")
@@ -100,8 +107,6 @@ if __name__ == "__main__":
     time.sleep(2)  # Wait a little for threads to finish
     opc_client.disconnect()
 
-"""
-
 if __name__ == "__main__":
     url = "opc.tcp://172.21.10.39:48010"
     opc_client = OPCClient(url)
@@ -111,3 +116,6 @@ if __name__ == "__main__":
     opc_client.stop()  # Signal the threads to stop
     time.sleep(2)  # Wait a little for threads to finish
     opc_client.disconnect()
+"""
+
+

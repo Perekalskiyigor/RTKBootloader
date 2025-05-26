@@ -6,7 +6,7 @@ import threading
 import socket
 from opcua import Client
 from opcua import ua
-
+import logging
 
 # Пользовательский класс камеры
 # mport CameraClass as CAM
@@ -125,39 +125,40 @@ class OPCClient:
         while not self.stop_event.is_set():  # Check if the stop event is set
             try:
                 with self.lock:
-
-
+                        
                     ############ Кнопка запрос заказов
-                    """Получаем сигнал от кнопки, змагружаем список заказов из 1С"""
-                    node3 = self.client.get_node("ns=2;s=Application.UserInterface.ButtonLoadOrders")
+                    """Получаем сигнал от кнопки, змагружаем список заказов из 1С""" 
+                    node3 = self.client.get_node('ns=2;s=Application.UserInterface.ButtonLoadOrders')
                     ButtonLoadOrders = node3.get_value()
-                    dict_OPC["ns=2;s=Application.UserInterface.ButtonLoadOrders"] = ButtonLoadOrders
-                    print(f"*********: {dict_OPC["ns=2;s=Application.UserInterface.ButtonLoadOrders"]}")
+                    logging.info("состояние кнопки запроса")
+
+                    dict_OPC['ns=2;s=Application.UserInterface.ButtonLoadOrders'] = ButtonLoadOrders  
+                    print(f"*********: {dict_OPC['ns=2;s=Application.UserInterface.ButtonLoadOrders']}") 
                     #Если нажата кнопка пишем заказы в перменную
                     if  ButtonLoadOrders == True:
                         # Получаем заказы из 1С
                         orders = Provider1C.getOrders()
                         data_value1 = ua.DataValue(ua.Variant(orders, ua.VariantType.String))
                         # Записываем новое значение в узел
-                        node2 = self.client.get_node("ns=2;s=Application.UserInterface.search_result")
+                        node2 = self.client.get_node('ns=2;s=Application.UserInterface.search_result')
                         node2.set_value(data_value1)
 
 
 
                     ############ Кнопка выбора заказа и получения данных
                     # 2. Читаем кнопку загрузки
-                    node5 = self.client.get_node("ns=2;s=Application.UserInterface.ButtonSelectOrder")
+                    node5 = self.client.get_node('ns=2;s=Application.UserInterface.ButtonSelectOrder')
                     ButtonSelectOrder = node5.get_value()
-                    dict_OPC["ns=2;s=Application.UserInterface.ButtonSelectOrder"] = ButtonSelectOrder
-                    print(f"UserInterface.ButtonSelectOrder: {dict_OPC["ns=2;s=Application.UserInterface.ButtonSelectOrder"]}")
+                    dict_OPC['ns=2;s=Application.UserInterface.ButtonSelectOrder'] = ButtonSelectOrder
+                    print(f"UserInterface.ButtonSelectOrder: {dict_OPC['ns=2;s=Application.UserInterface.ButtonSelectOrder']}")
                     
                     # Если нажата кнопка загрузки, пишем заказы в переменную
                     if ButtonSelectOrder:
                         # 1. Берем заказ из Order
-                        node4 = self.client.get_node("ns=2;s=Application.UserInterface.Order")
+                        node4 = self.client.get_node('ns=2;s=Application.UserInterface.Order')
                         opcOrder = node4.get_value()
                         
-                        dict_OPC["ns=2;s=Application.UserInterface.Order"] = opcOrder
+                        dict_OPC['ns=2;s=Application.UserInterface.Order'] = opcOrder
 
                         if opcOrder:  # Проверка, что заказ не пустой
                             order_id, board_name, firmware, batch, count, version, components = Provider1C.fetch_data(opcOrder)
@@ -167,11 +168,11 @@ class OPCClient:
                             print(f"Данные по заказу {opcOrder} загружены в базу")
 
                             # Пример записи состояния в интерфейс
-                            state = self.client.get_node("ns=2;s=Application.UserInterface.State")
+                            state = self.client.get_node('ns=2;s=Application.UserInterface.State')
                             state.set_value(ua.DataValue(ua.Variant("Данные загружены успешно", ua.VariantType.String)))
                         else:
                             print("В переменной Order нет данных")
-                            state = self.client.get_node("ns=2;s=Application.UserInterface.State")
+                            state = self.client.get_node('ns=2;s=Application.UserInterface.State')
                             state.set_value(ua.DataValue(ua.Variant("Ошибка загрузки", ua.VariantType.String)))
 
                     """
@@ -201,7 +202,7 @@ class OPCClient:
     def stop(self):
         self.stop_event.set()  # Set the event to stop threads
 
-url = "opc.tcp://172.21.10.39:48010"
+url = "opc.tcp://192.168.1.3:48010"
 opc_client = OPCClient(url)
 
 

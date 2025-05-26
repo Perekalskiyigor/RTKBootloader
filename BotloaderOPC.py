@@ -125,23 +125,28 @@ class OPCClient:
         while not self.stop_event.is_set():  # Check if the stop event is set
             try:
                 with self.lock:
-                        
+
                     ############ Кнопка запрос заказов
                     """Получаем сигнал от кнопки, змагружаем список заказов из 1С""" 
                     node3 = self.client.get_node('ns=2;s=Application.UserInterface.ButtonLoadOrders')
                     ButtonLoadOrders = node3.get_value()
-                    logging.info("состояние кнопки запроса")
+                    logging.debug(f"состояние кнопки запроса заказов - {ButtonLoadOrders}")
 
                     dict_OPC['ns=2;s=Application.UserInterface.ButtonLoadOrders'] = ButtonLoadOrders  
-                    print(f"*********: {dict_OPC['ns=2;s=Application.UserInterface.ButtonLoadOrders']}") 
+                    print(f"*********: {dict_OPC['ns=2;s=Application.UserInterface.ButtonLoadOrders']}")
+
                     #Если нажата кнопка пишем заказы в перменную
                     if  ButtonLoadOrders == True:
                         # Получаем заказы из 1С
                         orders = Provider1C.getOrders()
                         data_value1 = ua.DataValue(ua.Variant(orders, ua.VariantType.String))
+                        logging.debug(f"индекс заказа - {data_value1}")
+
+
                         # Записываем новое значение в узел
                         node2 = self.client.get_node('ns=2;s=Application.UserInterface.search_result')
                         node2.set_value(data_value1)
+                        logging.debug(f"передали индекс заказа - {node2} в узел")
 
 
 
@@ -149,6 +154,7 @@ class OPCClient:
                     # 2. Читаем кнопку загрузки
                     node5 = self.client.get_node('ns=2;s=Application.UserInterface.ButtonSelectOrder')
                     ButtonSelectOrder = node5.get_value()
+                    logging.debug(f"состояние кнопки загрузки - {ButtonSelectOrder}")
                     dict_OPC['ns=2;s=Application.UserInterface.ButtonSelectOrder'] = ButtonSelectOrder
                     print(f"UserInterface.ButtonSelectOrder: {dict_OPC['ns=2;s=Application.UserInterface.ButtonSelectOrder']}")
                     
@@ -157,6 +163,7 @@ class OPCClient:
                         # 1. Берем заказ из Order
                         node4 = self.client.get_node('ns=2;s=Application.UserInterface.Order')
                         opcOrder = node4.get_value()
+                        logging.debug(f"номер заказа - {opcOrder}")
                         
                         dict_OPC['ns=2;s=Application.UserInterface.Order'] = opcOrder
 

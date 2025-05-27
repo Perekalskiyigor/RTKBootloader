@@ -471,6 +471,71 @@ class DatabaseConnection:
             logging.error("SQLite ошибка в recievedata: %s", str(e))
             return None
         
+    # Получение данных из базы для интерфейса ОПС
+    def getDatafromOOPC(self, order_number):
+        logging.info("OPC Метод получения данных для ОПС запущен")
+
+        try:
+            self.cursor.execute('''
+                SELECT 
+                    O.ID
+                FROM orders AS O
+                WHERE O.order_number = ?
+                ORDER BY O.order_number DESC
+            ''', (order_number,))
+
+            row = self.cursor.fetchone()
+
+            if row:
+                order_id = row[0]
+                logging.info(f"OPC Данные по заказу '{order_number}' получены успешно.")
+            else:
+                logging.warning(f"OPC Заказ с номером '{order_number}' не найден в базе данных.")
+
+        except Exception as e:
+            logging.error(f"OPC Ошибка при получении данных по заказу '{order_number}': {e}", exc_info=True)
+            return None
+
+        try:
+            self.cursor.execute('''
+                SELECT 
+                    O.order_number,
+                    O.module,
+                    O.fw_version, 
+                    COUNT(*) FILTER (WHERE D.stand_id IS NULL) AS Lastcount,
+                    COUNT(D.id) AS CommonCount,
+                    COUNT(*) FILTER (WHERE D.report_path IS NOT NULL) AS Sucesscount,
+                    COUNT(*) FILTER (WHERE D.log_path IS NOT NULL) AS NonSucesscount
+                FROM orders AS O
+                JOIN order_details AS D ON O.id = D.order_id
+                WHERE D.order_id = ?
+                GROUP BY O.order_number, O.module, O.fw_version
+                ORDER BY O.order_number DESC
+            ''', (order_id,))
+
+            row = self.cursor.fetchone()
+
+            if row:
+                order_number = row[0]
+                module = row[1]
+                fw_version = row[2]
+                last_count = row[3]
+                common_count = row[4]
+                success_count = row[5]
+                nonsuccess_count = row[6]
+
+                logging.info(f"OPC Данные по заказу '{order_number}' получены успешно.")
+                return order_number, module, fw_version, last_count, common_count, success_count, nonsuccess_count
+            else:
+                logging.warning(f"OPC Заказ с номером '{order_number}' не найден в базе данных.")
+                return None
+
+        except Exception as e:
+            logging.error(f"OPC Ошибка при получении данных по заказу '{order_number}': {e}", exc_info=True)
+            return None
+
+        
+        
     def close_connection(self):
         """ Close the connection to the database """
         logging.info("Closing database connection.")
@@ -497,3 +562,24 @@ db_connection = DatabaseConnection()
 res = db_connection.recievedata(464)
 print(res)
 """
+
+
+"""
+# Проверка функции OPC
+db_connection = DatabaseConnection()
+result = db_connection.getDatafromOOPC('ЗНП-2160.1.1')
+
+if result:
+    order_number, module, fw_version, last_count, common_count, success_count, nonsuccess_count = result
+
+    print(f"Номер заказа: {order_number}")
+    print(f"Модуль: {module}")
+    print(f"Версия ПО: {fw_version}")
+    print(f"Количество оставшихся: {last_count}")
+    print(f"Общее количество записей: {common_count}")
+    print(f"С успешным report_path: {success_count}")
+    print(f"С успешным log_path: {nonsuccess_count}")
+else:
+    print("Данные по заказу не найдены или произошла ошибка.")
+"""
+

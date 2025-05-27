@@ -28,7 +28,7 @@ import Provider1C
 # Глобальные ящик и ясейка 
 Tray1 = 0
 Cell1 = 0
-Order = "ЗНП-2160.1.1"
+Order = "ЗНП-12986.1.1"
 # данные с платы для цикла main и сетапа
 photodata = None
 
@@ -43,19 +43,11 @@ dict_Table1 = {
     
 }
 
-# Глобальный словарь OPC интерфейса
+# Словарь опс интерфейса глобальный
 dict_OPC = {
     "ns=2;s=Application.PLC_PRG.VAL2": 0,
     "ns=2;s=Application.PLC_PRG.VAL1": 0,
-    "ns=2;s=Application.PLC_PRG.orderNode": "",
-    # Дополнительные ключи для хранения данных
-    "order_number": "",
-    "module": "",
-    "fw_version": "",
-    "last_count": 0,
-    "common_count": 0,
-    "success_count": 0,
-    "nonsuccess_count": 0
+    "ns=2;s=Application.PLC_PRG.orderNode":""
 }
 
 # Set up basic logging configuration
@@ -84,38 +76,59 @@ igle_table = Igable.IgleTable(
 
 ################################################# START SQL Communication class ###################################
  
-try:
-    # Create an instance of DatabaseConnection
-    db_connection = SQL.DatabaseConnection()
+# Класс для синхронизации с базой данных и обновления глобального словаря
+class DatabaseSynchronizer:
+    def __init__(self, order):
+        self.order = order
+        self.stop_event = threading.Event()  # Событие для остановки потока
+        self.update_thread = threading.Thread(target=self.update_data, daemon=True)
+        self.update_thread.start()
+        self.lock = threading.Lock()
 
-    # Данные для интерфейса из базы по заказу
-    result = db_connection.getDatafromOOPC(Order)
-    if result:
-        order_number, module, fw_version, last_count, common_count, success_count, nonsuccess_count = result
+    def update_data(self):
+        """Метод для обновления данных в глобальном словаре с базы данных"""
+        while not self.stop_event.is_set():  # Проверка на остановку потока
+            try:
+                # Попытка получения данных по заказу из базы данных
+                db_connection = SQL.DatabaseConnection()
+                result = db_connection.getDatafromOOPC(self.order)
+                
+                if result:
+                    order_number, module, fw_version, last_count, common_count, success_count, nonsuccess_count = result
 
-        print(f"Номер заказа: {order_number}")
-        print(f"Модуль: {module}")
-        print(f"Версия ПО: {fw_version}")
-        print(f"Количество оставшихся: {last_count}")
-        print(f"Общее количество записей: {common_count}")
-        print(f"С успешным report_path: {success_count}")
-        print(f"С успешным log_path: {nonsuccess_count}")
+                    # print(f"Номер заказа: {order_number}")
+                    # print(f"Модуль: {module}")
+                    # print(f"Версия ПО: {fw_version}")
+                    # print(f"Количество оставшихся: {last_count}")
+                    # print(f"Общее количество записей: {common_count}")
+                    # print(f"С успешным report_path: {success_count}")
+                    # print(f"С успешным log_path: {nonsuccess_count}")
+
+                    # Обновление глобального словаря с данными из базы
+                    with self.lock:
+                        dict_OPC["order_number"] = order_number
+                        dict_OPC["module"] = module
+                        dict_OPC["fw_version"] = fw_version
+                        dict_OPC["last_count"] = last_count
+                        dict_OPC["common_count"] = common_count
+                        dict_OPC["success_count"] = success_count
+                        dict_OPC["nonsuccess_count"] = nonsuccess_count
+                else:
+                    print("Данные по заказу не найдены или произошла ошибка.")
+
+            except Exception as e:
+                logging.error(f"Ошибка при синхронизации с базой данных: {e}")
+            
+            # Пауза 1 секунда перед следующей попыткой
+            time.sleep(1)
+
+    def stop(self):
+        """Метод для остановки потока"""
+        self.stop_event.set()  # Устанавливаем событие, чтобы остановить поток
 
 
-        # Дополнительные поля
-        dict_OPC["order_number"] = order_number
-        dict_OPC["module"] = module
-        dict_OPC["fw_version"] = fw_version
-        dict_OPC["last_count"] = last_count
-        dict_OPC["common_count"] = common_count
-        dict_OPC["success_count"] = success_count
-        dict_OPC["nonsuccess_count"] = nonsuccess_count
-
-    else:
-        print("Данные по заказу не найдены или произошла ошибка.")
-
-except Exception as e:
-    logging.error(f"Error Create an instance of DatabaseConnection: {e}")
+# Создаем и запускаем процесс синхронизации с БД
+db_sync = DatabaseSynchronizer(Order)
  ################################################# STOP SQL Communication class ###################################
 
 
@@ -157,7 +170,6 @@ class OPCClient:
 
     def update_registers(self):
         """ Метод обгновления пременных опс и словаря"""
-        global Order
         while not self.stop_event.is_set():  # Check if the stop event is set
             try:
                 with self.lock:
@@ -170,6 +182,7 @@ class OPCClient:
 
                     dict_OPC['ns=2;s=Application.UserInterface.ButtonLoadOrders'] = ButtonLoadOrders  
                     print(f"*********: {dict_OPC['ns=2;s=Application.UserInterface.ButtonLoadOrders']}")
+                    print(f"Данные из глобального словаря на интерфейс: {dict_OPC['module']}")
 
                     #Если нажата кнопка пишем заказы в перменную
                     if  ButtonLoadOrders == True:
@@ -193,7 +206,6 @@ class OPCClient:
                     logging.debug(f"состояние кнопки загрузки - {ButtonSelectOrder}")
                     dict_OPC['ns=2;s=Application.UserInterface.ButtonSelectOrder'] = ButtonSelectOrder
                     print(f"UserInterface.ButtonSelectOrder: {dict_OPC['ns=2;s=Application.UserInterface.ButtonSelectOrder']}")
-                    print (f"-**************{dict_OPC['module']}")
                     
                     # Если нажата кнопка загрузки, пишем заказы в переменную
                     if ButtonSelectOrder:
@@ -239,16 +251,14 @@ class OPCClient:
                     
 
             except Exception as e:
-                print(f"Error updating registers: {e}")
+                print(f"Error updating registers OPC: {e}")
             time.sleep(1)
             
 
     def stop(self):
         self.stop_event.set()  # Set the event to stop threads
 
-url = "opc.tcp://172.21.10.39:48010"
-
-#url = "opc.tcp://192.168.1.3:48010"
+url = "opc.tcp://192.168.1.3:48010"
 opc_client = OPCClient(url)
 
 

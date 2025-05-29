@@ -7,6 +7,14 @@ import socket
 from opcua import Client
 from opcua import ua
 import logging
+import yaml
+import subprocess
+import sys
+import os
+
+# Загрузка конфигурации из файла
+with open("config.yml", "r") as file:
+    config = yaml.safe_load(file)
 
 # Пользовательский класс камеры
 # mport CameraClass as CAM
@@ -52,14 +60,29 @@ dict_OPC = {
 
 shared_data = {
     1: {
+        'DICT1': 0,
         'Reg_move_Table': 0,
         'sub_Reg_move_Table': 0,
         'Reg_updown_Botloader': 0,
         'sub_Reg_updown_Botloader': 0,
         'Rob_Action': 0,
-        'sub_Rob_Action': 0
+        'sub_Rob_Action': 0,
+
+        'DB_order_number': "",
+        'DB_module': "",
+        'DB_fw_version': "",
+        'DB_last_count': 0,
+        'DB_common_count': 0,
+        'DB_success_count': 0,
+        'DB_nonsuccess_count': 0,
+
+        'OPC_ButtonLoadOrders': False,
+        'OPC_ButtonSelectOrder': False,
+        'OPC_Order': "",
+        'OPC_Orders': ""
         },
     2: {
+        'DICT2': 0,
         'Reg_move_Table': 0,
         'sub_Reg_move_Table': 0,
         'Reg_updown_Botloader': 0,
@@ -85,6 +108,8 @@ try:
 finally:
     s.close()
 print(f"Локальный IP-адрес: {ip}")
+
+# print(config["IgleTableCommunication"]["urlIgleTabeControl"])  # Выведет: MyAwesomeApp
    
 igle_table = Igable.IgleTable(
         urlIgleTabeControl=f"http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
@@ -97,11 +122,14 @@ igle_table = Igable.IgleTable(
  
 # Класс для синхронизации с базой данных и обновления глобального словаря
 class DatabaseSynchronizer:
-    def __init__(self, order):
+    def __init__(self, order, client_id, shared_dict) :
         self.order = order
         self.stop_event = threading.Event()  # Событие для остановки потока
         self.update_thread = threading.Thread(target=self.update_data, daemon=True)
         self.update_thread.start()
+        self.lock = threading.Lock()
+        self.client_id = client_id
+        self.my_data = shared_dict.get(client_id, {})  # Только своя часть словаря
         self.lock = threading.Lock()
 
     def update_data(self):
@@ -125,15 +153,15 @@ class DatabaseSynchronizer:
 
                     # Обновление глобального словаря с данными из базы
                     with self.lock:
-                        dict_OPC["order_number"] = order_number
-                        dict_OPC["module"] = module
-                        dict_OPC["fw_version"] = fw_version
-                        dict_OPC["last_count"] = last_count
-                        dict_OPC["common_count"] = common_count
-                        dict_OPC["success_count"] = success_count
-                        dict_OPC["nonsuccess_count"] = nonsuccess_count
+                        self.my_data["DB_order_number"] = order_number
+                        self.my_data["DB_module"] = module
+                        self.my_data["DB_fw_version"] = fw_version
+                        self.my_data["DB_last_count"] = last_count
+                        self.my_data["DB_common_count"] = common_count
+                        self.my_data["DB_success_count"] = success_count
+                        self.my_data["DB_nonsuccess_count"] = nonsuccess_count
                 else:
-                    print("Данные по заказу не найдены или произошла ошибка.")
+                    print(f"[DBSync {self.client_id}] Данные по заказу не найдены.")
 
             except Exception as e:
                 logging.error(f"Ошибка при синхронизации с базой данных: {e}")
@@ -146,8 +174,7 @@ class DatabaseSynchronizer:
         self.stop_event.set()  # Устанавливаем событие, чтобы остановить поток
 
 
-# Создаем и запускаем процесс синхронизации с БД
-db_sync = DatabaseSynchronizer(Order)
+
  ################################################# STOP SQL Communication class ###################################
 
 
@@ -158,9 +185,12 @@ db_sync = DatabaseSynchronizer(Order)
 
 
 class OPCClient:
-    def __init__(self, url):
+    def __init__(self, url, client_id, shared_dict):
         self.url = url
         self.lock = threading.Lock()
+        
+        self.shared_dict = shared_dict
+        self.my_data = shared_dict.get(client_id, {})  # Работает со своей частью словаря
 
         self.client = Client(url)
         self.running = False
@@ -199,9 +229,9 @@ class OPCClient:
                     ButtonLoadOrders = node3.get_value()
                     logging.debug(f"состояние кнопки запроса заказов - {ButtonLoadOrders}")
 
-                    dict_OPC['ns=2;s=Application.UserInterface.ButtonLoadOrders'] = ButtonLoadOrders  
-                    print(f"*********: {dict_OPC['ns=2;s=Application.UserInterface.ButtonLoadOrders']}")
-                    print(f"Данные из глобального словаря на интерфейс: {dict_OPC['module']}")
+                    self.my_data["OPC_ButtonLoadOrders"] = ButtonLoadOrders  
+                    #print(f"*********: {self.my_data["OPC_ButtonLoadOrders"]}")
+                    print(f"Данные из глобального словаря на интерфейс: {self.my_data["DB_module"]}")
 
                     #Если нажата кнопка пишем заказы в перменную
                     if  ButtonLoadOrders == True:
@@ -223,8 +253,8 @@ class OPCClient:
                     node5 = self.client.get_node('ns=2;s=Application.UserInterface.ButtonSelectOrder')
                     ButtonSelectOrder = node5.get_value()
                     logging.debug(f"состояние кнопки загрузки - {ButtonSelectOrder}")
-                    dict_OPC['ns=2;s=Application.UserInterface.ButtonSelectOrder'] = ButtonSelectOrder
-                    print(f"UserInterface.ButtonSelectOrder: {dict_OPC['ns=2;s=Application.UserInterface.ButtonSelectOrder']}")
+                    self.my_data["OPC_ButtonSelectOrder"] = ButtonSelectOrder
+                    # print(f"UserInterface.ButtonSelectOrder: {self.my_data["OPC_ButtonSelectOrder"]}")
                     
                     # Если нажата кнопка загрузки, пишем заказы в переменную
                     if ButtonSelectOrder:
@@ -233,7 +263,7 @@ class OPCClient:
                         opcOrder = node4.get_value()
                         logging.debug(f"номер заказа - {opcOrder}")
                         
-                        dict_OPC['ns=2;s=Application.UserInterface.Order'] = opcOrder
+                        self.my_data["OPC_Order"] = opcOrder
 
                         if opcOrder:  # Проверка, что заказ не пустой
                             order_id, board_name, firmware, batch, count, version, components = Provider1C.fetch_data(opcOrder)
@@ -277,8 +307,7 @@ class OPCClient:
     def stop(self):
         self.stop_event.set()  # Set the event to stop threads
 
-url = "opc.tcp://192.168.1.3:48010"
-opc_client = OPCClient(url)
+
 
 
 
@@ -291,15 +320,13 @@ class ModbusProvider:
     """Class MODBUS Communication with Modbus regul"""
     global Tray1
     global Cell1
-    def __init__(self):
+    def __init__(self, name, initial_dict):
         self.store = ModbusSlaveContext(
             hr=ModbusSequentialDataBlock(0, [0] * 100)
         )
         self.lock = threading.Lock()
-
-        self.Reg_move_Table = 0             # Move Table
-        self.Reg_updown_Botloader = 0        # Move botloader
-        self.Rob_Action = 0                 # Action to Robot
+        self.name = name
+        self.my_data = initial_dict.get(name, {})  # подсловарь объекта
 
         self.server_thread = threading.Thread(target=self.run_modbus_server, daemon=True)
         self.server_thread.start()
@@ -311,6 +338,8 @@ class ModbusProvider:
         context = ModbusServerContext(slaves=self.store, single=True)
         print("Starting Modbus TCP server on localhost:502")
         try:
+            # print(config["modbus"]["url"])  # Выведет: MyAwesomeApp
+            # print(config["modbus"]["port"])  # Выведет: MyAwesomeApp
             StartTcpServer(context, address=("192.168.1.100", 502))
         except Exception as e:
             print(f"Error starting Modbus server: {e}")
@@ -322,20 +351,17 @@ class ModbusProvider:
         while True:
             try:
                 with self.lock:
-                    dict_Table1["sub_Reg_move_Table"] = self.store.getValues(3, 1, count=1)[0]
-                    dict_Table1["sub_Reg_updown_Botloader"] = self.store.getValues(3, 3, count=1)[0]
-                    dict_Table1["sub_Rob_Action"] = self.store.getValues(3, 5, count=1)[0]
+                    self.my_data["sub_Reg_move_Table"] = self.store.getValues(3, 1, count=1)[0]
+                    self.my_data["sub_Reg_updown_Botloader"] = self.store.getValues(3, 3, count=1)[0]
+                    self.my_data["sub_Rob_Action"] = self.store.getValues(3, 5, count=1)[0]
 
-                    self.Reg_move_Table = dict_Table1["Reg_move_Table"]
-                    self.Reg_updown_Botloader = dict_Table1["Reg_updown_Botloader"]
-                    self.Rob_Action = dict_Table1["Rob_Action"]
+                    self.store.setValues(3, 0, [self.my_data["Reg_move_Table"]])
+                    self.store.setValues(3, 2, [self.my_data["Reg_updown_Botloader"]])
+                    self.store.setValues(3, 4, [self.my_data["Rob_Action"]])
 
-                    self.store.setValues(3, 0, [self.Reg_move_Table])
-                    self.store.setValues(3, 2, [self.Reg_updown_Botloader])
-                    self.store.setValues(3, 4, [self.Rob_Action])
-                    
                     self.store.setValues(3, 6, [Tray1])
                     self.store.setValues(3, 8, [Cell1])
+                    
             except Exception as e:
                 print(f"Error updating registers: {e}")
             time.sleep(1)
@@ -352,13 +378,16 @@ class Table:
     def __init__(self, name, initial_dict):
         self.name = name
         self.data = initial_dict
+        self.my_data = initial_dict.get(name, {})  # Работает только со своей частью данных
+        print(self.my_data)
 
 
     # Method write registers in modbus through modbus_provider
     def change_value(self, key, new_value):
         with modbus_provider.lock:
-            if key in self.data:
-                self.data[key] = new_value
+            if key in self.my_data:
+                self.my_data[key] = new_value
+                # print(f"Получен словарь {self.my_data[key]} команда на присвоение значения ключу {key} значения {new_value} ")
                 # print(f"Updated {key} to {new_value} in {self.name}.")
             else:
                 print(f"Key '{key}' not found in {self.name}.")
@@ -366,8 +395,8 @@ class Table:
     # Method read registers in modbus through modbus_provider
     def read_value(self, key):
         with modbus_provider.lock:
-            if key in self.data:
-                result = self.data[key]
+            if key in self.my_data:
+                result = self.my_data[key]
                 # print(f"Read {key}: {result} from {self.name}.")
             else:
                 print(f"Key '{key}' not found in {self.name}.")
@@ -1231,14 +1260,28 @@ class Table:
 
 
 if __name__ == "__main__":
-    modbus_provider = ModbusProvider()
-    
-    
+    modbus_provider = ModbusProvider(1, shared_data)
+    # print(config["opc"]["url"])  # Выведет: MyAwesomeApp
+    url = "opc.tcp://172.21.10.39:48010"
+    # url = "opc.tcp://192.168.1.3:48010"
+    opc_client = OPCClient(url, 1, shared_data)
+
+    # Создаем и запускаем процесс синхронизации с БД
+    db_sync = DatabaseSynchronizer(Order, 1, shared_data)
+
+    # Полный путь к исполняемому скрипту
+    script_path = os.path.abspath("ServerRTK.py")
+
+    # Открытие нового окна консоли и запуск скрипта
+    subprocess.Popen([
+        "start", "cmd", "/k", f"{sys.executable} {script_path}"
+    ], shell=True)
     
 
     ################################################# START OPC Communication class l ###################################
     
-    table1 = Table("Table 1", dict_Table1)
+    table1 = Table(1, shared_data)
+    print (shared_data)
    
     if Cell1 == 30:
         Tray1 +=1

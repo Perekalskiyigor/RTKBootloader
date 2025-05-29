@@ -153,13 +153,13 @@ class DatabaseSynchronizer:
 
                     # Обновление глобального словаря с данными из базы
                     with self.lock:
-                        self.my_data["DB_order_number"] = order_number
-                        self.my_data["DB_module"] = module
-                        self.my_data["DB_fw_version"] = fw_version
-                        self.my_data["DB_last_count"] = last_count
-                        self.my_data["DB_common_count"] = common_count
-                        self.my_data["DB_success_count"] = success_count
-                        self.my_data["DB_nonsuccess_count"] = nonsuccess_count
+                        self.my_data["DB_order_number"] = order_number          # номер заказа
+                        self.my_data["DB_module"] = module                      # имя платы
+                        self.my_data["DB_fw_version"] = fw_version              # версия прошивки
+                        self.my_data["DB_last_count"] = last_count              # колво непрошитых
+                        self.my_data["DB_common_count"] = common_count          # общее колво плат
+                        self.my_data["DB_success_count"] = success_count        # прошито ок
+                        self.my_data["DB_nonsuccess_count"] = nonsuccess_count  # не прошито
                 else:
                     print(f"[DBSync {self.client_id}] Данные по заказу не найдены.")
 
@@ -231,7 +231,25 @@ class OPCClient:
 
                     self.my_data["OPC_ButtonLoadOrders"] = ButtonLoadOrders  
                     #print(f"*********: {self.my_data["OPC_ButtonLoadOrders"]}")
-                    print(f"Данные из глобального словаря на интерфейс: {self.my_data["DB_module"]}")
+                    print(f"Данные из глобального словаря на интерфейс: {self.my_data['DB_module']}")
+                    #################### переменные на интерфейс
+
+                    node6 = self.client.get_node('ns=2;s=Application.UserInterface.name_board')
+                    data_value2 = ua.DataValue(ua.Variant(self.my_data['DB_module'], ua.VariantType.String))
+                    node6.set_value(data_value2)
+
+                    node7 = self.client.get_node('ns=2;s=Application.UserInterface.fw_version')
+                    data_value3 = ua.DataValue(ua.Variant(self.my_data['DB_fw_version'], ua.VariantType.String))
+                    node7.set_value(data_value3)
+
+                    node8 = self.client.get_node('ns=2;s=Application.UserInterface.last_count')
+                    data_value4 = ua.DataValue(ua.Variant(self.my_data['DB_last_count'], ua.VariantType.String))
+                    node8.set_value(data_value4)
+                    
+                    node9 = self.client.get_node('ns=2;s=Application.UserInterface.nonsuccess_count')
+                    data_value5 = ua.DataValue(ua.Variant(self.my_data['DB_nonsuccess_count'], ua.VariantType.String))
+                    node9.set_value(data_value5)
+
 
                     #Если нажата кнопка пишем заказы в перменную
                     if  ButtonLoadOrders == True:
@@ -279,24 +297,6 @@ class OPCClient:
                             print("В переменной Order нет данных")
                             state = self.client.get_node('ns=2;s=Application.UserInterface.State')
                             state.set_value(ua.DataValue(ua.Variant("Ошибка загрузки", ua.VariantType.String)))
-
-                    """
-                    ################### Читаем п ишемв словарь ###################
-                    node3 = self.client.get_node("ns=2;s=Application.PLC_PRG.VAL1")
-                    value2 = node3.get_value()
-                    dict_OPC["ns=2;s=Application.PLC_PRG.VAL2"] = value2
-                    print(f"*********: {dict_OPC["ns=2;s=Application.PLC_PRG.VAL2"]}")
-
-                    node4 = self.client.get_node("ns=2;s=Application.PLC_PRG.VAL2")
-                    value3 = node4.get_value()
-                    dict_OPC["ns=2;s=Application.PLC_PRG.VAL2"] = value3
-                    print(f"**VAL2**: {dict_OPC["ns=2;s=Application.PLC_PRG.VAL2"]}")
-
-                    node5 = self.client.get_node("ns=2;s=Application.PLC_PRG.orderNode")
-                    value4 = node5.get_value()
-                    dict_OPC["ns=2;s=Application.PLC_PRG.orderNode"] = value4
-                    print(f"******N*: {dict_OPC["ns=2;s=Application.PLC_PRG.orderNode"]}")
-                    """
                     
 
             except Exception as e:
@@ -1262,8 +1262,8 @@ class Table:
 if __name__ == "__main__":
     modbus_provider = ModbusProvider(1, shared_data)
     # print(config["opc"]["url"])  # Выведет: MyAwesomeApp
-    url = "opc.tcp://172.21.10.39:48010"
-    # url = "opc.tcp://192.168.1.3:48010"
+    #url = "opc.tcp://172.21.10.39:48010"
+    url = "opc.tcp://192.168.1.3:48010"
     opc_client = OPCClient(url, 1, shared_data)
 
     # Создаем и запускаем процесс синхронизации с БД

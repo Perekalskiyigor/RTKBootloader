@@ -22,7 +22,7 @@ import Botloader as Bot
 # Глобальные ящик и ясейка 
 Tray1 = 0
 Cell1 = 0
-Order = "ЗНП-9087.2.1"
+Order = "ЗНП-2160.1.1"
 # данные с платы для цикла main и сетапа
 photodata = None
 

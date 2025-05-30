@@ -36,7 +36,7 @@ import Provider1C
 # Глобальные ящик и ясейка 
 Tray1 = 0
 Cell1 = 0
-Order = "ЗНП-12986.1.1"
+Order = "ЗНП-2160.1.1"
 # данные с платы для цикла main и сетапа
 photodata = None
 
@@ -173,7 +173,11 @@ class DatabaseSynchronizer:
         """Метод для остановки потока"""
         self.stop_event.set()  # Устанавливаем событие, чтобы остановить поток
 
-
+try:
+        # Create an instance of DatabaseConnection
+        db_connection = SQL.DatabaseConnection()
+except Exception as e:
+        logging.error(f"Error Create an instance of DatabaseConnection: {e}")
 
  ################################################# STOP SQL Communication class ###################################
 
@@ -231,7 +235,7 @@ class OPCClient:
 
                     self.my_data["OPC_ButtonLoadOrders"] = ButtonLoadOrders  
                     #print(f"*********: {self.my_data["OPC_ButtonLoadOrders"]}")
-                    print(f"Данные из глобального словаря на интерфейс: {self.my_data['DB_module']}")
+                    #print(f"Данные из глобального словаря на интерфейс: {self.my_data['DB_module']}")
                     #################### переменные на интерфейс
 
                     node6 = self.client.get_node('ns=2;s=Application.UserInterface.name_board')
@@ -243,13 +247,12 @@ class OPCClient:
                     node7.set_value(data_value3)
 
                     node8 = self.client.get_node('ns=2;s=Application.UserInterface.last_count')
-                    data_value4 = ua.DataValue(ua.Variant(self.my_data['DB_last_count'], ua.VariantType.String))
+                    data_value4 = ua.DataValue(ua.Variant(str(self.my_data['DB_last_count']), ua.VariantType.String))
                     node8.set_value(data_value4)
-                    
+                   
                     node9 = self.client.get_node('ns=2;s=Application.UserInterface.nonsuccess_count')
-                    data_value5 = ua.DataValue(ua.Variant(self.my_data['DB_nonsuccess_count'], ua.VariantType.String))
+                    data_value5 = ua.DataValue(ua.Variant(str(self.my_data['DB_nonsuccess_count']), ua.VariantType.String))
                     node9.set_value(data_value5)
-
 
                     #Если нажата кнопка пишем заказы в перменную
                     if  ButtonLoadOrders == True:

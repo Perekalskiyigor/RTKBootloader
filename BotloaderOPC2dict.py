@@ -619,7 +619,7 @@ class Table:
         print("5.2 Регул <- Опусти прошивальщик ложе 1")
 
         logging.info(f"[START1] Робот <- Забери плату из тары")
-        #self.change_value('Rob_Action', 210)
+        self.change_value('Rob_Action', 210)
         logging.debug("Отправлена команда Rob_Action', 210")
 
         logging.info(f"[START2] Регул <- Опусти прошивальщик ложе 1")
@@ -631,7 +631,7 @@ class Table:
             logging.debug(f"sub_Reg_move_Table = {result1}")
 
             result2 = self.read_value("sub_Reg_updown_Botloader")
-            logging.debug(f"sub_Reg_updown_Botloader = {result1}")
+            logging.debug(f"sub_Reg_updown_Botloader = {result2}")
 
             if result1 != 210 and result2 != 103:
                 print(f"получено от робота = {result1}")
@@ -913,7 +913,7 @@ class Table:
         # 4 Робот <- Забери плату из тары  # Регул <- Подними прошивальщик.
         print("4.1 Робот <- забрать плату из тары")
         logging.info(f"[START1] Робот <- забрать плату из тары")
-        #self.change_value('Rob_Action', 210)
+        self.change_value('Rob_Action', 210)
         logging.debug("Отправлена команда 'Rob_Action', 210")
 
         print("4.2 Регул <- Подними прошивальщик.")
@@ -1146,7 +1146,7 @@ class Table:
 
         print("10.1 Робот <- забрать плату из тары")
         logging.info(f"[START1] Робот <- забрать плату из тары")
-        # self.change_value('Rob_Action', 210)
+        self.change_value('Rob_Action', 210)
         logging.debug("Отправлена команда 'Rob_Action', 210")
 
         print("10.2 Регул <- Подними прошивальщик.")

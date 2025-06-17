@@ -159,7 +159,7 @@ class DatabaseSynchronizer:
                         self.my_data["DB_last_count"] = last_count              # колво непрошитых
                         self.my_data["DB_common_count"] = common_count          # общее колво плат
                         self.my_data["DB_success_count"] = success_count        # прошито ок
-                        self.my_data["DB_nonsuccess_count"] = nonsuccess_count  # не прошито
+                        self.my_data["DB_nonsuccess_count"] = nonsuccess_count  # не прошито    
                 else:
                     print(f"[DBSync {self.client_id}] Данные по заказу не найдены.")
 

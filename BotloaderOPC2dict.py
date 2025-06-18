@@ -715,13 +715,15 @@ class Table:
         logging.info(f"[START2] Прошивка")
         result1 = 0
 
+        input("новая строка")
+
         # Данные по прошивке для этого серийника
         firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata1, loge)
         result2 = None  # Инициализируем перед циклом
         while True:
             # Обновляем result2 только если он еще не имеет нужного значения (200)
             if result2 != 200:
-                result2 = firmware_loader.loader(photodata1)
+                result2 = firmware_loader.loader(photodata1, loge)
                 print(f" result2 -- {result2}")
 
             # Обновляем result1 только если он еще не имеет нужного значения (222)

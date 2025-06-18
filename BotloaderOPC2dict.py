@@ -67,6 +67,7 @@ shared_data = {
         'sub_Reg_updown_Botloader': 0,
         'Rob_Action': 0,
         'sub_Rob_Action': 0,
+        'workplace1': 0, # Какое ложе сейчас раочее. нужно для платы индикации
 
         'DB_order_number': "",
         'DB_module': "",
@@ -88,7 +89,8 @@ shared_data = {
         'Reg_updown_Botloader': 0,
         'sub_Reg_updown_Botloader': 0,
         'Rob_Action': 0,
-        'sub_Rob_Action': 0
+        'sub_Rob_Action': 0,
+        'workplace2': 0, # Какое ложе сейчас раочее. нужно для платы индикации
         }
 }
 
@@ -357,6 +359,7 @@ class ModbusProvider:
                     self.my_data["sub_Reg_move_Table"] = self.store.getValues(3, 1, count=1)[0]
                     self.my_data["sub_Reg_updown_Botloader"] = self.store.getValues(3, 3, count=1)[0]
                     self.my_data["sub_Rob_Action"] = self.store.getValues(3, 5, count=1)[0]
+                    self.my_data["workplace1"] = self.store.getValues(3, 7, count=1)[0]
 
                     self.store.setValues(3, 0, [self.my_data["Reg_move_Table"]])
                     self.store.setValues(3, 2, [self.my_data["Reg_updown_Botloader"]])
@@ -618,6 +621,8 @@ class Table:
         print("5.1 Робот <- Забери плату из тары")
         print("5.2 Регул <- Опусти прошивальщик ложе 1")
 
+
+
         logging.info(f"[START1] Робот <- Забери плату из тары")
         self.change_value('Rob_Action', 210)
         logging.debug("Отправлена команда Rob_Action', 210")
@@ -699,12 +704,19 @@ class Table:
         self.change_value('Rob_Action', 222)
         logging.debug("Отправлена команда 'Rob_Action', 222")
         
+        # Передаем номер ложемента моржову
+        loge = self.read_value("workplace1")
+        print(f"Переадем номер ложемента Моржову = {loge}")
+            
         print("7.2 Сервер <- Начни шить")
+                # Передаем номер ложемента моржову
+        loge = self.read_value("workplace1")
+        print(f"Переадем номер ложемента Моржову = {loge}")
         logging.info(f"[START2] Прошивка")
         result1 = 0
 
         # Данные по прошивке для этого серийника
-        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata1)
+        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata1, loge)
         result2 = None  # Инициализируем перед циклом
         while True:
             # Обновляем result2 только если он еще не имеет нужного значения (200)

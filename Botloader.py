@@ -23,7 +23,7 @@ logging.basicConfig(
 
 ################################################# Botloader class ###################################
 class FirmwareLoader:
-    def __init__(self,db_connection,igle_table,stand_id, Order, photodata):
+    def __init__(self,db_connection,igle_table,stand_id, Order, photodata, loge):
         try:
             # Создаем экземпляр подключения к базе данных
             self.db_connection = db_connection
@@ -42,8 +42,9 @@ class FirmwareLoader:
         self.stand_id = stand_id
         self.Order = Order
         self.photodata = photodata
+        self.loge = loge
 
-    def loader(self, photodata):
+    def loader(self, photodata, loge):
         print("3 Прошивальщик <- Команда на прошивку")
         
         # Блок начала работы с БД: получаем свободный id для заказа
@@ -74,7 +75,7 @@ class FirmwareLoader:
         # Блок прошивки
         time.sleep(2)
         try:
-            self.igle_table.control_igle_table(data, photodata)
+            self.igle_table.control_igle_table(data, photodata, loge)
         except Exception as e:
             logging.error(f"Ошибка при контроле через Иглостол: {e}")
             print("Ошибка при контроле через Иглостол")

@@ -22,7 +22,7 @@ class IgleTable:
 
        
     # Запрос на прошивку
-    def control_igle_table(self,data, photodata):
+    def control_igle_table(self,data, photodata, loge):
         """Метод для отправки команд иглостэнду."""
         logging.info("Method control_igle_table called.")
         
@@ -37,6 +37,7 @@ class IgleTable:
                 fw_type = data.get('fw_type')
                 fw_path = data.get('fw_path')
                 fw_version = data.get('fw_version')
+                loge = loge
 
                 print(f"ID: {data['id']}")
                 print(f"Stand ID: {data['stand_id']}")
@@ -46,6 +47,7 @@ class IgleTable:
                 print(f"Firmware Type: {data['fw_type']}")
                 print(f"Firmware Path: {data['fw_path']}")
                 print(f"Firmware Version: {data['fw_version']}")
+                print(f"loge: {loge}")
 
                 # Логируем полученные параметры
                 logging.debug(f"Input parameters: stand_id={stand_id}, module_type={module_type}, "
@@ -63,6 +65,7 @@ class IgleTable:
             "module_type": module_type,
             "data_matrix": [data_matrix],
             "serial_number_8": serial_number_8,
+            "lodgment number": loge,
             "firmwares": [
                 {
                     "fw_type": "MCU",

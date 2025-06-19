@@ -709,9 +709,11 @@ class Table:
         print(f"Переадем номер ложемента Моржову = {loge}")
             
         print("7.2 Сервер <- Начни шить")
-                # Передаем номер ложемента моржову
+        
+        # Передаем номер ложемента моржову
         loge = self.read_value("workplace1")
         print(f"Переадем номер ложемента Моржову = {loge}")
+
         logging.info(f"[START2] Прошивка")
         result1 = 0
 
@@ -880,14 +882,18 @@ class Table:
         self.change_value('Rob_Action', 241)
         logging.debug("Отправлена команда 'Rob_Action', 241")
 
+        # Передаем номер ложемента моржову
+        loge = self.read_value("workplace1")
+        print(f"Переадем номер ложемента Моржову = {loge}")
+
         print("#3.2 Сервер <- Начни шить")
         logging.info(f"[START2] Прошивка")
         result1 = 0
-        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata)
+        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata, loge)
         while True:
             # Обновляем result2 только если он еще не имеет нужного значения (200)
             if result2 != 200:
-                result2 = firmware_loader.loader(photodata)
+                result2 = firmware_loader.loader(photodata, loge)
                 print(f" result2 -- {result2}")
 
             # Обновляем result1 только если он еще не имеет нужного значения (241)
@@ -1112,8 +1118,12 @@ class Table:
 
         print("#9.2 Сервер <- Начни шить")
         logging.info(f"[START2] Прошивка")
+
+        # Передаем номер ложемента моржову
+        loge = self.read_value("workplace1")
+        print(f"Переадем номер ложемента Моржову = {loge}")
         result1 = 0
-        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata)
+        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata, loge)
         while True:
             # Обновляем result2 только если он еще не имеет нужного значения (200)
             if result2 != 200:

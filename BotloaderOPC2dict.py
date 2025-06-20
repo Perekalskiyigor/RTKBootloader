@@ -11,7 +11,7 @@ import yaml
 import subprocess
 import sys
 import os
-
+#-----
 # Загрузка конфигурации из файла
 with open("config.yml", "r") as file:
     config = yaml.safe_load(file)

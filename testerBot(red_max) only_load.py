@@ -466,7 +466,7 @@ class Table:
         result1 = 0
 
         # Данные по прошивке для этого серийника
-        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata1)
+        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata1, loge=1)
         result2 = None  # Инициализируем перед циклом
         while True:
             # Обновляем result2 только если он еще не имеет нужного значения (200)
@@ -642,9 +642,9 @@ class Table:
         logging.info(f"[НАЧАЛО] Прошивка")
         # photodata = "Z45564564645"
         # Данные по прошивке для этого серийника
-        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata)
+        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata, loge=1)
         while True:
-            result1 = firmware_loader.loader(photodata)
+            result1 = firmware_loader.loader(photodata,1)
             if result1 != 200:
                 print(f"Ждем ответ прошивальщка {result1}")
                 logging.info(f"Ждем ответ от прошивальщика= {result1}")
@@ -776,9 +776,9 @@ class Table:
         print("20. Сервер -> Ответ по прошивке (плохо, хорошо)")
         logging.info(f"[НАЧАЛО] Прошивка")
         # photodata = "Z45564564645"
-        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata)
+        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata, loge=1)
         while True:
-            result1 = firmware_loader.loader(photodata)
+            result1 = firmware_loader.loader(photodata,1)
             if result1 != 200:
                 print(f"Ждем ответ прошивальщка {result1}")
                 logging.info(f"Ждем ответ от прошивальщика= {result1}")

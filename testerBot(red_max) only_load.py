@@ -117,6 +117,7 @@ class ModbusProvider:
                     dict_Table1["sub_Reg_move_Table"] = self.store.getValues(3, 1, count=1)[0]
                     dict_Table1["sub_Reg_updown_Botloader"] = self.store.getValues(3, 3, count=1)[0]
                     dict_Table1["sub_Rob_Action"] = self.store.getValues(3, 5, count=1)[0]
+                    dict_Table1["workplace1"] = self.store.getValues(3, 7, count=1)[0]
 
                     self.Reg_move_Table = dict_Table1["Reg_move_Table"]
                     self.Reg_updown_Botloader = dict_Table1["Reg_updown_Botloader"]
@@ -642,7 +643,9 @@ class Table:
         logging.info(f"[НАЧАЛО] Прошивка")
         # photodata = "Z45564564645"
         # Данные по прошивке для этого серийника
-        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata, loge=1)
+        loge = self.read_value("workplace1")
+        print(f"Переадем номер ложемента Моржову = {loge}")
+        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata, loge)
         while True:
             result1 = firmware_loader.loader(photodata,1)
             if result1 != 200:
@@ -775,8 +778,10 @@ class Table:
         print("19. Сервер <- Начни шить")
         print("20. Сервер -> Ответ по прошивке (плохо, хорошо)")
         logging.info(f"[НАЧАЛО] Прошивка")
+        loge = self.read_value("workplace1")
+        print(f"Переадем номер ложемента Моржову = {loge}")
         # photodata = "Z45564564645"
-        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata, loge=1)
+        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata, loge)
         while True:
             result1 = firmware_loader.loader(photodata,1)
             if result1 != 200:

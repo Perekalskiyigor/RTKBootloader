@@ -375,6 +375,42 @@ class ModbusProvider:
 ################################################# START MODBUS Communication class with Modbus regul ###################################
 
 
+################################################# START LOG Sender Thread #####################################################################
+def LogSender_thread():
+    print("1С thread start")
+    while True:  # Бесконечный цикл
+        # Запрашиваем из БД первый не отправленный серийник (отметкаLogSentStatus и время)
+        try:
+            # Если серийник не существует ничего не делаем
+            print(f"Поток отправки лога в 1С работает")
+            if False:
+                time.sleep(1)  # Короткая пауза
+                continue
+            else:
+                print(f"Обнаружен новый серийник для отправки в 1С:")
+            
+            # Отправка результата в 1С                
+            print(f"Отправляем результат в 1С")
+            response_code1С = 200
+            # Проверка на 404 и показ сообщения один раз
+            if response_code1С == 404 or response_code1С == None and not error_404_shown:
+                error_404_shown = True
+            elif response_code1С == 200:
+                print(f"отправили успешно")
+            else:
+                print(f"Данные о маркеровке в 1С не потравляются, обратитесь к администратору", fg="red",font=("Arial", 9))
+            # Пауза между проверками
+            time.sleep(3)  # Проверяем каждые 3 секунд
+            
+        except Exception as e:
+            print(f"Ошибка в потоке LogSender_thread: {e}")
+            time.sleep(3)
+################################################# STOP LOG Sender Thread #####################################################################
+
+
+
+
+
 ################################################# START TABLE CLASS #####################################################################
 class Table:
     """ TABLE CLASS"""
@@ -1287,6 +1323,10 @@ class Table:
 
 
 if __name__ == "__main__":
+    t = threading.Thread(target=LogSender_thread)  # Поток отправки в 1С
+    t.start()
+
+
     modbus_provider = ModbusProvider(1, shared_data)
     # print(config["opc"]["url"])  # Выведет: MyAwesomeApp
     #url = "opc.tcp://172.21.10.39:48010"

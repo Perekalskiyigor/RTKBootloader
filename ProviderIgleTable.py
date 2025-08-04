@@ -65,7 +65,8 @@ class IgleTable:
             "module_type": module_type,
             "data_matrix": [data_matrix],
             "serial_number_8": serial_number_8,
-            "lodgment number": loge,
+            "lodgment_number": loge,
+
             "firmwares": [
                 {
                     "fw_type": "MCU",

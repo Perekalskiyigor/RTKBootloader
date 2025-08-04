@@ -1127,7 +1127,7 @@ class Table:
         while True:
             # Обновляем result2 только если он еще не имеет нужного значения (200)
             if result2 != 200:
-                result2 = firmware_loader.loader(photodata)
+                result2 = firmware_loader.loader(photodata, loge)
                 print(f" result2 -- {result2}")
 
             # Обновляем result1 только если он еще не имеет нужного значения (241)

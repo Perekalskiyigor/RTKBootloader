@@ -341,6 +341,7 @@ class DatabaseConnection:
             self.cursor.execute(update_query, (stand_id, serial_number_8, data_matrix, test_result, log_path, report_path, error_description, record_id))
             self.conn.commit()
 
+            
             # Консольный вывод
             print("[DB]  Данные успешно сохранены:")
             print(f"   - stand_id: {stand_id}")
@@ -371,8 +372,18 @@ class DatabaseConnection:
 
         
 
-    def get_order_insert_orders_frm1C(self, order_id, board_name, firmware, batch, count, version, components):
+    def get_order_insert_orders_frm1C(self, dictResult):
         """ Запрос информации по заказам и вставка данных в таблицы Orders и order_details """
+        order_id = dictResult.get('order_id')
+        components = dictResult.get('components', {})
+        products = dictResult.get('products', {})
+        firmware = products.get('firmware', '')
+        board_name = products.get('board_name', None)
+        batch = products.get('batch', {})
+        count = products.get('count', 0)
+        version = products.get('version', None)
+        marking_templates = products.get('marking_templates', [])
+
         logging.info("Метод get_order_insert_orders_frm1C вызван.")
         logging.info(f"Входные данные - order_id: '{order_id}', board_name: '{board_name}', firmware: '{firmware}' count {count} version {version} components {components}")
 
@@ -382,7 +393,7 @@ class DatabaseConnection:
             print("Ошибка: Отсутствуют обязательные данные.")
             return
 
-        if not isinstance(batch, dict) or not batch:
+        if not isinstance(batch, list) or not batch:
             logging.warning("Некорректные или пустые данные batch.")
             print("Ошибка: Некорректные или пустые данные batch.")
             return
@@ -391,9 +402,9 @@ class DatabaseConnection:
             # Шаг 1: Вставка данных заказа в таблицу Orders
             logging.info("Вставка данных заказа в таблицу Orders.")
             self.cursor.execute('''
-                INSERT INTO Orders (order_number, module, Nomenclature, Value, VersionLoadFile, fw_version)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (order_id, board_name, components, count, firmware, version))
+                INSERT INTO Orders (order_number, module, Nomenclature, Value, VersionLoadFile, fw_version, marking_templates)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (order_id, board_name, components, count, firmware, version, marking_templates))
             self.conn.commit()
 
             # Получение ID вставленного заказа
@@ -401,15 +412,16 @@ class DatabaseConnection:
             inserted_order_id = self.cursor.fetchone()[0]
             logging.info(f"Заказ вставлен с ID: {inserted_order_id}")
 
-            # Шаг 2: Вставка деталей заказа
-            logging.info("Вставка серийных номеров в таблицу order_details.")
-            for key in batch.keys():
-                serial_8 = key[:8]  # Первые 8 символов серийного номера
+
+            for item in batch:
+                serial = item["number"]
+                serial_8 = item["number8"]
+                serial_15 = item["number15"]
                 self.cursor.execute('''
-                    INSERT INTO order_details (order_id, serial_number_8)
-                    VALUES (?, ?)
-                ''', (inserted_order_id, serial_8))
-            self.conn.commit()
+                    INSERT INTO order_details (order_id, serial_number, serial_number_8, serial_number_15)
+                    VALUES (?, ?, ?, ?)
+                ''', (inserted_order_id, serial, serial_8, serial_15))
+                self.conn.commit()
 
             logging.info("Заказ и его детали успешно вставлены.")
             print("Заказ и его детали успешно вставлены.")

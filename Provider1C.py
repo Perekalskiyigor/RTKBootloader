@@ -4,6 +4,15 @@ import logging
 import sqlite3
 from datetime import datetime
 import SQLite
+import configparser
+
+# Загрузка конфигурации
+config = configparser.ConfigParser()
+config.read('config.ini')
+
+getOrders_url = config['serverOrder']['getOrders_url']
+username = config['serverOrder']['password']
+fetch_data_url = config['serverOrder']['fetch_data_url']
 
 
 # Настройка логирования
@@ -16,7 +25,7 @@ logging.basicConfig(
 def getOrders():
     url = "https://black/erp_game_ivshin255/hs/rtk/orderlist/RTK_R050"
     headers = {
-        'Authorization': 'Basic cnRrOnJ0azEyMw=='
+        'Authorization': 'Basic bWFya19EUEE6MTIzNDU2elo='
     }
 
     try:
@@ -43,53 +52,99 @@ def getOrders():
 
 
 def fetch_data(order):
+    logging.info("Вызвана функция получения данных по заказу в бд def fetch_data(order) и провайдера SQL")
+
     try:
         url = f"https://black/erp_game_ivshin255/hs/rtk/order/RTK_R050/{order}"
         payload = {}
         headers = {
-        'Authorization': 'Basic cnRrOnJ0azEyMw=='
+        'Authorization': 'Basic bWFya19EUEE6MTIzNDU2elo='
         }
         response = requests.request("GET", url, headers=headers, data=payload, verify=False)
-        print(response.text)
+        #print(response.text)
         data = response.json()
 
         order_id = data.get('order')
         components = data.get('components', {})
-        components = ", ".join(f"{key}: {value}" for key, value in components.items())
+        components_str = json.dumps(components, ensure_ascii=False)
         products = data.get('products', {})
         firmware = products.get('firmware', '')
         board_name = products.get('product', None)
         batch = products.get('batch', {})
         count = products.get('count', 0)
         version = products.get('version', None)
+        marking_templates = products.get('marking_templates', [])
+        marking_templates_str = json.dumps(marking_templates, ensure_ascii=False)
 
+        result = {
+            'order_id': order_id,
+            'components': components_str,
+            'products': {
+                'firmware': firmware,
+                'board_name': board_name,
+                'batch': batch,
+                'count': count,
+                'version': version,
+                'marking_templates': marking_templates_str
+            }
+        }
+
+        # Извлекаем данные первого шаблона (если он есть)
+        if marking_templates:
+            first_template = marking_templates[0]
+            template_type = first_template.get('type')
+            template_type_ru = first_template.get('type_RU')
+            template_path = first_template.get('path')
+        else:
+            template_type = None
+            template_type_ru = None
+            template_path = None
+
+        """
         # Вывод в консоль
+        print("="*50)
         print(f"Order ID: {order_id}")
         print(f"Board Name: {board_name}")
+        print(f"Version: {version}")
+        print(f"Quantity: {count}")
         print(f"Firmware: {firmware}")
-        print(f"Total Serials: {batch}")
         print("\nComponents:")
+        for comp_code, comp_desc in components.items():
+            print(f"  {comp_code}: {comp_desc}")
+
+        print("\nMarking Templates:")
+        if marking_templates:
+            print(f"  Type: {template_type}")
+            print(f"  Type (RU): {template_type_ru}")
+            print(f"  Path: {template_path}")
+        else:
+            print("  No marking templates available")
+
+        print("\nBatch Numbers:")
+        for i, item in enumerate(batch, 1):
+            print(f"  {i}. Full: {item['number']} | 8-digit: {item['number8']} | 15-digit: {item['number15']}")
+        print("="*50)
+        """
+        
+        
 
         logging.info("Data successfully fetched.")
-        return order_id, board_name, firmware, batch, count, version, components
+        return result
     except Exception as e:
         logging.error(f"Error fetching data: {e}")
         raise
 
 
 """
-order_id, board_name, firmware, batch, count, version, components = fetch_data()
+dict = fetch_data("ЗНП-5972.1.1")
 db_connection = SQLite.DatabaseConnection()
-db_connection.get_order_insert_orders_frm1C(order_id, board_name, firmware, batch, count, version, components)
-
-
-
-order_id, board_name, firmware, batch, count, version, components = fetch_data()
-db_connection = SQLite.DatabaseConnection()
-db_connection.get_order_insert_orders_frm1C(order_id, board_name, firmware, batch, count, version, components)
-
+db_connection.get_order_insert_orders_frm1C(dict)
+ 
 getOrders()
 
-fetch_data("ЗНП-5972.1.1")
+
 """
+#getOrders()
+# fetch_data("ЗНП-5972.1.1")
+
 

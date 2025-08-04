@@ -124,14 +124,15 @@ igle_table = Igable.IgleTable(
  
 # Класс для синхронизации с базой данных и обновления глобального словаря
 class DatabaseSynchronizer:
-    def __init__(self, order, client_id, shared_dict) :
+    def __init__(self, order, shared_dict) :
         self.order = order
         self.stop_event = threading.Event()  # Событие для остановки потока
         self.update_thread = threading.Thread(target=self.update_data, daemon=True)
         self.update_thread.start()
         self.lock = threading.Lock()
-        self.client_id = client_id
-        self.my_data = shared_dict.get(client_id, {})  # Только своя часть словаря
+        self.my_data1 = shared_dict.get(1, {})  # Для 1 стола
+        self.my_data2 = shared_dict.get(2, {})  # Для 2 стола
+        self.my_data3 = shared_dict.get(3, {})  # Для 3 стола
         self.lock = threading.Lock()
 
     def update_data(self):
@@ -153,15 +154,31 @@ class DatabaseSynchronizer:
                     # print(f"С успешным report_path: {success_count}")
                     # print(f"С успешным log_path: {nonsuccess_count}")
 
-                    # Обновление глобального словаря с данными из базы
+                    # Обновление глобального словаря с данными из базы раскопируем для всех 3 столов одни данные
                     with self.lock:
-                        self.my_data["DB_order_number"] = order_number          # номер заказа
-                        self.my_data["DB_module"] = module                      # имя платы
-                        self.my_data["DB_fw_version"] = fw_version              # версия прошивки
-                        self.my_data["DB_last_count"] = last_count              # колво непрошитых
-                        self.my_data["DB_common_count"] = common_count          # общее колво плат
-                        self.my_data["DB_success_count"] = success_count        # прошито ок
-                        self.my_data["DB_nonsuccess_count"] = nonsuccess_count  # не прошито    
+                        self.my_data1["DB_order_number"] = order_number          # номер заказа
+                        self.my_data1["DB_module"] = module                      # имя платы
+                        self.my_data1["DB_fw_version"] = fw_version              # версия прошивки
+                        self.my_data1["DB_last_count"] = last_count              # колво непрошитых
+                        self.my_data1["DB_common_count"] = common_count          # общее колво плат
+                        self.my_data1["DB_success_count"] = success_count        # прошито ок
+                        self.my_data1["DB_nonsuccess_count"] = nonsuccess_count  # не прошито    
+
+                        self.my_data2["DB_order_number"] = order_number          # номер заказа
+                        self.my_data2["DB_module"] = module                      # имя платы
+                        self.my_data2["DB_fw_version"] = fw_version              # версия прошивки
+                        self.my_data2["DB_last_count"] = last_count              # колво непрошитых
+                        self.my_data2["DB_common_count"] = common_count          # общее колво плат
+                        self.my_data2["DB_success_count"] = success_count        # прошито ок
+                        self.my_data2["DB_nonsuccess_count"] = nonsuccess_count  # не прошито    
+
+                        self.my_data3["DB_order_number"] = order_number          # номер заказа
+                        self.my_data3["DB_module"] = module                      # имя платы
+                        self.my_data3["DB_fw_version"] = fw_version              # версия прошивки
+                        self.my_data3["DB_last_count"] = last_count              # колво непрошитых
+                        self.my_data3["DB_common_count"] = common_count          # общее колво плат
+                        self.my_data3["DB_success_count"] = success_count        # прошито ок
+                        self.my_data3["DB_nonsuccess_count"] = nonsuccess_count  # не прошито    
                 else:
                     print(f"[DBSync {self.client_id}] Данные по заказу не найдены.")
 
@@ -191,12 +208,13 @@ except Exception as e:
 
 
 class OPCClient:
-    def __init__(self, url, client_id, shared_dict):
+    def __init__(self, url, shared_dict):
         self.url = url
         self.lock = threading.Lock()
         
         self.shared_dict = shared_dict
-        self.my_data = shared_dict.get(client_id, {})  # Работает со своей частью словаря
+        self.my_data1 = shared_dict.get(1, {})  # Работает со своей частью словаря
+        
 
         self.client = Client(url)
         self.running = False
@@ -235,25 +253,26 @@ class OPCClient:
                     ButtonLoadOrders = node3.get_value()
                     logging.debug(f"состояние кнопки запроса заказов - {ButtonLoadOrders}")
 
-                    self.my_data["OPC_ButtonLoadOrders"] = ButtonLoadOrders  
+                    self.my_data1["OPC_ButtonLoadOrders"] = ButtonLoadOrders
+
                     #print(f"*********: {self.my_data["OPC_ButtonLoadOrders"]}")
                     #print(f"Данные из глобального словаря на интерфейс: {self.my_data['DB_module']}")
                     #################### переменные на интерфейс
 
                     node6 = self.client.get_node('ns=2;s=Application.UserInterface.name_board')
-                    data_value2 = ua.DataValue(ua.Variant(self.my_data['DB_module'], ua.VariantType.String))
+                    data_value2 = ua.DataValue(ua.Variant(self.my_data1['DB_module'], ua.VariantType.String))
                     node6.set_value(data_value2)
 
                     node7 = self.client.get_node('ns=2;s=Application.UserInterface.fw_version')
-                    data_value3 = ua.DataValue(ua.Variant(self.my_data['DB_fw_version'], ua.VariantType.String))
+                    data_value3 = ua.DataValue(ua.Variant(self.my_data1['DB_fw_version'], ua.VariantType.String))
                     node7.set_value(data_value3)
 
                     node8 = self.client.get_node('ns=2;s=Application.UserInterface.last_count')
-                    data_value4 = ua.DataValue(ua.Variant(str(self.my_data['DB_last_count']), ua.VariantType.String))
+                    data_value4 = ua.DataValue(ua.Variant(str(self.my_data1['DB_last_count']), ua.VariantType.String))
                     node8.set_value(data_value4)
                    
                     node9 = self.client.get_node('ns=2;s=Application.UserInterface.nonsuccess_count')
-                    data_value5 = ua.DataValue(ua.Variant(str(self.my_data['DB_nonsuccess_count']), ua.VariantType.String))
+                    data_value5 = ua.DataValue(ua.Variant(str(self.my_data1['DB_nonsuccess_count']), ua.VariantType.String))
                     node9.set_value(data_value5)
 
                     #Если нажата кнопка пишем заказы в перменную
@@ -276,7 +295,7 @@ class OPCClient:
                     node5 = self.client.get_node('ns=2;s=Application.UserInterface.ButtonSelectOrder')
                     ButtonSelectOrder = node5.get_value()
                     logging.debug(f"состояние кнопки загрузки - {ButtonSelectOrder}")
-                    self.my_data["OPC_ButtonSelectOrder"] = ButtonSelectOrder
+                    self.my_data1["OPC_ButtonSelectOrder"] = ButtonSelectOrder
                     # print(f"UserInterface.ButtonSelectOrder: {self.my_data["OPC_ButtonSelectOrder"]}")
                     
                     # Если нажата кнопка загрузки, пишем заказы в переменную
@@ -325,13 +344,14 @@ class ModbusProvider:
     """Class MODBUS Communication with Modbus regul"""
     global Tray1
     global Cell1
-    def __init__(self, name, initial_dict):
+    def __init__(self, initial_dict):
         self.store = ModbusSlaveContext(
             hr=ModbusSequentialDataBlock(0, [0] * 100)
         )
         self.lock = threading.Lock()
-        self.name = name
-        self.my_data = initial_dict.get(name, {})  # подсловарь объекта
+        self.my_data1 = initial_dict.get(1, {})  # подсловарь объекта
+        self.my_data2 = initial_dict.get(2, {})  # подсловарь объекта
+        self.my_data3 = initial_dict.get(3, {})  # подсловарь объекта
 
         self.server_thread = threading.Thread(target=self.run_modbus_server, daemon=True)
         self.server_thread.start()
@@ -356,17 +376,45 @@ class ModbusProvider:
         while True:
             try:
                 with self.lock:
-                    self.my_data["sub_Reg_move_Table"] = self.store.getValues(3, 1, count=1)[0]
-                    self.my_data["sub_Reg_updown_Botloader"] = self.store.getValues(3, 3, count=1)[0]
-                    self.my_data["sub_Rob_Action"] = self.store.getValues(3, 5, count=1)[0]
-                    self.my_data["workplace1"] = self.store.getValues(3, 7, count=1)[0]
+                    self.my_data1["sub_Reg_move_Table"] = self.store.getValues(3, 1, count=1)[0]
+                    self.my_data1["sub_Reg_updown_Botloader"] = self.store.getValues(3, 3, count=1)[0]
+                    self.my_data1["sub_Rob_Action"] = self.store.getValues(3, 5, count=1)[0]
+                    self.my_data1["workplace1"] = self.store.getValues(3, 7, count=1)[0]
 
-                    self.store.setValues(3, 0, [self.my_data["Reg_move_Table"]])
-                    self.store.setValues(3, 2, [self.my_data["Reg_updown_Botloader"]])
-                    self.store.setValues(3, 4, [self.my_data["Rob_Action"]])
+                    self.store.setValues(3, 0, [self.my_data1["Reg_move_Table"]])
+                    self.store.setValues(3, 2, [self.my_data1["Reg_updown_Botloader"]])
+                    self.store.setValues(3, 4, [self.my_data1["Rob_Action"]])
 
                     self.store.setValues(3, 6, [Tray1])
                     self.store.setValues(3, 8, [Cell1])
+
+                    # 2 стол
+                    self.my_data2["sub_Reg_move_Table"] = self.store.getValues(3, 9, count=1)[0]
+                    self.my_data2["sub_Reg_updown_Botloader"] = self.store.getValues(3, 11, count=1)[0]
+                    self.my_data2["sub_Rob_Action"] = self.store.getValues(3, 13, count=1)[0]
+                    self.my_data2["workplace1"] = self.store.getValues(3, 15, count=1)[0]
+
+                    self.store.setValues(3, 10, [self.my_data2["Reg_move_Table"]])
+                    self.store.setValues(3, 12, [self.my_data2["Reg_updown_Botloader"]])
+                    self.store.setValues(3, 14, [self.my_data2["Rob_Action"]])
+
+                    self.store.setValues(3, 6, [Tray1])
+                    self.store.setValues(3, 8, [Cell1])
+
+                    # 3 стол
+                    self.my_data3["sub_Reg_move_Table"] = self.store.getValues(3, 17, count=1)[0]
+                    self.my_data3["sub_Reg_updown_Botloader"] = self.store.getValues(3, 19, count=1)[0]
+                    self.my_data3["sub_Rob_Action"] = self.store.getValues(3, 21, count=1)[0]
+                    self.my_data3["workplace1"] = self.store.getValues(3, 23, count=1)[0]
+
+                    self.store.setValues(3, 18, [self.my_data3["Reg_move_Table"]])
+                    self.store.setValues(3, 20, [self.my_data3["Reg_updown_Botloader"]])
+                    self.store.setValues(3, 22, [self.my_data3["Rob_Action"]])
+
+                    self.store.setValues(3, 6, [Tray1])
+                    self.store.setValues(3, 8, [Cell1])
+
+
                     
             except Exception as e:
                 print(f"Error updating registers: {e}")
@@ -1163,7 +1211,7 @@ class Table:
         while True:
             # Обновляем result2 только если он еще не имеет нужного значения (200)
             if result2 != 200:
-                result2 = firmware_loader.loader(photodata, loge)
+                result2 = firmware_loader.loader(photodata)
                 print(f" result2 -- {result2}")
 
             # Обновляем result1 только если он еще не имеет нужного значения (241)

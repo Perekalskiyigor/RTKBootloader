@@ -376,6 +376,8 @@ class ModbusProvider:
         while True:
             try:
                 with self.lock:
+
+                    # 2 стол
                     self.my_data1["sub_Reg_move_Table"] = self.store.getValues(3, 1, count=1)[0]
                     self.my_data1["sub_Reg_updown_Botloader"] = self.store.getValues(3, 3, count=1)[0]
                     self.my_data1["sub_Rob_Action"] = self.store.getValues(3, 5, count=1)[0]
@@ -388,7 +390,7 @@ class ModbusProvider:
                     self.store.setValues(3, 6, [Tray1])
                     self.store.setValues(3, 8, [Cell1])
 
-                    # 2 стол
+                    # 1 стол
                     self.my_data2["sub_Reg_move_Table"] = self.store.getValues(3, 9, count=1)[0]
                     self.my_data2["sub_Reg_updown_Botloader"] = self.store.getValues(3, 11, count=1)[0]
                     self.my_data2["sub_Rob_Action"] = self.store.getValues(3, 13, count=1)[0]
@@ -1375,14 +1377,14 @@ if __name__ == "__main__":
     t.start()
 
 
-    modbus_provider = ModbusProvider(1, shared_data)
+    modbus_provider = ModbusProvider(shared_data)
     # print(config["opc"]["url"])  # Выведет: MyAwesomeApp
     #url = "opc.tcp://172.21.10.39:48010"
     url = "opc.tcp://192.168.1.3:48010"
-    opc_client = OPCClient(url, 1, shared_data)
+    opc_client = OPCClient(url, shared_data)
 
     # Создаем и запускаем процесс синхронизации с БД
-    db_sync = DatabaseSynchronizer(Order, 1, shared_data)
+    db_sync = DatabaseSynchronizer(Order, shared_data)
 
     # Полный путь к исполняемому скрипту
     script_path = os.path.abspath("ServerRTK.py")

@@ -1,17 +1,32 @@
 """Класс стола но буду вероятно использовать класс тэйбл там многопоточность"""
 
 import socket
+import time
 import requests
 import json
 import logging
 import sqlite3
 from datetime import datetime
 
+"""
+Данный класс реализует интеграцию между базой данных, системой прошивки и испытательным стендом (иглостолом).
+
+1. Метод `control_igle_table`:
+   Выполняет выборку данных из заказа, формирует необходимую команду управления, и передаёт её загрузчику для выполнения прошивки устройства. 
+   В состав передаваемых параметров входят: тип модуля, серийный номер, путь к прошивке, версия прошивки, а также информация о стенде и посадочном месте.
+
+2. Метод `recentData`:
+   Осуществляет опрос состояния иглостола. После завершения тестирования, иглостол отправляет результат на сервер, где данные временно сохраняются.
+   Метод `recentData` запрашивает эти данные с REST API, обрабатывает и возвращает информацию, включая: результат тестирования, серийный номер, дата-матрицу, пути к логам и отчётам.
+
+Таким образом, класс обеспечивает полный цикл взаимодействия: от подготовки и передачи задания на прошивку до получения и интерпретации результатов тестирования.
+"""
+
+
 class IgleTable:
     def __init__(self, urlIgleTabeControl, urlStatusFromIgleTabe):
         self.urlIgleTabeControl = urlIgleTabeControl
         self.urlStatusFromIgleTabe = urlStatusFromIgleTabe
-
         
         # Настройка логирования
         logging.basicConfig(
@@ -104,18 +119,17 @@ class IgleTable:
         try:
             response = requests.get(url)
             if response.status_code == 200:
-                data = response.json().get("data", {})
-                data2 = response.json()
-                result = data2.get("result")
+                json_data = response.json()
+                data = json_data.get("data", {})
+                result = json_data.get("result")
                 test_result = data.get("test_result")
-                #error_description = test_result.get("error_description")
                 datamatrix = data.get("data_matrix")
 
                 return {
-                    "data_matrix": datamatrix[0],
+                    "data_matrix": datamatrix[0] if isinstance(datamatrix, list) and datamatrix else None,
                     "log_path": data.get("log_file_path"),
                     "report_path": data.get("report_file_path"),
-                    "serial_number_8": data.get("serial_number_8"),
+                    "serial_number_8": data.get("serial_number_8") or data.get("serial"),
                     "stand_id": data.get("stand_id"),
                     "error_description": test_result,
                     "status_code": result
@@ -123,14 +137,46 @@ class IgleTable:
             else:
                 return {"status_code": 404}
         except Exception as e:
-            # Можно залогировать ошибку при необходимости
+            logging.error(f"Error in recentData(): {str(e)}")
             return {"status_code": 404}
         
 
-
-
-
     
+"""
+Тест пересылки данных
+igle_table1 = IgleTable(
+    urlIgleTabeControl="http://172.21.10.182:5000/nails_table/start_test_board_with_rtk",
+    urlStatusFromIgleTabe="http://172.21.10.182:5003/get_test_results/1"
+)
+
+result1 = igle_table1.recentData()
+print("Received from RTK server (stand 1):")
+print(result1)
+
+time.sleep(1.5)  # ⏱️ Пауза 1.5 секунды
+
+igle_table2 = IgleTable(
+    urlIgleTabeControl="http://172.21.10.182:5000/nails_table/start_test_board_with_rtk",
+    urlStatusFromIgleTabe="http://172.21.10.182:5003/get_test_results/2"
+)
+
+result2 = igle_table2.recentData()
+print("Received from RTK server (stand 2):")
+print(result2)
+
+time.sleep(1.5)  # ⏱️ Пауза 1.5 секунды
+
+igle_table3 = IgleTable(
+    urlIgleTabeControl="http://172.21.10.182:5000/nails_table/start_test_board_with_rtk",
+    urlStatusFromIgleTabe="http://172.21.10.182:5003/get_test_results/3"
+)
+
+result3 = igle_table3.recentData()
+print("Received from RTK server (stand 3):")
+print(result3)
+
+"""
+
 
 """
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

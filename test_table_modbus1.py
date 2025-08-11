@@ -4,7 +4,13 @@ from pymodbus.server import StartTcpServer
 from pymodbus.datastore import ModbusSequentialDataBlock, ModbusSlaveContext, ModbusServerContext
 import threading
 import socket
-
+from opcua import Client
+from opcua import ua
+import logging
+import yaml
+import subprocess
+import sys
+import os
 
 
 
@@ -13,6 +19,7 @@ import socket
 import CameraSocket
  
  # Пользовательский класс БД
+import Provider1C
 import SQLite as SQL
 
 # Поьзовательский класс провайдера Иглостола
@@ -148,7 +155,59 @@ igle_table3 = Igable.IgleTable(
 
 
 ################################################# START SQL Communication class ###################################
- 
+# Класс для синхронизации с базой данных и обновления глобального словаря
+class DatabaseSynchronizer:
+    def __init__(self, order, number, shared_dict) :
+        self.order = order
+        self.stop_event = threading.Event()  # Событие для остановки потока
+        self.update_thread = threading.Thread(target=self.update_data, daemon=True)
+        self.update_thread.start()
+        self.lock = threading.Lock()
+        self.number = number
+        self.my_data = shared_dict.get(number, {})  # Только своя часть словаря
+        self.lock = threading.Lock()
+
+    def update_data(self):
+        """Метод для обновления данных в глобальном словаре с базы данных"""
+        while not self.stop_event.is_set():  # Проверка на остановку потока
+            try:
+                # Попытка получения данных по заказу из базы данных
+                db_connection = SQL.DatabaseConnection()
+                result = db_connection.getDatafromOOPC(self.order)
+                
+                if result:
+                    order_number, module, fw_version, last_count, common_count, success_count, nonsuccess_count = result
+
+                    # print(f"Номер заказа: {order_number}")
+                    # print(f"Модуль: {module}")
+                    # print(f"Версия ПО: {fw_version}")
+                    # print(f"Количество оставшихся: {last_count}")
+                    # print(f"Общее количество записей: {common_count}")
+                    # print(f"С успешным report_path: {success_count}")
+                    # print(f"С успешным log_path: {nonsuccess_count}")
+
+                    # Обновление глобального словаря с данными из базы
+                    with self.lock:
+                        self.my_data["DB_order_number"] = order_number          # номер заказа
+                        self.my_data["DB_module"] = module                      # имя платы
+                        self.my_data["DB_fw_version"] = fw_version              # версия прошивки
+                        self.my_data["DB_last_count"] = last_count              # колво непрошитых
+                        self.my_data["DB_common_count"] = common_count          # общее колво плат
+                        self.my_data["DB_success_count"] = success_count        # прошито ок
+                        self.my_data["DB_nonsuccess_count"] = nonsuccess_count  # не прошито    
+                else:
+                    print(f"[DBSync {self.client_id}] Данные по заказу не найдены.")
+
+            except Exception as e:
+                logging.error(f"Ошибка при синхронизации с базой данных: {e}")
+            
+            # Пауза 1 секунда перед следующей попыткой
+            time.sleep(1)
+
+    def stop(self):
+        """Метод для остановки потока"""
+        self.stop_event.set()  # Устанавливаем событие, чтобы остановить поток
+
 try:
         # Create an instance of DatabaseConnection
         db_connection = SQL.DatabaseConnection()
@@ -161,6 +220,128 @@ except Exception as e:
 
 ################################################# START OPC Communication class ###################################
 
+
+class OPCClient:
+    def __init__(self, url, client_id, shared_dict):
+        self.url = url
+        self.lock = threading.Lock()
+        
+        self.shared_dict = shared_dict
+        self.my_data = shared_dict.get(client_id, {})  # Работает со своей частью словаря
+
+        self.client = Client(url)
+        self.running = False
+        self.stop_event = threading.Event()  # Event to signal when to stop the threads
+
+        # Start threads after initializing the client
+        self.server_thread = threading.Thread(target=self.connect, daemon=True)
+        self.update_thread = threading.Thread(target=self.update_registers, daemon=True)
+
+        self.server_thread.start()
+        self.update_thread.start()
+
+    def connect(self):
+        try:
+            self.client.connect()
+            print(f"Подключено к {self.url}")
+        except Exception as e:
+            print(f"Ошибка подключения: {e}")
+
+    def disconnect(self):
+        try:
+            self.client.disconnect()
+            print("Отключено от OPC сервера")
+        except Exception as e:
+            print(f"Ошибка отключения: {e}")
+
+    def update_registers(self):
+        """ Метод обгновления пременных опс и словаря"""
+        while not self.stop_event.is_set():  # Check if the stop event is set
+            try:
+                with self.lock:
+
+                    ############ Кнопка запрос заказов
+                    """Получаем сигнал от кнопки, змагружаем список заказов из 1С""" 
+                    node3 = self.client.get_node('ns=2;s=Application.UserInterface.ButtonLoadOrders')
+                    ButtonLoadOrders = node3.get_value()
+                    logging.debug(f"состояние кнопки запроса заказов - {ButtonLoadOrders}")
+
+                    self.my_data["OPC_ButtonLoadOrders"] = ButtonLoadOrders  
+                    #print(f"*********: {self.my_data["OPC_ButtonLoadOrders"]}")
+                    #print(f"Данные из глобального словаря на интерфейс: {self.my_data['DB_module']}")
+                    #################### переменные на интерфейс
+
+                    node6 = self.client.get_node('ns=2;s=Application.UserInterface.name_board')
+                    data_value2 = ua.DataValue(ua.Variant(self.my_data['DB_module'], ua.VariantType.String))
+                    node6.set_value(data_value2)
+
+                    node7 = self.client.get_node('ns=2;s=Application.UserInterface.fw_version')
+                    data_value3 = ua.DataValue(ua.Variant(self.my_data['DB_fw_version'], ua.VariantType.String))
+                    node7.set_value(data_value3)
+
+                    node8 = self.client.get_node('ns=2;s=Application.UserInterface.last_count')
+                    data_value4 = ua.DataValue(ua.Variant(str(self.my_data['DB_last_count']), ua.VariantType.String))
+                    node8.set_value(data_value4)
+                   
+                    node9 = self.client.get_node('ns=2;s=Application.UserInterface.nonsuccess_count')
+                    data_value5 = ua.DataValue(ua.Variant(str(self.my_data['DB_nonsuccess_count']), ua.VariantType.String))
+                    node9.set_value(data_value5)
+
+                    #Если нажата кнопка пишем заказы в перменную
+                    if  ButtonLoadOrders == True:
+                        # Получаем заказы из 1С
+                        orders = Provider1C.getOrders()
+                        data_value1 = ua.DataValue(ua.Variant(orders, ua.VariantType.String))
+                        logging.debug(f"индекс заказа - {data_value1}")
+
+
+                        # Записываем новое значение в узел
+                        node2 = self.client.get_node('ns=2;s=Application.UserInterface.search_result')
+                        node2.set_value(data_value1)
+                        logging.debug(f"передали индекс заказа - {node2} в узел")
+
+
+
+                    ############ Кнопка выбора заказа и получения данных
+                    # 2. Читаем кнопку загрузки
+                    node5 = self.client.get_node('ns=2;s=Application.UserInterface.ButtonSelectOrder')
+                    ButtonSelectOrder = node5.get_value()
+                    logging.debug(f"состояние кнопки загрузки - {ButtonSelectOrder}")
+                    self.my_data["OPC_ButtonSelectOrder"] = ButtonSelectOrder
+                    # print(f"UserInterface.ButtonSelectOrder: {self.my_data["OPC_ButtonSelectOrder"]}")
+                    
+                    # Если нажата кнопка загрузки, пишем заказы в переменную
+                    if ButtonSelectOrder:
+                        # 1. Берем заказ из Order
+                        node4 = self.client.get_node('ns=2;s=Application.UserInterface.Order')
+                        opcOrder = node4.get_value()
+                        logging.debug(f"номер заказа - {opcOrder}")
+                        
+                        self.my_data["OPC_Order"] = opcOrder
+
+                        if opcOrder:  # Проверка, что заказ не пустой
+                            order_id, board_name, firmware, batch, count, version, components = Provider1C.fetch_data(opcOrder)
+                            db_connection = SQL.DatabaseConnection()
+                            db_connection.get_order_insert_orders_frm1C(order_id, board_name, firmware, batch, count, version, components)
+                            print(f"Заказ {opcOrder} отправлен на загрузку данных")
+                            print(f"Данные по заказу {opcOrder} загружены в базу")
+
+                            # Пример записи состояния в интерфейс
+                            state = self.client.get_node('ns=2;s=Application.UserInterface.State')
+                            state.set_value(ua.DataValue(ua.Variant("Данные загружены успешно", ua.VariantType.String)))
+                        else:
+                            print("В переменной Order нет данных")
+                            state = self.client.get_node('ns=2;s=Application.UserInterface.State')
+                            state.set_value(ua.DataValue(ua.Variant("Ошибка загрузки", ua.VariantType.String)))
+                    
+
+            except Exception as e:
+                print(f"Error updating registers OPC: {e}")
+            time.sleep(1)
+            
+
+    def stop(self):
+        self.stop_event.set()  # Set the event to stop threads
 
 ################################################# START OPC Communication class l ###################################
 
@@ -194,7 +375,7 @@ class ModbusProvider:
         global shared_data, Tray1, Cell1
         while True:
             try:
-                with self.lock:
+                with shared_data_lock:
 
                     # СТОЛ 1
                     # Получаем данные из регистров и записываем в shared_data[1]
@@ -203,10 +384,27 @@ class ModbusProvider:
                     shared_data[1]['sub_Rob_Action'] = self.store.getValues(3, 13, count=1)[0]
                     shared_data[1]['workplace1'] = self.store.getValues(3, 15, count=1)[0]
 
+                    # Логирование операций чтения регистров
+                    logging.info(
+                        "[Modbus] Команда получения данных из регистров (Стол 1):\n"
+                        f"  sub_Reg_move_Table       = {shared_data[1]['sub_Reg_move_Table']}\n"
+                        f"  sub_Reg_updown_Botloader = {shared_data[1]['sub_Reg_updown_Botloader']}\n"
+                        f"  sub_Rob_Action           = {shared_data[1]['sub_Rob_Action']}\n"
+                        f"  workplace1               = {shared_data[1]['workplace1']}"
+                    )
+
                     # Записываем данные из shared_data[1] в регистры
                     self.store.setValues(3, 10, [shared_data[1]['Reg_move_Table']])
                     self.store.setValues(3, 12, [shared_data[1]['Reg_updown_Botloader']])
                     self.store.setValues(3, 14, [shared_data[1]['Rob_Action']])
+
+                    # Логирование операций записи регистров
+                    logging.info(
+                        "[Modbus] Команда записи данных в регистры (Стол 1):\n"
+                        f"  Reg_move_Table       = {shared_data[1]['Reg_move_Table']}\n"
+                        f"  Reg_updown_Botloader = {shared_data[1]['Reg_updown_Botloader']}\n"
+                        f"  Rob_Action           = {shared_data[1]['Rob_Action']}"
+                    )
 
 
                     # СТОЛ 2
@@ -216,10 +414,27 @@ class ModbusProvider:
                     shared_data[2]['sub_Rob_Action'] = self.store.getValues(3, 5, count=1)[0]
                     shared_data[2]['workplace1'] = self.store.getValues(3, 7, count=1)[0]
 
-                    # Записываем данные из shared_data[1] в регистры
+                    # Логирование операций чтения регистров
+                    logging.info(
+                        "[Modbus] Команда получения данных из регистров (Стол 2):\n"
+                        f"  sub_Reg_move_Table       = {shared_data[2]['sub_Reg_move_Table']}\n"
+                        f"  sub_Reg_updown_Botloader = {shared_data[2]['sub_Reg_updown_Botloader']}\n"
+                        f"  sub_Rob_Action           = {shared_data[2]['sub_Rob_Action']}\n"
+                        f"  workplace1               = {shared_data[2]['workplace1']}"
+                    )
+
+                    # Записываем данные из shared_data[2] в регистры
                     self.store.setValues(3, 0, [shared_data[2]['Reg_move_Table']])
                     self.store.setValues(3, 2, [shared_data[2]['Reg_updown_Botloader']])
                     self.store.setValues(3, 4, [shared_data[2]['Rob_Action']])
+
+                    # Логирование операций записи регистров
+                    logging.info(
+                        "[Modbus] Команда записи данных в регистры (Стол 2):\n"
+                        f"  Reg_move_Table       = {shared_data[2]['Reg_move_Table']}\n"
+                        f"  Reg_updown_Botloader = {shared_data[2]['Reg_updown_Botloader']}\n"
+                        f"  Rob_Action           = {shared_data[2]['Rob_Action']}"
+                    )
 
                     # СТОЛ 3
                     # Получаем данные из регистров и записываем в shared_data[1]
@@ -228,14 +443,37 @@ class ModbusProvider:
                     shared_data[3]['sub_Rob_Action'] = self.store.getValues(3, 21, count=1)[0]
                     shared_data[3]['workplace1'] = self.store.getValues(3, 23, count=1)[0]
 
+                    # Логирование операций чтения регистров
+                    logging.info(
+                        "[Modbus] Команда получения данных из регистров (Стол 3):\n"
+                        f"  sub_Reg_move_Table       = {shared_data[3]['sub_Reg_move_Table']}\n"
+                        f"  sub_Reg_updown_Botloader = {shared_data[3]['sub_Reg_updown_Botloader']}\n"
+                        f"  sub_Rob_Action           = {shared_data[3]['sub_Rob_Action']}\n"
+                        f"  workplace1               = {shared_data[3]['workplace1']}"
+                    )
+
                     # Записываем данные из shared_data[1] в регистры
                     self.store.setValues(3, 18, [shared_data[3]['Reg_move_Table']])
                     self.store.setValues(3, 20, [shared_data[3]['Reg_updown_Botloader']])
                     self.store.setValues(3, 22, [shared_data[3]['Rob_Action']])
+
+                    # Логирование операций записи регистров
+                    logging.info(
+                        "[Modbus] Команда записи данных в регистры (Стол 3):\n"
+                        f"  Reg_move_Table       = {shared_data[3]['Reg_move_Table']}\n"
+                        f"  Reg_updown_Botloader = {shared_data[3]['Reg_updown_Botloader']}\n"
+                        f"  Rob_Action           = {shared_data[3]['Rob_Action']}"
+                    )
                     
                     # Записываем глобальные переменные
                     self.store.setValues(3, 6, [Tray1])
                     self.store.setValues(3, 8, [Cell1])
+
+                    logging.info(
+                        "[Modbus] Запись глобальных переменных ящик-ячейка:\n"
+                        f"  Tray1 = {Tray1}\n"
+                        f"  Cell1 = {Cell1}"
+                    )
 
                     # Выводим значения для проверки
                     print(f"Registers updated - Table1: {shared_data[1]['Reg_move_Table']}, "
@@ -264,15 +502,16 @@ class Table:
     global Tray1
     global Cell1
     global Order
-    def __init__(self, name, shared_data, number):
+    def __init__(self, name, shared_data, shared_data_lock, number):
         self.name = name
         self.data = shared_data.get(number, {})  # подсловарь объекта
+        self.lock = shared_data_lock
 
 
 
     # Method write registers in modbus through modbus_provider
     def change_value(self, key, new_value):
-        with modbus_provider.lock:
+        with self.lock:
             if key in self.data:
                 self.data[key] = new_value
                 # print(f"Updated {key} to {new_value} in {self.name}.")
@@ -281,7 +520,7 @@ class Table:
 
     # Method read registers in modbus through modbus_provider
     def read_value(self, key):
-        with modbus_provider.lock:
+        with self.lock:
             if key in self.data:
                 result = self.data[key]
                 # print(f"Read {key}: {result} from {self.name}.")
@@ -1048,9 +1287,17 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Test stopped")
     """
-    table1 = Table("Table 1", shared_data, 1)
-    table2 = Table("Table 2", shared_data, 2)
-    table3 = Table("Table 3", shared_data, 3)
+
+    # Создаем и запускаем процесс синхронизации с БД
+    db_sync = DatabaseSynchronizer(Order, 1, shared_data)
+    db_sync = DatabaseSynchronizer(Order, 2, shared_data)
+    db_sync = DatabaseSynchronizer(Order, 3, shared_data)
+
+
+    # Создаём столы
+    table1 = Table("Table1", shared_data, shared_data_lock, 1)
+    table2 = Table("Table2", shared_data, shared_data_lock, 2)
+    table3 = Table("Table3", shared_data, shared_data_lock, 3)
 
     # Создаем потоки для каждого объекта
     thread1 = threading.Thread(target=table1.main)

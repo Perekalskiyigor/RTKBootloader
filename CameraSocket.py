@@ -1,6 +1,7 @@
 import socket
 import logging
 import time
+import threading
 
 # Set up basic logging configuration
 logging.basicConfig(
@@ -8,6 +9,9 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
+
+# Локальная блокировка на уровне модуля — общая для всех импортов
+_camera_lock = threading.Lock()
 
 
 def get_qr_result():
@@ -36,31 +40,31 @@ def get_qr_result():
         return None
 
 def photo():
-    attempts = 3
-    results = []
+    with _camera_lock:  # <--- КРИТИЧЕСКИЙ СЕКЦИЯ
+        attempts = 3
+        results = []
 
-    for i in range(attempts):
-        logging.info("CAM Попытка №%d получения QR-кода...", i + 1)
-        result = get_qr_result()
-        if result:
-            results.append(result)
+        for i in range(attempts):
+            logging.info("CAM Попытка №%d получения QR-кода...", i + 1)
+            result = get_qr_result()
+            if result:
+                results.append(result)
 
-    if not results:
-        logging.error("CAM QR-код не получен ни в одной из попыток.")
-        QRresult = 404
-        return QRresult, None
+        if not results:
+            logging.error("CAM QR-код не получен ни в одной из попыток.")
+            QRresult = 404
+            return QRresult, None
 
-    unique_results = list(set(results))
-    if len(unique_results) == 1:
-        logging.info("CAM QR-код стабильно считан: %s", unique_results[0])
-        QRresult = 200
-        data = unique_results[0]
-
-        return QRresult, data 
-    else:
-        logging.warning("CAM QR-коды отличаются между попытками: %s", unique_results)
-        QRresult = 404
-        return QRresult, None
+        unique_results = list(set(results))
+        if len(unique_results) == 1:
+            logging.info("CAM QR-код стабильно считан: %s", unique_results[0])
+            QRresult = 200
+            data = unique_results[0]
+            return QRresult, data
+        else:
+            logging.warning("CAM QR-коды отличаются между попытками: %s", unique_results)
+            QRresult = 404
+            return QRresult, None
     
 
 

@@ -303,7 +303,12 @@ class OPCClient:
                             state = self.client.get_node('ns=2;s=Application.UserInterface.State')
                             state.set_value(ua.DataValue(ua.Variant("Ошибка загрузки", ua.VariantType.String)))
                     
-
+                         ################### Пишем ###################
+                        orders = ['dadadad', 'ЗНП015251', 'ЗНП015252', 'ЗНП015253', 'ЗНП015254', 'ЗНП015255', 'ЗНП015256', 'ЗНП015257', 'ЗНП015258', 'ЗНП015259', 'ЗНП015260', 'ЗНП015261', 'ЗНП015262', 'ЗНП015263', 'ЗНП015264', 'ЗНП015265', 'ЗНП015266', 'ЗНП015267', 'ЗНП015268', 'ЗНП015269', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']
+                        data_value1 = ua.DataValue(ua.Variant(orders, ua.VariantType.String))
+                        # Записываем новое значение в узел
+                        node2 = self.client.get_node("ns=2;s=Application.UserInterface.search_result")
+                        node2.set_value(data_value1)
             except Exception as e:
                 print(f"Error updating registers OPC: {e}")
             time.sleep(1)

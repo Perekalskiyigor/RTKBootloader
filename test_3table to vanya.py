@@ -12,88 +12,35 @@ import subprocess
 import sys
 import os
 
+class TableTimeoutException(Exception):
+    """Исключение при превышении таймаута работы со столом"""
+    pass
 
-# Списки команд для каждого стола
-command_toBOt = []    # Стол 1
-command_toBOt2 = []   # Стол 2
-command_toBOt3 = []   # Стол 3
+class TableOperationFailed(Exception):
+    """Исключение при ошибке выполнения команды столом"""
+    pass
 
-# Блокировка для потокобезопасности
-command_toBOt_lock = threading.Lock()
 
-# Текущий обрабатываемый список (1, 2 или 3)
-current_list = 1
-# Счетчик пустых проходов (для выхода, если все списки пусты)
-empty_passes = 0
+class RobActionManager:
+    def __init__(self):
+        self.lock = threading.Lock()  # Для атомарных операций
+        self.current_table = None     # Какой стол сейчас владеет ресурсом
 
-def insertincommand_toBOt(command, listnumber):
-    global command_toBOt, command_toBOt2, command_toBOt3
-    
-    with command_toBOt_lock:
-        if listnumber == 1:
-            command_toBOt.append(command)
-            print(f"Добавлена команда {command} в список 1")
-        elif listnumber == 2:
-            command_toBOt2.append(command)
-            print(f"Добавлена команда {command} в список 2")
-        elif listnumber == 3:
-            command_toBOt3.append(command)
-            print(f"Добавлена команда {command} в список 3")
-        else:
-            raise ValueError("listnumber должен быть 1, 2 или 3")
+    def acquire(self, table_id):
+        """Попытаться захватить Rob_Action для указанного стола."""
+        with self.lock:
+            if self.current_table is None:
+                self.current_table = table_id
+                return True
+            return False
 
-def get_next_command():
-    global current_list, empty_passes
-    
-    with command_toBOt_lock:
-        # Проверяем текущий список
-        if current_list == 1 and command_toBOt:
-            cmd = command_toBOt[-1]
-            print(f"Обрабатываем список 1 (команда: {cmd})")
-            empty_passes = 0
-            return cmd, 1
-        
-        if current_list == 2 and command_toBOt2:
-            cmd = command_toBOt2[-1]
-            print(f"Обрабатываем список 2 (команда: {cmd})")
-            empty_passes = 0
-            return cmd, 2
-        
-        if current_list == 3 and command_toBOt3:
-            cmd = command_toBOt3[-1]
-            print(f"Обрабатываем список 3 (команда: {cmd})")
-            empty_passes = 0
-            return cmd, 3
-        
-        # Если список пуст, переключаемся на следующий
-        print(f"Список {current_list} пуст. Переключаемся...")
-        empty_passes += 1
-        
-        # Переключаем список по кругу
-        current_list = current_list % 3 + 1
-        
-        # Если все списки пусты 3 раза подряд
-        if empty_passes >= 3:
-            print("Все списки пусты. Ожидаем новые команды...")
-            return None, current_list
-        
-        return None, None  # Продолжаем проверять
-
-def eracecommandBot(command, listnumber):
-    global command_toBOt, command_toBOt2, command_toBOt3
-    
-    with command_toBOt_lock:
-        if listnumber == 1 and command in command_toBOt:
-            command_toBOt.remove(command)
-            print(f"Удалена команда {command} из списка 1")
-        elif listnumber == 2 and command in command_toBOt2:
-            command_toBOt2.remove(command)
-            print(f"Удалена команда {command} из списка 2")
-        elif listnumber == 3 and command in command_toBOt3:
-            command_toBOt3.remove(command)
-            print(f"Удалена команда {command} из списка 3")
-        else:
-            print(f"Команда {command} не найдена в списке {listnumber}")
+    def release(self, table_id):
+        """Освободить Rob_Action."""
+        with self.lock:
+            if self.current_table == table_id:
+                self.current_table = None
+                return True
+            return False    
 
 
 
@@ -112,7 +59,8 @@ import ProviderIgleTable as Igable
 import Botloader as Bot
 
 # Глобальные ящик и ясейка 
-Tray1 = 0
+Tray1 = 2
+Tray2 = 1
 Cell1 = 0
 Order = "ЗНП-2160.1.1"
 # данные с платы для цикла main и сетапа
@@ -445,6 +393,7 @@ class OPCClient:
 class ModbusProvider:
     """Class MODBUS Communication with Modbus regul"""
     global Tray1
+    global Tray2
     global Cell1
     global command_toBOt
     def __init__(self):
@@ -468,16 +417,18 @@ class ModbusProvider:
             print(f"Error starting Modbus server: {e}")
 
     def update_registers(self):
-        global shared_data, Tray1, Cell1
+        global shared_data, Tray1, Cell1, Tray2
         while True:
             try:
                 with shared_data_lock:
+
 
                     # СТОЛ 1
                     # Получаем данные из регистров и записываем в shared_data[1]
                     shared_data[1]['sub_Reg_move_Table'] = self.store.getValues(3, 9, count=1)[0]
                     shared_data[1]['sub_Reg_updown_Botloader'] = self.store.getValues(3, 11, count=1)[0]
-                    shared_data[1]['sub_Rob_Action'] = self.store.getValues(3, 13, count=1)[0]
+                    # shared_data[1]['sub_Rob_Action'] = self.store.getValues(3, 13, count=1)[0]
+                    shared_data[1]['sub_Rob_Action'] = self.store.getValues(3, 5, count=1)[0]
                     shared_data[1]['workplace1'] = self.store.getValues(3, 15, count=1)[0]
 
                     # Логирование операций чтения регистров
@@ -492,9 +443,10 @@ class ModbusProvider:
                     # Записываем данные из shared_data[1] в регистры
                     self.store.setValues(3, 10, [shared_data[1]['Reg_move_Table']])
                     self.store.setValues(3, 12, [shared_data[1]['Reg_updown_Botloader']])
-                    Rob_Action = get_next_command()
-                    self.store.setValues(3, 4, [Rob_Action])
-                    #print(f"СТОЛ 1 В модбасе получаем команду робота = {Rob_Action}")
+                    value = shared_data[1]["Rob_Action"]
+                    if value != 0:
+                        self.store.setValues(3, 4, [value])
+                    
 
                     # Логирование операций записи регистров
                     logging.info(
@@ -524,9 +476,10 @@ class ModbusProvider:
                     # Записываем данные из shared_data[2] в регистры
                     self.store.setValues(3, 0, [shared_data[2]['Reg_move_Table']])
                     self.store.setValues(3, 2, [shared_data[2]['Reg_updown_Botloader']])
-                    Rob_Action = get_next_command()
-                    #self.store.setValues(3, 4, [Rob_Action])
-                    #print(f"СТОЛ 2 В модбасе получаем команду робота = {Rob_Action}")
+                    value = shared_data[2]["Rob_Action"]
+                    if value != 0:
+                        self.store.setValues(3, 4, [value])
+
 
                     # Логирование операций записи регистров
                     logging.info(
@@ -540,7 +493,8 @@ class ModbusProvider:
                     # Получаем данные из регистров и записываем в shared_data[1]
                     shared_data[3]['sub_Reg_move_Table'] = self.store.getValues(3, 17, count=1)[0]
                     shared_data[3]['sub_Reg_updown_Botloader'] = self.store.getValues(3, 19, count=1)[0]
-                    shared_data[3]['sub_Rob_Action'] = self.store.getValues(3, 21, count=1)[0]
+                    # shared_data[3]['sub_Rob_Action'] = self.store.getValues(3, 21, count=1)[0]
+                    shared_data[3]['sub_Rob_Action'] = self.store.getValues(3, 5, count=1)[0]
                     shared_data[3]['workplace1'] = self.store.getValues(3, 23, count=1)[0]
 
                     # Логирование операций чтения регистров
@@ -555,8 +509,9 @@ class ModbusProvider:
                     # Записываем данные из shared_data[1] в регистры
                     self.store.setValues(3, 18, [shared_data[3]['Reg_move_Table']])
                     self.store.setValues(3, 20, [shared_data[3]['Reg_updown_Botloader']])
-                    Rob_Action = get_next_command()
-                    #self.store.setValues(3, 4, [shared_data[3]['Rob_Action']])
+                    value = shared_data[3]["Rob_Action"]
+                    if value != 0:
+                        self.store.setValues(3, 4, [value]) 
 
                     # Логирование операций записи регистров
                     logging.info(
@@ -569,14 +524,16 @@ class ModbusProvider:
                     # Записываем глобальные переменные
                     self.store.setValues(3, 6, [Tray1])
                     self.store.setValues(3, 8, [Cell1])
+                    self.store.setValues(3, 24, [Tray2])
 
                     logging.info(
                         "[Modbus] Запись глобальных переменных ящик-ячейка:\n"
                         f"  Tray1 = {Tray1}\n"
+                        f"  Tray2 = {Tray2}\n"
                         f"  Cell1 = {Cell1}"
                     )
 
-                    """
+                    
                     # Выводим значения для проверки
                     print(f"Registers updated - Table1: {shared_data[1]['Rob_Action']}, "
                           f"SubTable1: {shared_data[1]['sub_Rob_Action']}, ")
@@ -589,7 +546,7 @@ class ModbusProvider:
                     # Выводим значения для проверки
                     print(f"Registers updated - Table3: {shared_data[3]['Rob_Action']}, "
                           f"SubTable3: {shared_data[3]['sub_Rob_Action']}, ")
-                    """
+                    
                     
 
 
@@ -606,11 +563,12 @@ class Table:
     global Tray1
     global Cell1
     global Order
-    def __init__(self, name, shared_data, shared_data_lock, number):
+    def __init__(self, name, shared_data, shared_data_lock, number, rob_manager):
         self.name = name
         self.data = shared_data.get(number, {})  # подсловарь объекта
         self.lock = shared_data_lock
         self.number = number
+        self.rob_manager = rob_manager
 
 
 
@@ -635,885 +593,476 @@ class Table:
 
     # The first cycle Protect Table in the start work
 
-   
-    def defence_cycle(self):
-        print("******ЦИКЛ DEFENCE*******")
-        print("1 Регул <- Сдвинь плату освободив ложе1.")
-        logging.info(f"Отправка команды Reg_move_Table = 101")
-        self.change_value('Reg_move_Table', 101)
-        while True:
-            result1 = self.read_value("sub_Reg_move_Table")
-            logging.debug(f"Текущее значение sub_Reg_move_Table: {result1}")
-            if result1 != 101:
-                print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-                logging.debug(f"Ожидание ответа от стола... Текущее значение: {result1}")
-            elif result1 == 404:
-                print(f"От регула получен код 404 на операции движения стола")
-                logging.warning("От регула получен код 404 (успех операции движения стола)")
-            else:
-                logging.info("Успешное завершение: стол сдвинут")
-                break
-            time.sleep(1)
-        logging.info(f"Сброс команды Reg_move_Table = 0")
-        self.change_value('Reg_move_Table', 0)
+    def _send_robot_command(self, base_command, cell_num=None):
+        """Отправляет команду роботу с явным разделением 220 (укладка) и 230 (забор).
+        
+        Args:
+            base_command (int): Базовый код:
+                - 210 → Забрать из тары общая для всех.
+                - 220 → укладка в ложемпент тестирования (221-226).
+                - 230 → забор из ложемента укладка в тару (231-236).
+                - 241 →  укладка роботом в тару (241).
+            cell_num (int, optional): Номер ячейки (1 или 2). Обязателен для 220/230.
+        
+        Returns:
+            bool: True — успех, False — ошибка/таймаут.
+        
+        Raises:
+            ValueError: Если некорректные данные.
+        """
+        # Проверка входных данных
+        if base_command in (220, 230):
+            if cell_num not in (1, 2):
+                raise ValueError("Для команд 220/230 укажите cell_num: 1 или 2")
+        if not (1 <= self.number <= 3):
+            raise ValueError(f"Некорректный номер стола: {self.number}. Допустимо: 1-3")
 
+        # Формирование команды
+        if base_command == 210:
+            command = 210
+        elif base_command == 241:
+            command = 241
+        elif base_command == 242:
+            command = 242
+        elif base_command == 220:  # Укладка
+            command = 220 + (self.number - 1) * 2 + cell_num  # 221-226
+        elif base_command == 230:  # Забор
+            command = 230 + (self.number - 1) * 2 + cell_num  # 231-236
+        else:
+            command = base_command + self.number  # Прочие команды
 
-        print("2 Робот <- Забери плату с ложе 1.")
-        logging.info(f"Отправка команды Rob_Action = 231")
-        #input("Меняем в регистре")
-        command = 230 + self.number
-        insertincommand_toBOt(command)
-        print(f'стол {self.number} отдал команду {command}')
+        # Отправка команды
+        action_desc = "Укладка" if base_command == 220 else "Забор" if base_command == 230 else "Команда"
+        logging.info(f"СТОЛ {self.number}, ЯЧЕЙКА {cell_num} → {action_desc}: {command}")
+        self.change_value('Rob_Action', command)
 
-        while True:
-            result1 = self.read_value("sub_Rob_Action")
-            logging.debug(f"Текущее значение sub_Rob_Action: {result1}")
+        # Ожидание ответа (таймаут 30 сек)
+        start_time = time.time()
+        timeout = 120
 
-            if result1 == command:
-                eracecommandBot(command)
-                print(f"ответ от робота = {command}")
-                logging.info("От робота получен код 200 (успех операции 'взять плату')")
-                break  
-            elif result1 == 404:
-                print(f"от робота ошибка 404")
-                logging.warning("От робота получен код 404 (успех операции 'взять плату')")
-            else:
-                logging.debug(f"Ожидание ответа от робота... Текущее значение: {result1}")
-            time.sleep(1)
-        logging.info(f"Сброс команды Rob_Action = 0")
-        self.change_value('Rob_Action', 0)
-        command = 0
-        result1 = 0
-
-        print("3 Регул <- Сдвинь плату освободив ложе2.")
-        logging.info("3 Регул <- Сдвинь плату освободив ложе2.")
-        logging.info(f"Отправка команды Reg_move_Table = 102")
-        self.change_value('Reg_move_Table', 102)
-        while True:
-            logging.debug(f"Текущее значение sub_Reg_move_Table: {result1}")
-
-            result1 = self.read_value("sub_Reg_move_Table")
-            if result1 != 102:
-                print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-                logging.debug(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-            elif result1 == 404:
-                print(f"От регула получен код 404 на операции движения стола")
-                logging.warning(f"От регула получен код 404 на операции движения стола")
-            else:
-                logging.info("Успешное завершение: стол сдвинут")
-                break
+        while time.time() - start_time < timeout:
+            result = self.read_value("sub_Rob_Action")
+            if result == command:
+                self.change_value('Rob_Action', 0)
+                logging.info(f"Успешно: {command}")
+                return True
+            elif result == 404:
+                logging.error(f"Ошибка выполнения: {command}")
+                return False
             time.sleep(1)
 
-        logging.info(f"Сброс команды Reg_move_Table = 0")
-        self.change_value('Reg_move_Table', 0)
+        logging.error(f"Таймаут команды: {command}")
+        return False
+            
 
-        print("4 Робот <- Забери плату с ложе 4 5 6")
-        command = 233 + self.number
-        insertincommand_toBOt(command)
-        print(f'стол {self.number} отдал команду {command}')
-        while True:
-            result1 = self.read_value("sub_Rob_Action")
-            logging.debug(f"Текущее значение sub_Rob_Action: {result1}")
-            if result1 == command:
-                eracecommandBot(command)
-                print (f'__________________________{command_toBOt}')
-                print(f"ответ от робота = {command}")
-                logging.info("От робота получен код 200 (успех операции 'взять плату')")
-                break  
-            elif result1 == 404:
-                print(f"от робота ошибка 404")
-                logging.warning("От робота получен код 404 (успех операции 'взять плату')")
+    def _send_table_command(self, command, timeout=30):
+        """
+        Универсальный метод для отправки команд столу
+        command: код команды 
+            (101 - сдвинуть ложе1, 102 - сдвинуть ложе2, 
+            103 - поднять ложе, 104 - опустить ложе)
+        timeout: максимальное время ожидания ответа в секундах
+        """
+        start_time = time.time()
+        command_name = {
+            101: "Сдвинь плату освободив ложе1",
+            102: "Сдвинь плату освободив ложе2",
+            103: "Поднять ложе",
+            104: "Опустить ложе"
+        }.get(command, f"Команда {command}")
+
+        print(f"СТОЛ {self.number} Регул <- {command_name}")
+        logging.info(f"СТОЛ {self.number} Отправка команды {'Reg_updown_Botloader' if command in (103, 104) else 'Reg_move_Table'} = {command}")
+        
+        try: 
+            # Отправляем команду
+            if command in (103, 104):
+                self.change_value('Reg_updown_Botloader', command)
+                response_reg = 'sub_Reg_updown_Botloader'
             else:
-                logging.debug(f"Ожидание ответа от робота... Текущее значение: {result1}")
-            time.sleep(1)
-        logging.info(f"Сброс команды Rob_Action = 0")
-        self.change_value('Rob_Action', 0)
-        command = 0
-        result1 = 0
-        print("******ЦИКЛ DEFENCE Завершен*******")
+                self.change_value('Reg_move_Table', command)
+                response_reg = 'sub_Reg_move_Table'
+            
+            # Ожидаем подтверждения
+            while time.time() - start_time < timeout:
+                result = self.read_value(response_reg)
+                
+                if result == command:
+                    logging.info(f"СТОЛ {self.number} Успешное завершение: команда {command_name} выполнена")
+                    return True
+                elif result == 404:
+                    logging.warning(f"СТОЛ {self.number} От регула получен код 404")
+                    raise TableOperationFailed("Ошибка выполнения команды стола")
+                
+                logging.debug(f"СТОЛ {self.number} Ожидание ответа... Текущее значение: {result}")
+                time.sleep(0.5)
+            
+            # Если дошли сюда - таймаут
+            logging.error(f"СТОЛ {self.number} ТАЙМАУТ: Стол не ответил на команду {command}")
+            raise TableTimeoutException(f"Стол не ответил за {timeout} сек")
+        finally:
+            # Всегда сбрасываем команду
+            if command in (103, 104):
+                self.change_value('Reg_updown_bootloader', 0)
+            else:
+                self.change_value('Reg_move_Table', 0)
+            logging.info(f"СТОЛ {self.number} Команда сброшена")
+
+    def _take_photo(self, max_attempts=3, retry_delay=1):
+        """
+        Метод для выполнения фотосъемки с обработкой ошибок и повторных попыток
+        :param max_attempts: максимальное количество попыток получения фото
+        :param retry_delay: задержка между попытками в секундах
+        :return: кортеж (result_code, photo_data)
+        """
+        print(f"2 Стол {self.number} Камера <- сделай фото")
+        logging.info(f"Стол {self.number} Камера <- сделай фото")
+        
+        # Первоначальные попытки получить фото
+        for attempt in range(max_attempts):
+            try:
+                logging.debug(f"Стол {self.number} Попытка {attempt + 1}: запрос фото с камеры")
+                res, photodata = CameraSocket.photo()
+                print(f"Стол {self.number} С камеры получен ID {photodata}")
+                logging.debug(f"Стол {self.number} Успех: получен ID фото {photodata}")
+                
+                # Если фото получено успешно, возвращаем результат
+                if res == 200 and photodata != "NoRead":
+                    return res, photodata
+                    
+            except Exception as e:
+                print(f"Ошибка: камера недоступна. Детали: {e}")
+                logging.warning(f"Попытка {attempt + 1}: ошибка подключения к камере: {str(e)}")
+            
+            time.sleep(retry_delay)
+        
+        # Если фото не получено после попыток, продолжаем ожидание
+        while True:
+            try:
+                res, photodata = CameraSocket.photo()
+                logging.debug(f"Стол {self.number} Ожидание фото. Код {res}, данные {photodata}")
+                
+                if res == 200 and photodata != "NoRead":
+                    print(f"Стол {self.number} Фото успешно получено: {photodata}")
+                    logging.debug(f"[END] Камера <- сделай фото: {photodata}")
+                    return res, photodata
+                else:
+                    print(f"Стол {self.number} Ошибка получения фото с камеры (код: {res}, данные: {photodata})")
+                    logging.warning(f"Стол {self.number} Ошибка получения фото с камеры (код: {res}, данные: {photodata})")
+                    
+            except Exception as e:
+                print(f"Стол {self.number} Ошибка при запросе фото: {e}")
+                logging.error(f"Стол {self.number} Ошибка при запросе фото: {str(e)}")
+                
+            time.sleep(retry_delay)
+        
+    def start_sewing(self, photodata, loge, max_attempts=1, retry_delay=1):
+        """
+        Метод для инициализации процесса прошивки с обработкой ошибок
+        
+        Args:
+            photodata: Данные фото (серийный номер)
+            loge: Номер ложемента для прошивки
+            max_attempts: Максимальное количество попыток (по умолчанию 3)
+            retry_delay: Задержка между попытками в секундах (по умолчанию 1)
+        
+        Returns:
+            bool: True если прошивка успешно начата, False в случае ошибки
+        
+        Raises:
+            TableOperationFailed: Если прошивка не удалась после всех попыток
+        """
+        print(f"СТОЛ {self.number} Сервер <- Начни шить (ложемент {loge})")
+        logging.info(f"[START2] Прошивка для стола {self.number}, ложемент {loge}")
+        
+        # Инициализируем загрузчик прошивки
+        firmware_loader = Bot.FirmwareLoader(
+            db_connection, 
+            igle_table,
+            1, 
+            Order, 
+            photodata, 
+            loge
+        )
+        
+        attempt = 0
+        while attempt < max_attempts:
+            attempt += 1
+            try:
+                result = firmware_loader.loader(photodata, loge)
+                print(f"Ответ от прошивальщика (попытка {attempt}): {result}")
+                logging.debug(f"Ответ от прошивальщика: {result}")
+                
+                if result == 200:
+                    print(f"Прошивка успешно начата для ложемента {loge}")
+                    logging.info(f"Прошивка успешно начата для стола {self.number}, ложемент {loge}")
+                    return True
+                elif result == 404:
+                    logging.warning(f"Ошибка 404 от регула (попытка {attempt})")
+                    if attempt == max_attempts:
+                        raise TableOperationFailed(f"Ошибка прошивки: получен код 404 для ложемента {loge}")
+            except Exception as e:
+                print(f"Ошибка при запуске прошивки для ложемента {loge}: {e}")
+                logging.error(f"Ошибка при запуске прошивки (попытка {attempt}): {str(e)}")
+                if attempt == max_attempts:
+                    raise TableOperationFailed(f"Не удалось начать прошивку для ложемента {loge} после {max_attempts} попыток")
+            
+            if attempt < max_attempts:
+                time.sleep(retry_delay)
+        
+        return False
+    
+    #  # 1. Сдвигаем плату (ложе1)
+    #     self._send_table_command(101)
+        
+    #     # 2. Забираем плату роботом
+    #     self._send_robot_command(230)
+        
+    #     # 3. Сдвигаем плату (ложе2)
+    #     self._send_table_command(102)
+        
+    #     # 4. Забираем плату с ложемента
+    #     self._send_robot_command(233)
+
     
 
-    ############# ****ЦИКЛ SETUP ******"
-    def setup_cycle(self):
+
+    ####################### DEFENCE START ############################################################
+    def defence_robo_cycle(self):
         global photodata
+        global Tray1
+        Tray1 = 1
+        Tray2 = 5
+        global Cell1
+        global Order
+        print(f"[НАЧАЛО] ЦИКЛ DEFENCE для {self.number} стола старт")
+        logging.info(f"[НАЧАЛО] ЦИКЛ DEFENCE для {self.number} стола старт")
+        ######################################################
+
+        print(f"СТОЛ {self.number} 1 Регул <- Сдвинь плату освободив ложе1.")
+        logging.info(f"СТОЛ {self.number} Отправка команды Reg_move_Table = 101")
+        self._send_table_command(101)
+        time.sleep(1)
+
+        # Робот забери плату
+        while not self.rob_manager.acquire(self.number):
+            logging.info(f"СТОЛ {self.number} ждет освобождения робота")
+            time.sleep(1)  # Подождать 1 секунду
+
+        try:
+            print(f"[Начало] Стол {self.number} Захват робота столом")
+            logging.info(f"[Начало] Стол {self.number} Захват робота столом")
+            print(f"СТОЛ {self.number} 2 Робот <- Забери плату с ложе 1.")
+            self._send_robot_command(230, cell_num=1)
+            time.sleep(1)
+        finally:
+            print(f"[Конец] Стол {self.number} Робот освобожден столом")
+            logging.info(f"[Конец] Стол {self.number} Робот освобожден столом")
+            self.rob_manager.release(self.number)
+
+        print(f"[Начало] Стол {self.number} Регул <- Сдвинь плату освободив ложе2.")
+        logging.info(f"[Начало] Стол {self.number} Регул <- Сдвинь плату освободив ложе2.")
+        self._send_table_command(102)
+        time.sleep(1)
+        
+        # Робот забери плату
+        while not self.rob_manager.acquire(self.number):
+            logging.info(f"СТОЛ {self.number} ждет освобождения робота")
+            time.sleep(1)  # Подождать 1 секунду
+
+        try:
+            print(f"[Начало] Стол {self.number} Захват робота столом")
+            logging.info(f"[Начало] Стол {self.number} Захват робота столом")
+            print(f"СТОЛ {self.number} 2 Робот <- Забери плату с ложе 1.")
+            self._send_robot_command(230, cell_num=2)  # self.number=3
+            time.sleep(1)
+        finally:
+            print(f"[Конец] Стол {self.number} Робот освобожден столом")
+            logging.info(f"[Конец] Стол {self.number} Робот освобожден столом")
+            self.rob_manager.release(self.number)
+    ####################### DEFENCE STOP ############################################################
+
+    ####################### SETUP START ############################################################
+
+    def setup_robo_cycle(self):
+        global photodata
+        global photodata1
         global Tray1
         global Cell1
         global Order
-        print("****ЦИКЛ SETUP******")
+        print(f"[НАЧАЛО] ЦИКЛ SETUP для {self.number} стола старт")
+        logging.info(f"[НАЧАЛО] ЦИКЛ SETUP для {self.number} стола старт")
         ######################################################
         #input("нажми ентер")
         
-        # 1СТОЛ_______Робот <- Забери плату из тары  # 2 Делаем фото платы # 3 Робот <- Уложи плату в ложемент тетситрования
-        Cell1 = Cell1 + 1
-        insertincommand_toBOt(210, self.number)
-        insertincommand_toBOt("cmd2_1", self.number)
-        insertincommand_toBOt("cmd3_1", self.number)
-        print("1 Робот <- забрать плату из тары")
-        logging.info(f"[START] Робот <- забрать плату из тары")
-        self.change_value('Rob_Action', 210)
-        
-        while True:
-            result1 = self.read_value("sub_Rob_Action")
-            logging.debug(f"sub_Rob_Action = {result1}")
+        # Робот <- Забери плату из тары
+        # Сделать фото
+        # Робот <- Уложи плату в ложемент тетситрования
 
-            if result1 != 210:
-                print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
-                logging.debug(f"ответ от робота = {result1}")
-            elif result1 == 404:
-                print(f"ошибка 404")
-                logging.warning(f"ошибка 404")
-                
-            else:
-                print(f"ответ от робота = {result1}")
-                logging.debug(f"ответ от робота = {result1}")
-                logging.info(f"[END] Робот <- забрать плату из тары")
-                break
+        while not self.rob_manager.acquire(self.number):
+            logging.info(f"СТОЛ {self.number} ждет освобождения робота")
+            time.sleep(1)  # Подождать 1 секунду
+
+        try:
+            print(f"[Начало] Стол {self.number} Захват робота столом")
+            logging.info(f"[Начало] Стол {self.number} Захват робота столом")
+
+            # 1. Забираем первую плату из тары
+            print(f"1 Стол {self.number} Робот <- Забери плату из тары")
+            logging.info(f"Стол {self.number} Робот <- Забери плату из тары")
+            Cell1 = Cell1 + 1
+            if not self._send_robot_command(210):
+                raise TableOperationFailed("Ошибка забора первой платы из тары")
             time.sleep(1)
-        self.change_value('Rob_Action', 0)
-        result1=0
-    
-        print("2 Камера <- сделай фото")
-        logging.info(f"[START] Камера <- сделай фото")
-        for i in range(3):
-            try:
-                logging.debug(f"Попытка {i}: запрос фото с камеры")
-                res,photodata1= CameraSocket.photo()
-                print(f"С камеры получен ID {photodata1}")
-                logging.debug(f"Успех: получен ID фото {photodata1}")
-            except Exception as e:
-                print(f"Ошибка: камера недоступна. Детали: {e}")
-                logging.warning(f"Попытка {i}: неверный ответ (код: {res}, данные: {photodata1})")
-            time.sleep(1)
-        while True:
-            res,photodata1= CameraSocket.photo()
-            logging.debug(f"Ожидание фото.код {res}, данные {photodata1}")
-            if res != 200 or photodata1== "NoRead":
-                print(f"Ошибка получения фото с камеры")
-                logging.warning(f"Ошибка получения фото с камеры")
-                time.sleep(1)
-            else:
-                print(f"Фото успешно получено: {photodata1}")
-                logging.debug(f"[END] Камера <- сделай фото: {photodata1}")
-                break
-            time.sleep(1)
-
-        print("3 Робот <- Уложи плату в ложемент тетситрования 1")
-        logging.info(f"[START] Робот <- Уложи плату в ложемент тетситрования 1")
-        self.change_value('Rob_Action', 221)
-        while True:
-            result1 = self.read_value("sub_Rob_Action")
-            logging.debug(f"sub_Rob_Action = {result1}")
-            if result1 != 221:
-                logging.debug(f"Получено от робота = {result1}")
-                print(f"Получено от робота = {result1}")
-                time.sleep(1)
-            elif result1 == 404:
-                print(f"ошибка 404")
-                logging.warning(f"ошибка 404")
-                time.sleep(1)
-            else:
-                logging.debug(f"Получено от робота = {result1}")
-                print(f"Получено от робота = {result1}")
-                break
-            logging.info(f"[END] Робот <- Уложи плату в ложемент тетситрования 1")
-            time.sleep(1)
-        self.change_value('Rob_Action', 0)
-        result1 = 0
-        # 2СТОЛ_______Робот <- Забери плату из тары  # 2 Делаем фото платы # 3 Робот <- Уложи плату в ложемент тетситрования
-        Cell1 = Cell1 + 1
-        print("1 Робот <- забрать плату из тары")
-        logging.info(f"[START] Робот <- забрать плату из тары")
-        self.change_value('Rob_Action', 210)
-        while True:
-            result1 = self.read_value("sub_Rob_Action")
-            logging.debug(f"sub_Rob_Action = {result1}")
-
-            if result1 != 210:
-                print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
-                logging.debug(f"ответ от робота = {result1}")
-            elif result1 == 404:
-                print(f"ошибка 404")
-                logging.warning(f"ошибка 404")
-                
-            else:
-                print(f"ответ от робота = {result1}")
-                logging.debug(f"ответ от робота = {result1}")
-                logging.info(f"[END] Робот <- забрать плату из тары")
-                break
-            time.sleep(1)
-        self.change_value('Rob_Action', 0)
-        result1=0
-    
-        print("2 Камера <- сделай фото")
-        logging.info(f"[START] Камера <- сделай фото")
-        for i in range(3):
-            try:
-                logging.debug(f"Попытка {i}: запрос фото с камеры")
-                res,photodata1= CameraSocket.photo()
-                print(f"С камеры получен ID {photodata1}")
-                logging.debug(f"Успех: получен ID фото {photodata1}")
-            except Exception as e:
-                print(f"Ошибка: камера недоступна. Детали: {e}")
-                logging.warning(f"Попытка {i}: неверный ответ (код: {res}, данные: {photodata1})")
-            time.sleep(1)
-        while True:
-            res,photodata1= CameraSocket.photo()
-            logging.debug(f"Ожидание фото.код {res}, данные {photodata1}")
-            if res != 200 or photodata1== "NoRead":
-                print(f"Ошибка получения фото с камеры")
-                logging.warning(f"Ошибка получения фото с камеры")
-                time.sleep(1)
-            else:
-                print(f"Фото успешно получено: {photodata1}")
-                logging.debug(f"[END] Камера <- сделай фото: {photodata1}")
-                break
-            time.sleep(1)
-
-        print("3 Робот <- Уложи плату в ложемент тетситрования 1")
-        logging.info(f"[START] Робот <- Уложи плату в ложемент тетситрования 1")
-        self.change_value('Rob_Action', 222)
-        while True:
-            result1 = self.read_value("sub_Rob_Action")
-            logging.debug(f"sub_Rob_Action = {result1}")
-            if result1 != 222:
-                logging.debug(f"Получено от робота = {result1}")
-                print(f"Получено от робота = {result1}")
-                time.sleep(1)
-            elif result1 == 404:
-                print(f"ошибка 404")
-                logging.warning(f"ошибка 404")
-                time.sleep(1)
-            else:
-                logging.debug(f"Получено от робота = {result1}")
-                print(f"Получено от робота = {result1}")
-                break
-            logging.info(f"[END] Робот <- Уложи плату в ложемент тетситрования 1")
-            time.sleep(1)
-        self.change_value('Rob_Action', 0)
-        result1 = 0
-
-        # 3СТОЛ_______Робот <- Забери плату из тары  # 2 Делаем фото платы # 3 Робот <- Уложи плату в ложемент тетситрования
-        Cell1 = Cell1 + 1
-        print("1 Робот <- забрать плату из тары")
-        logging.info(f"[START] Робот <- забрать плату из тары")
-        self.change_value('Rob_Action', 210)
-        while True:
-            result1 = self.read_value("sub_Rob_Action")
-            logging.debug(f"sub_Rob_Action = {result1}")
-
-            if result1 != 210:
-                print(f"Ждем ответ от робота, что плату забрал из тары получено от робота = {result1}")
-                logging.debug(f"ответ от робота = {result1}")
-            elif result1 == 404:
-                print(f"ошибка 404")
-                logging.warning(f"ошибка 404")
-                
-            else:
-                print(f"ответ от робота = {result1}")
-                logging.debug(f"ответ от робота = {result1}")
-                logging.info(f"[END] Робот <- забрать плату из тары")
-                break
-            time.sleep(1)
-        self.change_value('Rob_Action', 0)
-        result1=0
-    
-        print("2 Камера <- сделай фото")
-        logging.info(f"[START] Камера <- сделай фото")
-        for i in range(3):
-            try:
-                logging.debug(f"Попытка {i}: запрос фото с камеры")
-                res,photodata1= CameraSocket.photo()
-                print(f"С камеры получен ID {photodata1}")
-                logging.debug(f"Успех: получен ID фото {photodata1}")
-            except Exception as e:
-                print(f"Ошибка: камера недоступна. Детали: {e}")
-                logging.warning(f"Попытка {i}: неверный ответ (код: {res}, данные: {photodata1})")
-            time.sleep(1)
-        while True:
-            res,photodata1= CameraSocket.photo()
-            logging.debug(f"Ожидание фото.код {res}, данные {photodata1}")
-            if res != 200 or photodata1== "NoRead":
-                print(f"Ошибка получения фото с камеры")
-                logging.warning(f"Ошибка получения фото с камеры")
-                time.sleep(1)
-            else:
-                print(f"Фото успешно получено: {photodata1}")
-                logging.debug(f"[END] Камера <- сделай фото: {photodata1}")
-                break
-            time.sleep(1)
-
-        print("3 Робот <- Уложи плату в ложемент тетситрования 1")
-        logging.info(f"[START] Робот <- Уложи плату в ложемент тетситрования 1")
-        self.change_value('Rob_Action', 223)
-        while True:
-            result1 = self.read_value("sub_Rob_Action")
-            logging.debug(f"sub_Rob_Action = {result1}")
-            if result1 != 221:
-                logging.debug(f"Получено от робота = {result1}")
-                print(f"Получено от робота = {result1}")
-                time.sleep(1)
-            elif result1 == 404:
-                print(f"ошибка 404")
-                logging.warning(f"ошибка 404")
-                time.sleep(1)
-            else:
-                logging.debug(f"Получено от робота = {result1}")
-                print(f"Получено от робота = {result1}")
-                break
-            logging.info(f"[END] Робот <- Уложи плату в ложемент тетситрования 1")
-            time.sleep(1)
-        self.change_value('Rob_Action', 0)
-        result1 = 0
-
-        ######################################################################
-        # 4 Регул - Сдвигаем стол осовобождая ложе2
-        print("4 Регул <- Сдвинь плату освободив ложе2.")
-        logging.info(f"[START] Регул <- Сдвинь плату освободив ложе2")
-
-        self.change_value('Reg_move_Table', 102)
-        logging.debug("Отправлена команда Reg_move_Table', 102")
-        while True:
-            result1 = self.read_value("sub_Reg_move_Table")
-            logging.debug(f"sub_Reg_move_Table = {result1}")
-
-            if result1 != 102:
-                logging.debug(f"получено от регула = {result1}")
-                print(f"получено от регула = {result1}")
-                time.sleep(1)
-            elif result1 == 404:
-                print(f"ошибка 404")
-                logging.warning(f"ошибка 404")
-            else:
-                logging.debug(f"получено от регула = {result1}")
-                print(f"получено от регула = {result1}")
-                break
-            time.sleep(1)
-        logging.info(f"[END] Регул <- Сдвинь плату освободив ложе2")
-        self.change_value('Reg_move_Table', 0)
-        result1 = 0
-        ############################################################################
-        #input("нажми ентер")
-        
-        #############################################################################
-        # 5 Робот <- Забери плату из тары # Регул <- Опусти прошивальщик (плата на ложе1).
-        Cell1 = Cell1 + 1
-        
-        print("5.1 Робот <- Забери плату из тары")
-        print("5.2 Регул <- Опусти прошивальщик ложе 1")
-
-        logging.info(f"[START1] Робот <- Забери плату из тары")
-        #self.change_value('Rob_Action', 210)
-        logging.debug("Отправлена команда Rob_Action', 210")
-
-        logging.info(f"[START2] Регул <- Опусти прошивальщик ложе 1")
-        self.change_value('Reg_updown_Botloader', 103)
-        logging.debug("Отправлена команда 'Reg_updown_Botloader', 103")
-
-        while True:
-            result1 = self.read_value("sub_Rob_Action")
-            logging.debug(f"sub_Reg_move_Table = {result1}")
-
-            result2 = self.read_value("sub_Reg_updown_Botloader")
-            logging.debug(f"sub_Reg_updown_Botloader = {result1}")
-
-            #if result1 != 210 and result2 != 103:
-            if result2 != 103:
-                print(f"получено от робота = {result1}")
-                logging.debug(f"получено от робота = {result1}")
             
-                print(f"получено от регула = {result2}")
-                logging.debug(f"получено от регула = {result2}")
-            elif result1 == 404:
-                print(f"От робота ошибка 404")
-                logging.warning(f"От робота ошибка 404")
-            elif result2 == 404:
-                print(f"От регула ошибка 404")
-                logging.warning(f"От регула ошибка 404")
-            #elif result1 == 210 and result2 == 103:
-            elif result2 == 103:
-                print(f"получено от робота = {result1}")
-                logging.debug(f"получено от робота = {result1}")
-
-                print(f"получено от регула = {result2}")
-                logging.debug(f"получено от регула = {result2}")
-                break
-            time.sleep(1)
-        logging.info(f"[END1] Робот <- Забери плату из тары")
-        self.change_value('Rob_Action', 0)
-        result1 = 0
-        logging.info(f"[END2] Регул <- Опусти прошивальщик ложе 1")
-        self.change_value('Reg_updown_Botloader', 0)
-        result2 = 0
-        ##################################################################################
-        #input("нажми ентер")
-
-        ################################################################
-        # 6 Делаем фото платы
-        print("6 Камера <- сделай фото")
-        logging.info(f"[START] Камера <- сделай фото")
-        for i in range(3):
-            try:
-                logging.debug(f"Попытка {i}: запрос фото с камеры")
-                res,photodata= CameraSocket.photo()
-                print(f"С камеры получен ID {photodata}")
-                logging.debug(f"Успех: получен ID фото {photodata}")
-            except Exception as e:
-                print(f"Ошибка: камера недоступна. Детали: {e}")
-                logging.warning(f"Попытка {i}: неверный ответ (код: {res}, данные: {photodata})")
-            time.sleep(1)
-        while True:
-            res,photodata= CameraSocket.photo()
-            logging.debug(f"Ожидание фото.код {res}, данные {photodata}")
-            if res != 200 or photodata== "NoRead":
-                print(f"Ошибка получения фото с камеры")
-                logging.warning(f"Ошибка получения фото с камеры")
-                time.sleep(1)
-            else:
-                print(f"Фото успешно получено: {photodata}")
-                logging.debug(f"[END] Камера <- сделай фото: {photodata}")
-                break
-            time.sleep(1)
-        ###########################################################################
-
-
-        #input("нажми ентер")
-        ###################################################################################
-        # 7 Робот <- Уложи плату в ложемент тетситрования 2 # Сервер <- Начни шить 
-        print("7.1 Робот <- Уложи плату в ложемент тетситрования 2")
-        logging.info(f"[START1] Робот <- Уложи плату в ложемент тетситрования 2")
-        self.change_value('Rob_Action', 222)
-        logging.debug("Отправлена команда 'Rob_Action', 222")
-        
-        print("7.2 Сервер <- Начни шить")
-        logging.info(f"[START2] Прошивка")
-        result1 = 0
-        loge = self.read_value("workplace1")
-        print(f"Переадем номер ложемента Моржову = {loge}")
-        # Данные по прошивке для этого серийника
-        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata1, loge)
-        result2 = None  # Инициализируем перед циклом
-        while True:
-            # Обновляем result2 только если он еще не имеет нужного значения (200)
-            if result2 != 200:
-                result2 = firmware_loader.loader(photodata1, loge)
-                print(f" result2 -- {result2}")
-
-            # Обновляем result1 только если он еще не имеет нужного значения (222)
-            if result1 != 222:
-                result1 = self.read_value("sub_Rob_Action")
-                print(f" result1 -- {result1}")
+            # 2. Фотографируем первую плату
+            _, photodata1 = self._take_photo()
             
-            if result1 != 222 and result2 != 200:
-                print(f"Ответ от прошивальщика {result2}")
-                logging.debug(f"Ответ от прошивальщика= {result2}")
-             
-                print(f"Ответ от робота {result1}")
-                logging.debug(f"Ответ от робота= {result1}")
-            elif result1 == 404:
-                print(f"От робота ошибка 404")
-                logging.warning(f"От робота ошибка 404")
-            elif result2 == 404:
-                print(f"От регула ошибка 404")
-                logging.warning(f"От регула ошибка 404")
-            elif result1 == 222 and result2 == 200:
-                print(f"Ответ от прошивальщика {result2}")
-                logging.debug(f"Ответ от прошивальщика= {result2}")
-
-                print(f"Ответ от робота {result1}")
-                logging.debug(f"Ответ от робота= {result1}")
-                break
-            
-            time.sleep(1)
-
-        self.change_value('Rob_Action', 0)
-        logging.info(f"[END1] Прошивка")
-        logging.info(f"[END2] Робот <- Уложи плату в ложемент тетситрования 2")
-
-        photodata1 = None
-        result1 = 0
-        result2 = 0
-
-        ###############################################################################################
-        #input("нажми ентер")
-
-        ################################################################################################
-        # 8. Регул <- Подними прошивальщик.
-        print("8. Регул <- Подними прошивальщик.")
-        logging.info(f"[START] Регул <- Подними прошивальщик.")
-        self.change_value('Reg_updown_Botloader', 104)
-        logging.debug("Отправлена команда 'Reg_updown_Botloader', 104")
-        while True:
-            result1 = self.read_value("sub_Reg_updown_Botloader")
-            if result1 != 104:
-                print(f"ответ от регула= {result1}")
-                logging.debug(f"ответ от регула= {result1}")
-            elif result1 == 404:
-                print(f"ошибка 404")
-                logging.warning(f"ошибка 404")
-            else:
-                print(f"ответ от регула= {result1}")
-                logging.debug(f"ответ от регула= {result1}")
-                break
-            time.sleep(1)
-        logging.info(f"[END] Регул <- Подними прошивальщик.")
-        self.change_value('Reg_updown_Botloader', 0)
-        result1 = 0
-        ################################################################################################
-        #input("нажми ентер")
-        
-    ############# ****ЦИКЛ SETUP END ******"
-
-    ############# ****ЦИКЛ MAIN ******"
-    def main(self):
+            # 3. Укладываем первую плату на ложемент 2
+            print(f"3 Стол {self.number} Робот <- Уложи плату в ложемент тетситрования 2")
+            logging.info(f"3 Стол {self.number} Робот <- Уложи плату в ложемент тетситрования 2")
+            if not self._send_robot_command(220, cell_num=2):
+                raise TableOperationFailed("Ошибка укладки в ложемент 2")
+    
+        finally:
+            print(f"[Конец] Стол {self.number} Робот освобожден столом")
+            logging.info(f"[Конец] Стол {self.number} Робот освобожден столом")
+            self.rob_manager.release(self.number)
+        print(f"[СТОП] ЦИКЛ SETUP для {self.number} стола старт")
+        logging.info(f"[СТОП] ЦИКЛ SETUP для {self.number} стола старт")
+    
+    ####################### SETUP END ##############################################################
+    
+    
+    ####################### MAIN START ############################################################
+    def robo_main_cycle(self):
         global Tray1
+        Tray1 = 2
         global Cell1
         global photodata
-        print("ЦИКЛ MAIN _ START")
-        ################################################################################################
-        ######################################################
-        #input("нажми ентер")
+        global photodata1
+        print(f"[НАЧАЛО] ЦИКЛ MAIN для {self.number} стола старт")
+        logging.info(f"[НАЧАЛО] ЦИКЛ MAIN для {self.number} стола старт")
 
-        ################################################################
-        # 2 Делаем фото платы
-        print("2 Камера <- сделай фото")
-        logging.info(f"[НАЧАЛО] Камера <- сделай фото")
-        for i in range(3):
+        current_loge = 2  # Начинаем с ложемента 2
+        # next_photodata = photodata1
+        while True:
             try:
-                logging.debug(f"Попытка {i}: запрос фото с камеры")
-                res,photodata = CameraSocket.photo()
-                print(f"С камеры получен ID {photodata}")
-                logging.info(f"Успех: получен ID фото {photodata}")
+                print(f"\n=== Обработка ложемента {current_loge} ===")
+            
+                # 1. Сдвигаем стол под прошивальщик
+                self._send_table_command(101 if current_loge == 1 else 102)
+                
+                # 2. Опускаем прошивальщик
+                self._send_table_command(103)
+                
+                # 3. Запускаем прошивку (используем фото, сделанное заранее)
+                # self.start_sewing(next_photodata, loge=current_loge)
+                # Прошивка будет работать в фоне, пока мы готовим следующую плату
+                """
+                sewing_thread = threading.Thread(
+                    target=self.start_sewing, 
+                    args=(next_photodata, current_loge)
+                )
+                sewing_thread.start()
+                """
+
+                time.sleep(3)
+                print(f"для {self.number}*******************************ШЬЕМ")
+                
+                
+                # 4. Пока шьется на текущем ложементе, готовим следующий
+                
+                # 4.1 Определяем свободный ложемент
+                free_loge = 2 if current_loge == 1 else 1
+                
+                while not self.rob_manager.acquire(self.number):
+                    logging.info(f"СТОЛ {self.number} ждет освобождения робота")
+                    time.sleep(1)  # Подождать 1 секунду
+                try:
+                    # 4.2 Забираем новую плату из тары
+                    Cell1 = Cell1 + 1
+                    if not self._send_robot_command(210):
+                        raise TableOperationFailed("Ошибка забора платы из тары")
+                    
+                    # 4.3 Фотографируем новую плату
+                    _, new_photodata = self._take_photo()
+                    
+                    # 4.4 Укладываем новую плату на свободный ложемент
+                    if not self._send_robot_command(220, cell_num=free_loge):
+                        raise TableOperationFailed(f"Ошибка укладки в ложемент {free_loge}")
+                finally:
+                    print(f"[Конец] Стол {self.number} Робот освобожден столом")
+                    logging.info(f"[Конец] Стол {self.number} Робот освобожден столом")
+                    self.rob_manager.release(self.number)
+
+                # 5. ЖДЕМ ЗАВЕРШЕНИЯ ПРОШИВКИ
+                # sewing_thread.join()  # Ждем окончания прошивки
+
+                # 6. Поднимаем прошивальщик
+                self._send_table_command(104)
+                
+                # 7. Сдвигаем стол для доступа к обработанной плате
+                self._send_table_command(102 if current_loge == 1 else 101)
+                
+                # 8. Забираем обработанную плату и кладем в тару
+                while not self.rob_manager.acquire(self.number):
+                    logging.info(f"СТОЛ {self.number} ждет освобождения робота")
+                    time.sleep(1)
+
+                try:
+                    # 8.1 Забираем обработанную плату
+                    if not self._send_robot_command(230, cell_num=current_loge):
+                        raise TableOperationFailed(f"Ошибка забора с ложемента {current_loge}")
+                    
+                    # 8.2 Укладываем в тару
+                    if not self._send_robot_command(241):
+                        raise TableOperationFailed("Ошибка укладки в тару")
+                    
+                finally:
+                    print(f"[Конец] Стол {self.number} Робот освобожден столом")
+                    logging.info(f"[Конец] Стол {self.number} Робот освобожден столом")
+                    self.rob_manager.release(self.number)
+                
+                # 9. Подготавливаем данные для следующей итерации
+                current_loge = free_loge  # Переключаемся на следующий ложемент
+                # next_photodata = new_photodata  # Используем фото новой платы
+                
+                print(f"Готово! Следующая итерация: ложемент {current_loge}")
+                
             except Exception as e:
-                print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
-                logging.warning(f"Попытка {i}: неверный ответ (код: {res}, данные: {photodata})")
-            time.sleep(1)
-        while True:
-            res,photodata = CameraSocket.photo()
-            logging.debug(f"Ожидание фото.код {res}, данные {photodata}")
-            if res != 200 or photodata == "NoRead":
-                print(f"Ошибка получения фото с камеры")
-                logging.warning(f"Ошибка получения фото с камеры")
-                time.sleep(1)
-            else:
-                print(f"Фото успешно получено: {photodata}")
-                logging.info(f"[Завершение] Камера <- сделай фото: {photodata}")
-                break
-            time.sleep(1)
-        input("Нажми ентер")
-        ###########################################################################
-    
-        #input("нажми ентер")
+                logging.error(f"Ошибка в цикле обработки: {str(e)}")
+                # Здесь может быть логика восстановления
+                time.sleep(5)
+       
+    ####################### MAIN STOP ############################################################
 
+    def testcycle(self):
+        result, photo_id = self._take_photo()
+        if result == 200:
+            print(f"Успешно получено фото с ID: {photo_id}")
+        else:
+            print("Не удалось получить фото")
 
-        ######################################################################
-        # 4 Регул - Сдвигаем стол осовобождая ложе2
-        print("4 Регул <- Сдвинь плату освободив ложе2.")
-        logging.info(f"[НАЧАЛО] Регул <- Сдвинь плату освободив ложе2")
+        # self._send_table_command(101)
+        # self._send_table_command(102)
+        # self._send_table_command(103)
+        # self._send_table_command(104)
+        
+        """
+        # 2. Забираем плату роботом
+        while not self.rob_manager.acquire(self.number):
+            logging.info(f"СТОЛ {self.number} ждет освобождения робота")
+            time.sleep(1)  # Подождать 1 секунду
 
-        self.change_value('Reg_move_Table', 102)
-        logging.debug("Отправлена команда Reg_move_Table', 102")
-        while True:
-            result1 = self.read_value("sub_Reg_move_Table")
-            logging.debug(f"[Статус] sub_Reg_move_Table = {result1}")
+        try:
+            self._send_robot_command1(230)  
+            self._send_robot_command1(231)
+            self._send_robot_command1(232)
+        finally:
+            self.rob_manager.release(self.number)
 
-            if result1 != 102:
-                logging.info(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-                print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-                time.sleep(1)
-            elif result1 == 404:
-                print(f"От регула получен код 404 на операции движения стола")
-                logging.info(f"От регула получен код 404 на операции движения стола")
-            else:
-                break
-            time.sleep(1)
-        logging.info(f"[Завершение] Регул <- Сдвинь плату освободив ложе2")
-        self.change_value('Reg_move_Table', 0)
-        result1 = 0
-        ############################################################################
-        #input("нажми ентер")
-
-
-        ########################################################################################
-        # 8. Регул <- Опусти прошивальщик ложе 1.
-        print("1 Регул <- Опусти прошивальщик ложе 1")
-        logging.info(f"[НАЧАЛО] Регул <- Опусти прошивальщик ложе 1")
-
-        self.change_value('Reg_updown_Botloader', 103)
-        logging.debug("Отправлена команда 'Reg_updown_Botloader', 103")
-        while True:
-            result1 = self.read_value("sub_Reg_updown_Botloader")
-            logging.debug(f"[Статус] sub_Reg_updown_Botloader = {result1}")
-            if result1 != 103:
-                print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
-                logging.info(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
-            elif result1 == 404:
-                print(f"От регула получен код 404 на на операции опустить прошивальщик")
-                logging.info(f"От регула получен код 404 на на операции опустить прошивальщик")
-            else:
-                break
-            time.sleep(1)
-        logging.info(f"[Завершение] Регул <- Опусти прошивальщик ложе 1")
-        self.change_value('Reg_updown_Botloader', 0)
-        result1 = 0
-        #############################################################################################
-        #input("нажми ентер")
-
-
-        ##############################################################################################
-        # 9. Сервер <- Начни шить
-        # 10. Сервер -> Ответ по прошивке (плохо, хорошо)
-        print("9. Сервер <- Начни шить")
-        print("10. Сервер -> Ответ по прошивке (плохо, хорошо)")
-        logging.info(f"[НАЧАЛО] Прошивка")
-        # photodata = "Z45564564645"
-        # Данные по прошивке для этого серийника
-        loge = self.read_value("workplace1")
-        print(f"Переадем номер ложемента Моржову = {loge}")
-        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata, loge)
-        result1 = 200 #удалить
-        while True:
-            result1 = firmware_loader.loader(photodata, loge)
-            if result1 != 200:
-                print(f"Ждем ответ прошивальщка {result1}")
-                logging.info(f"Ждем ответ от прошивальщика= {result1}")
-            else:
-                print(f"Ответ от прошивальщика {result1}")
-                break
-            time.sleep(1)
-        print (f"Ответ от прошивальщика получен {result1}")
-        logging.info(f"[Завершение] Прошивка")
-        # Очищаем перменные результата
-        photodata = None
-        result1 = 0
-        ###############################################################################################
-        #input("нажми ентер")
-
-
-        ################################################################################################
-        # 11. Регул <- Подними прошивальщик.
-        print("11. Регул <- Подними прошивальщик.")
-        logging.info(f"[НАЧАЛО] Регул <- Подними прошивальщик.")
-        self.change_value('Reg_updown_Botloader', 104)
-        logging.debug("Отправлена команда 'Reg_updown_Botloader', 104")
-        while True:
-            result1 = self.read_value("sub_Reg_updown_Botloader")
-            if result1 != 104:
-                print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
-                logging.info(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
-            elif result1 == 404:
-                print(f"От регула получен код 404 на на операции поднять прошивальщик")
-                logging.info(f"От регула получен код 404 на на операции поднять прошивальщик")
-            else:
-                break
-            time.sleep(1)
-        logging.info(f"[Завершение] Регул <- Подними прошивальщик.")
-        self.change_value('Reg_updown_Botloader', 0)
-        result1 = 0
-        ################################################################################################
-        #input("нажми ентер")
-
-
-        ################################################################################################
-        # 12. Регул <- Сдвинь плату освободив ложе1.
-        print("12 Регул <- Сдвинь плату освободив ложе1")
-        logging.info(f"[НАЧАЛО] Регул <- Сдвинь плату освободив ложе1")
-        self.change_value('Reg_move_Table', 101)
-        logging.debug("Отправлена команда 'Reg_move_Table', 101")
-
-        while True:
-            result1 = self.read_value("sub_Reg_move_Table")
-            if result1 != 101:
-                print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-                logging.info(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-            elif result1 == 404:
-                print(f"От регула получен код 404 на операции движения стола")
-                logging.info(f"От регула получен код 404 на операции движения стола")
-            else:
-                break
-            time.sleep(1)
-        self.change_value('Reg_move_Table', 0)
-        logging.info(f"[Завершение] Регул <- Сдвинь плату освободив ложе1")
-        result1 = 0
-        ###################################################################################################
-        #input("нажми ентер")
-
-
-
-
-
-        ################################################################
-        # 16 Делаем фото платы
-        print("16 Камера <- сделай фото")
-        logging.info(f"[НАЧАЛО] Камера <- сделай фото")
-        for i in range(3):
-            try:
-                logging.debug(f"Попытка {i}: запрос фото с камеры")
-                res,photodata = CameraSocket.photo()
-                print(f"С камеры получен ID {photodata}")
-                logging.info(f"Успех: получен ID фото {photodata}")
-            except Exception as e:
-                print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
-                logging.warning(f"Попытка {i}: неверный ответ (код: {res}, данные: {photodata})")
-            time.sleep(1)
-        while True:
-            res,photodata = CameraSocket.photo()
-            logging.debug(f"Ожидание фото.код {res}, данные {photodata}")
-            if res != 200 or photodata == "NoRead":
-                print(f"Ошибка получения фото с камеры")
-                logging.warning(f"Ошибка получения фото с камеры")
-                time.sleep(1)
-            else:
-                print(f"Фото успешно получено: {photodata}")
-                logging.info(f"[Завершение] Камера <- сделай фото: {photodata}")
-                break
-            time.sleep(1)
-        ###########################################################################
-        #input("нажми ентер")
-
-
-        ########################################################################################
-        # 18. Регул <- Опусти прошивальщик ложе 2.
-        print("1 Регул <- Опусти прошивальщик ложе 2")
-        logging.info(f"[НАЧАЛО] Регул <- Опусти прошивальщик ложе 2")
-
-        self.change_value('Reg_updown_Botloader', 103)
-        logging.debug("Отправлена команда 'Reg_updown_Botloader', 103")
-        while True:
-            result1 = self.read_value("sub_Reg_updown_Botloader")
-            logging.debug(f"[Статус] sub_Reg_updown_Botloader = {result1}")
-            if result1 != 103:
-                print(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
-                logging.info(f"Ждем ответ от регула, что прошивальщик опущен= {result1}")
-            elif result1 == 404:
-                print(f"От регула получен код 404 на на операции опустить прошивальщик")
-                logging.info(f"От регула получен код 404 на на операции опустить прошивальщик")
-            else:
-                break
-            time.sleep(1)
-        logging.info(f"[Завершение] Регул <- Опусти прошивальщик ложе 2")
-        self.change_value('Reg_updown_Botloader', 0)
-        result1 = 0
-        #############################################################################################
-        #input("нажми ентер")
-
-
-        ##############################################################################################
-        # 19. Сервер <- Начни шить
-        # 20. Сервер -> Ответ по прошивке (плохо, хорошо)
-        print("19. Сервер <- Начни шить")
-        print("20. Сервер -> Ответ по прошивке (плохо, хорошо)")
-        logging.info(f"[НАЧАЛО] Прошивка")
-        loge = self.read_value("workplace1")
-        print(f"Переадем номер ложемента Моржову = {loge}")
-        # photodata = "Z45564564645"
-        firmware_loader = Bot.FirmwareLoader(db_connection,igle_table,1, Order, photodata, loge)
-        result1 = 200 #удалить
-        while True:
-            result1 = firmware_loader.loader(photodata, loge)
-            if result1 != 200:
-                print(f"Ждем ответ прошивальщка {result1}")
-                logging.info(f"Ждем ответ от прошивальщика= {result1}")
-            else:
-                print(f"Ответ от прошивальщика {result1}")
-                break
-            time.sleep(1)
-        print (f"Ответ от прошивальщика получен {result1}")
-        logging.info(f"[Завершение] Прошивка")
-        # Очищаем перменные результата
-        photodata = None
-        result1 = 0
-        ###############################################################################################
-        #input("нажми ентер")
-
-
-        ################################################################################################
-        # 21. Регул <- Подними прошивальщик.
-        print("21. Регул <- Подними прошивальщик.")
-        logging.info(f"[НАЧАЛО] Регул <- Подними прошивальщик.")
-        self.change_value('Reg_updown_Botloader', 104)
-        logging.debug("Отправлена команда 'Reg_updown_Botloader', 104")
-        while True:
-            result1 = self.read_value("sub_Reg_updown_Botloader")
-            if result1 != 104:
-                print(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
-                logging.info(f"Ждем ответ от регула, что прошивальщик поднят= {result1}")
-            elif result1 == 404:
-                print(f"От регула получен код 404 на на операции поднять прошивальщик")
-                logging.info(f"От регула получен код 404 на на операции поднять прошивальщик")
-            else:
-                break
-            time.sleep(1)
-        logging.info(f"[Завершение] Регул <- Подними прошивальщик.")
-        self.change_value('Reg_updown_Botloader', 0)
-        result1 = 0
-        ################################################################################################
-        #input("нажми ентер")
-
-
-
-        ######################################################################
-        # 22 Регул - Сдвигаем стол осовобождая ложе2
-        print("22 Регул <- Сдвинь плату освободив ложе2.")
-        logging.info(f"[НАЧАЛО] Регул <- Сдвинь плату освободив ложе2")
-
-        self.change_value('Reg_move_Table', 102)
-        logging.debug("Отправлена команда Reg_move_Table', 102")
-        while True:
-            result1 = self.read_value("sub_Reg_move_Table")
-            logging.debug(f"[Статус] sub_Reg_move_Table = {result1}")
-
-            if result1 != 102:
-                logging.info(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-                print(f"Ждем ответ о том что стол сдвинут - сейчас значение = {result1}")
-            elif result1 == 404:
-                print(f"От регула получен код 404 на операции движения стола")
-                logging.info(f"От регула получен код 404 на операции движения стола")
-            else:
-                break
-            time.sleep(1)
-        logging.info(f"[Завершение] Регул <- Сдвинь плату освободив ложе2")
-        self.change_value('Reg_move_Table', 0)
-        result1 = 0
-        ############################################################################
-        #input("нажми ентер")
-
-
-
-        ################################################################
-        # 26 Делаем фото платы
-        print("26 Камера <- сделай фото")
-        logging.info(f"[НАЧАЛО] Камера <- сделай фото")
-        for i in range(3):
-            try:
-                logging.debug(f"Попытка {i}: запрос фото с камеры")
-                res,photodata = CameraSocket.photo()
-                print(f"С камеры получен ID {photodata}")
-                logging.info(f"Успех: получен ID фото {photodata}")
-            except Exception as e:
-                print(f"Ошибка: камера недоступна (photo camera not available). Детали: {e}")
-                logging.warning(f"Попытка {i}: неверный ответ (код: {res}, данные: {photodata})")
-            time.sleep(1)
-        while True:
-            res,photodata = CameraSocket.photo()
-            logging.debug(f"Ожидание фото.код {res}, данные {photodata}")
-            if res != 200 or photodata == "NoRead":
-                print(f"Ошибка получения фото с камеры")
-                logging.warning(f"Ошибка получения фото с камеры")
-                time.sleep(1)
-            else:
-                print(f"Фото успешно получено: {photodata}")
-                logging.info(f"[Завершение] Камера <- сделай фото: {photodata}")
-                break
-            time.sleep(1)
-        ###########################################################################
-        #input("нажми ентер")
-
-        print("****ЦИКЛ MAIN END")
-
-    ############# ****ЦИКЛ MAIN END ******"
-
-
-
+        """
 
     
 ################################################# STOP TABLE CLASS #####################################################################
@@ -1528,6 +1077,7 @@ class Table:
 if __name__ == "__main__":
 
     modbus_provider = ModbusProvider()
+    rob_manager = RobActionManager()
     
 
     # Создаем и запускаем процесс синхронизации с БД
@@ -1557,33 +1107,33 @@ if __name__ == "__main__":
         print("Test stopped")
     """
 
-    # Создаем и запускаем процесс синхронизации с БД
-    db_sync = DatabaseSynchronizer(Order, 1, shared_data)
-    db_sync = DatabaseSynchronizer(Order, 2, shared_data)
-    db_sync = DatabaseSynchronizer(Order, 3, shared_data)
-
-
     # Создаём столы
-    table1 = Table("Table1", shared_data, shared_data_lock, 1)
-    table2 = Table("Table2", shared_data, shared_data_lock, 2)
-    table3 = Table("Table3", shared_data, shared_data_lock, 3)
+    table1 = Table("Table1", shared_data, shared_data_lock, 1, rob_manager)
+    table2 = Table("Table2", shared_data, shared_data_lock, 2, rob_manager)
+    table3 = Table("Table3", shared_data, shared_data_lock, 3, rob_manager)
 
-    # Создаем потоки для каждого объекта
-    thread1 = threading.Thread(target=table1.defence_cycle)
-    thread2 = threading.Thread(target=table2.defence_cycle)
-    thread3 = threading.Thread(target=table3.defence_cycle)
+    # Выполняем однократные методы для каждого стола
+    for table in (table1, table2, table3):
+        table.defence_robo_cycle()
+        table.setup_robo_cycle()
 
+    # Создаем потоки для основного цикла
+    thread1 = threading.Thread(target=table1.robo_main_cycle)
+    thread2 = threading.Thread(target=table2.robo_main_cycle)
+    thread3 = threading.Thread(target=table3.robo_main_cycle)
 
     # Запускаем потоки
     print('__________________1 стол')
     thread1.start()
-    # time.sleep(10)
+    time.sleep(5)
+
     print('__________________2 стол')
     thread2.start()
-    #time.sleep(10)
+    time.sleep(5)
+
     print('__________________3 стол')
     thread3.start()
-    # time.sleep(10)
+    time.sleep(5)
 
     # Ждем завершения всех потоков
     thread1.join()
@@ -1592,9 +1142,7 @@ if __name__ == "__main__":
 
     print("Все потоки завершены.")
     opc_client.stop()
-    
-    
-    
+
 
     ################################################# START OPC Communication class l ###################################
     

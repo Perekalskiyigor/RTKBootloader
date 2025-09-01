@@ -72,7 +72,7 @@ def eracecommandBot(command, listnumber):
             command_toBOt3.remove(command)
             print(f"Удалена команда {command} из списка 3")
         else:
-            print(f"Команда {command} не найдена в списке {listnumber}")
+            print(f"Команда {command} не найдена в списке {listnumber}") 
 
 
 

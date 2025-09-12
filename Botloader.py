@@ -51,22 +51,22 @@ class FirmwareLoader:
         try:
             self.db_connection.db_connect()
             # Берем свовобоный заказ
-            record_id = self.db_connection.setTable(self.Order)
+            record_id = self.db_connection.setTable(self.Order, self.stand_id)
             print(f"БД - получили свободный заказ {record_id}")
             #  получаем для него данные из бд для прошивки
             data = self.db_connection.recievedata(record_id)
             # Если данные были получены, напечатаем их
-            # if data:
-            #     print(f"ID: {data['id']}")
-            #     print(f"Stand ID: {data['stand_id']}")
-            #     print(f"Module Type: {data['module_type']}")
-            #     print(f"Data Matrix: {data['data_matrix']}")
-            #     print(f"Serial Number: {data['serial_number_8']}")
-            #     print(f"Firmware Type: {data['fw_type']}")
-            #     print(f"Firmware Path: {data['fw_path']}")
-            #     print(f"Firmware Version: {data['fw_version']}")
-            # else:
-            #     print(f"Не удалось получить данные для прошивки")
+            if data:
+                 print(f"ID: {data['id']}")
+                 print(f"Stand ID: {data['stand_id']}")
+                 print(f"Module Type: {data['module_type']}")
+                 print(f"Data Matrix: {data['data_matrix']}")
+                 print(f"Serial Number: {data['serial_number_8']}")
+                 print(f"Firmware Type: {data['fw_type']}")
+                 print(f"Firmware Path: {data['fw_path']}")
+                 print(f"Firmware Version: {data['fw_version']}")
+            else:
+                 print(f"Не удалось получить данные для прошивки")
         except Exception as e:
             logging.error(f"Ошибка при работе с базой данных: {e}")
             print("Ошибка при подключении или получении записи из БД")
@@ -75,6 +75,7 @@ class FirmwareLoader:
         # Блок прошивки
         time.sleep(2)
         try:
+            print (data, photodata, loge)
             self.igle_table.control_igle_table(data, photodata, loge)
         except Exception as e:
             logging.error(f"Ошибка при контроле через Иглостол: {e}")
@@ -83,6 +84,7 @@ class FirmwareLoader:
         
         while True:
             try:
+                time.sleep(2)
                 # Получаем данные о результате от стола через сервер RTK
                 resultTest = self.igle_table.recentData()
                 print("Результат запроса:")
@@ -146,26 +148,24 @@ class FirmwareLoader:
         self.igle_table = None
         print("Переменные очищены.")
 
-"""
+
 if __name__ == "__main__":
+
+    """
+
     ################################################# IgleTable Communication Class ###################################
     
     igle_table = Igable.IgleTable(
-            urlIgleTabeControl=f"http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
-            urlStatusFromIgleTabe=f"http://192.168.1.100:5003/get_test_results",
+        urlIgleTabeControl=f"http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
+        urlStatusFromIgleTabe=f"http://192.168.1.100:5003/get_test_results/1")
 
-            module_type="R050 DI 16 011-000-AAA",
-            stand_id="nt_kto_rtk_1",
-            serial_number_8="1",
-            data_matrix=["11"],
-            firmwares = [
-                {
-                "fw_type": "MCU",
-                "fw_path": "C:\\nails_table_bridge\\plc050_di16012-full.hex",
-                "fw_version": "1.0.36.0"
-                }
-            ]
-        )
+    igle_table2 = Igable.IgleTable(
+            urlIgleTabeControl=f"http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
+            urlStatusFromIgleTabe=f"http://192.168.1.100:5003/get_test_results/2")
+
+    igle_table3 = Igable.IgleTable(
+            urlIgleTabeControl=f"http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
+            urlStatusFromIgleTabe=f"http://192.168.1.100:5003/get_test_results/3")
     ################################################# IgleTable Communication Class ###################################
 
 
@@ -178,14 +178,16 @@ if __name__ == "__main__":
             logging.error(f"Error Create an instance of DatabaseConnection: {e}")
     ################################################# STOP SQL Communication class ###################################
 
-    Order = "ЗНП-0005747"
+    Order = "ЗНП-2160.1.1"
     photodata = "45654465"
-    firmware_loader = FirmwareLoader(db_connection,igle_table,1, Order, photodata)
-    res = firmware_loader.loader()
+    stand_id = "table_3"
+    loge = 1
+    firmware_loader = FirmwareLoader(db_connection,igle_table3,stand_id, Order, photodata, loge)
+    res = firmware_loader.loader(photodata, loge)
     print (f"***************{res}")
-"""
 
 
+    """
 """
 Order = "ЗНП-9087.2.1"
 photodata = "45654465"

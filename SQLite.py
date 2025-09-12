@@ -171,7 +171,7 @@ class DatabaseConnection:
     
     
     
-    def setTable(self, order_number):
+    def setTable(self, order_number, stand_id):
         """Поиск заказа и обновление одной записи в order_details."""
         logging.info("Метод setTable вызван с order_number = %s", order_number)
         print(f"Метод setTable вызван с order_number = {order_number}")
@@ -218,9 +218,9 @@ class DatabaseConnection:
             self.conn.execute('BEGIN IMMEDIATE')  # Начинаем транзакцию с блокировкой
             self.cursor.execute('''
                 UPDATE order_details
-                SET stand_id = "nt_kto_rtk_1"
+                SET stand_id = ?
                 WHERE id = ?
-            ''', (serial_id,))
+            ''', (stand_id, serial_id,))
 
             if self.cursor.rowcount > 0:
                 self.conn.commit()
@@ -391,7 +391,7 @@ class DatabaseConnection:
         if not order_id or not board_name or not firmware:
             logging.warning("Отсутствуют обязательные данные: order_id, board_name или firmware.")
             print("Ошибка: Отсутствуют обязательные данные.")
-            return
+            return 
 
         if not isinstance(batch, list) or not batch:
             logging.warning("Некорректные или пустые данные batch.")

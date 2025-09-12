@@ -45,7 +45,7 @@ def set_test_results():
 @app.route('/get_test_results/1', methods=['GET'])
 def get_test_results1():
     try:
-        stand_id = f"RTK_1"
+        stand_id = f"table_1"
         data = latest_data_by_stand.get(stand_id)
 
         if not data:
@@ -65,7 +65,7 @@ def get_test_results1():
 @app.route('/get_test_results/2', methods=['GET'])
 def get_test_results2():
     try:
-        stand_id = f"RTK_2"
+        stand_id = f"table_2"
         data = latest_data_by_stand.get(stand_id)
 
         if not data:
@@ -85,7 +85,7 @@ def get_test_results2():
 @app.route('/get_test_results/3', methods=['GET'])
 def get_test_results3():
     try:
-        stand_id = f"RTK_3"
+        stand_id = f"table_3"
         data = latest_data_by_stand.get(stand_id)
 
         if not data:

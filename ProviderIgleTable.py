@@ -142,8 +142,8 @@ class IgleTable:
         
 
     
-"""
-Тест пересылки данных
+
+
 igle_table1 = IgleTable(
     urlIgleTabeControl="http://172.21.10.182:5000/nails_table/start_test_board_with_rtk",
     urlStatusFromIgleTabe="http://172.21.10.182:5003/get_test_results/1"
@@ -152,7 +152,7 @@ igle_table1 = IgleTable(
 result1 = igle_table1.recentData()
 print("Received from RTK server (stand 1):")
 print(result1)
-
+"""
 time.sleep(1.5)  # ⏱️ Пауза 1.5 секунды
 
 igle_table2 = IgleTable(

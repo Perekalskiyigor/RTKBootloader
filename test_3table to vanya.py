@@ -1014,11 +1014,13 @@ class Table:
     ####################### MAIN START ############################################################
     def robo_main_cycle(self):
         import threading, time, logging
+        from dataclasses import dataclass
         global Tray1, Cell1, photodata, photodata1
 
         SEW_WAIT_TIMEOUT = 1200  # сек
+        ROBOT_WAIT_TIMEOUT = 300 # сек
 
-        Tray1 = 1
+        Tray1 = 2
         print(f"[MAIN] ЦИКЛ MAIN для {self.number} стола старт")
         logging.info(f"[MAIN] ЦИКЛ MAIN для {self.number} стола старт")
 
@@ -1027,19 +1029,31 @@ class Table:
         photodata1 = '111'                     # DM для первой прошивки (если требуется)
         next_photodata = photodata1            # DM, который будет прошиваться на current_loge
 
-        # Поток «идущей» прошивки, который ждём в начале следующего цикла
+        # Поток «идущей» прошивки 1-й итерации (как было)
         in_flight_sewing_thread = None
-        in_flight_loge = None
 
         def _move_table_to_loge(loge: int):
             self._send_table_command(101 if loge == 1 else 102)
+
+        def _robot_remove(loge: int) -> bool:
+            # было: 231/232 -> fallback 230
+            # стало: всегда используем базовую 230 + cell_num, пусть класс сам посчитает 231..236
+            return self._send_robot_command(230, cell_num=loge)
+
+        def _robot_place(loge: int) -> bool:
+            # было: 221/222 -> fallback 220
+            # стало: всегда используем базовую 220 + cell_num, пусть класс сам посчитает 221..226
+            return self._send_robot_command(220, cell_num=loge)
+
+        # Флаг: после первой итерации переходим в новый «двухпоточный» режим
+        parallel_join_mode = False
 
         while True:
             try:
                 print(f"\n=== Обработка ложемента {current_loge} ===")
 
-                if in_flight_sewing_thread is None:
-                    # ---------------- ПЕРВЫЙ ЦИКЛ ----------------
+                if in_flight_sewing_thread is None and not parallel_join_mode:
+                    # ---------------- ПЕРВЫЙ ЦИКЛ (БЕЗ ИЗМЕНЕНИЙ) ----------------
                     free_loge = 2 if current_loge == 1 else 1
 
                     # 1) Поднять голову (страховка), подвести current_loge
@@ -1050,14 +1064,14 @@ class Table:
                     logging.info(f"[MAIN] Сдвигаем стол {self.number} под прошивальщик (под головкой ложе {current_loge})")
 
                     # 2) ОДНОВРЕМЕННО: опускаем прошивальщик И работаем с роботом на free_loge
-                    self._send_table_command(103)  # Начинаем опускать прошивальщик
+                    self._send_table_command(103)
                     logging.info(f"[MAIN] Опускаем прошивальщик стол {self.number} (параллельно с операциями робота)")
 
-                    # Параллельно с опусканием головы - работаем с роботом
                     while not self.rob_manager.acquire(self.number):
                         logging.info(f"[MAIN] СТОЛ {self.number} ждет освобождения робота (загрузка новой на ложе {free_loge})")
                         time.sleep(1)
                     try:
+                        global Cell1
                         Cell1 = Cell1 + 1
                         if not self._send_robot_command(210):
                             raise TableOperationFailed("Ошибка забора платы из тары")
@@ -1074,8 +1088,7 @@ class Table:
                         logging.info(f"[MAIN] Стол {self.number} Робот освобожден столом (после загрузки новой на free_loge)")
                         self.rob_manager.release(self.number)
 
-                    # 3) Запускаем прошивку (голова уже должна опуститься)
-                    logging.info(f"[MAIN] Запускаем прошивку стол {self.number}")
+                    # 3) Запускаем прошивку current_loge
                     sewing_thread = threading.Thread(
                         target=self.start_sewing, args=(next_photodata, current_loge), daemon=True
                     )
@@ -1097,10 +1110,9 @@ class Table:
                     logging.info(f"[MAIN] СТОЛ {self.number} сдвинут по оси X (под головкой теперь ложе {free_loge})")
 
                     # 6) ОДНОВРЕМЕННО: опускаем прошивальщик И работаем с роботом на старом ложе
-                    self._send_table_command(103)  # Начинаем опускать прошивальщик
+                    self._send_table_command(103)
                     logging.info(f"[MAIN] Опускаем прошивальщик на ложе {free_loge} (параллельно с операциями робота)")
 
-                    # Параллельно с опусканием головы - работаем с роботом на СТАРОМ ложе
                     while not self.rob_manager.acquire(self.number):
                         logging.info(f"[MAIN] СТОЛ {self.number} ждет освобождения робота (выгрузка+загрузка на ложе {current_loge})")
                         time.sleep(1)
@@ -1115,6 +1127,7 @@ class Table:
                         logging.info(f"[MAIN] СТОЛ {self.number} Укладываем в тару плату (с ложе {current_loge})")
 
                         # сразу взять новую и уложить на только что освобождённое ложе
+                        global Cell1
                         Cell1 = Cell1 + 1
                         if not self._send_robot_command(210):
                             raise TableOperationFailed("Ошибка забора платы из тары")
@@ -1131,7 +1144,7 @@ class Table:
                         logging.info(f"[MAIN] Стол {self.number} Робот освобожден столом (после выгрузки+загрузки старого ложемента)")
                         self.rob_manager.release(self.number)
 
-                    # 7) Запускаем прошивку на free_loge (голова уже должна опуститься)
+                    # 7) Запускаем прошивку на free_loge как in-flight к началу 2-й итерации
                     next_sewing_thread = threading.Thread(
                         target=self.start_sewing, args=(dm_for_free, free_loge), daemon=True
                     )
@@ -1139,82 +1152,114 @@ class Table:
                     logging.info(f"[MAIN] СТОЛ {self.number} Прошивка запущена на ложе {free_loge} (DM={dm_for_free})")
 
                     in_flight_sewing_thread = next_sewing_thread
-                    in_flight_loge = free_loge
-
-                    # 8) Подготовить следующую итерацию:
-                    next_photodata = dm_for_old
-                    current_loge = free_loge  # на нём сейчас идёт in-flight
-                    logging.info(f"[MAIN] Стол {self.number} Подготовка к следующей итерации: current_loge={current_loge}, DM={next_photodata}")
-                    print(f"[MAIN] Следующая итерация: ложемент {current_loge}")
+                    current_loge = free_loge           # на нём сейчас идёт in-flight
+                    next_photodata = dm_for_old        # DM на противоположном (перезаряженном) ложе
+                    parallel_join_mode = True          # со 2-й итерации — новый режим
+                    logging.info(f"[MAIN] Подготовка к 2-й итерации: current_loge={current_loge}, next_DM={next_photodata}")
 
                 else:
-                    # ---------------- ВСЕ ПОСЛЕДУЮЩИЕ ЦИКЛЫ ----------------
-                    # 0) Дождаться завершения in-flight на current_loge
-                    logging.info(f"[MAIN] СТОЛ {self.number} Ожидаем завершения прошивки на ложе {current_loge} (in-flight)")
-                    in_flight_sewing_thread.join(timeout=SEW_WAIT_TIMEOUT)
-                    if in_flight_sewing_thread.is_alive():
-                        logging.error(f"[MAIN] СТОЛ {self.number} Таймаут ожидания прошивки на ложе {current_loge}")
-                        raise RuntimeError("Sewing join timeout (subsequent cycle)")
-                    logging.info(f"[MAIN] СТОЛ {self.number} Прошивка на ложе {current_loge} завершена (in-flight)")
-                    in_flight_sewing_thread = None
-                    in_flight_loge = None
+                    # ---------------- СО 2-Й ИТЕРАЦИИ: ДВА ПАРАЛЛЕЛЬНЫХ ПОТОКА ----------------
+                    # 0) Дождаться завершения in-flight на current_loge (с конца 1-й итерации)
+                    if in_flight_sewing_thread is not None:
+                        logging.info(f"[MAIN] Ожидаем завершения прошивки (in-flight) на ложе {current_loge}")
+                        in_flight_sewing_thread.join(timeout=SEW_WAIT_TIMEOUT)
+                        if in_flight_sewing_thread.is_alive():
+                            logging.error(f"[MAIN] Таймаут ожидания прошивки на ложе {current_loge}")
+                            raise RuntimeError("Sewing join timeout (parallel mode)")
+                        in_flight_sewing_thread = None
+                        logging.info(f"[MAIN] Прошивка на ложе {current_loge} завершена (in-flight)")
 
-                    # 1) Поднять голову, перейти на ПРОТИВОПОЛОЖНОЕ ложе
+                    # 1) Поднять голову 104 — ОТДЕЛЬНО
                     self._send_table_command(104)
-                    logging.info(f"[MAIN] СТОЛ {self.number} Подняли прошивальщик (после завершения на ложе {current_loge})")
+                    logging.info(f"[MAIN] СТОЛ {self.number} 104 — подняли прошивальщик")
 
+                    # 2) Подвести противоположное ложе 10X — ОТДЕЛЬНО
                     next_loge = 2 if current_loge == 1 else 1
                     _move_table_to_loge(next_loge)
-                    logging.info(f"[MAIN] СТОЛ {self.number} Сдвинули стол под ложе {next_loge}")
+                    logging.info(f"[MAIN] СТОЛ {self.number} 10{'1' if next_loge==1 else '2'} — подвели ложе {next_loge}")
 
-                    # 2) ОДНОВРЕМЕННО: опускаем прошивальщик И работаем с роботом
-                    self._send_table_command(103)  # Начинаем опускать прошивальщик
-                    logging.info(f"[MAIN] Опускаем прошивальщик на ложе {next_loge} (параллельно с операциями робота)")
+                    # --- Запускаем 2 параллельных потока ---
+                    dm_holder = {"dm": None}
+                    thread_errors = {"table": None, "robot": None}
 
-                    # Параллельно с опусканием головы - работаем с роботом на СТАРОМ ложе
-                    while not self.rob_manager.acquire(self.number):
-                        logging.info(f"[MAIN] СТОЛ {self.number} ждет освобождения робота (выгрузка+загрузка на ложе {current_loge})")
-                        time.sleep(1)
-                    try:
-                        if not self._send_robot_command(230, cell_num=current_loge):
-                            raise TableOperationFailed(f"Ошибка забора с ложемента {current_loge}")
-                        logging.info(f"[MAIN] СТОЛ {self.number} Забираем обработанную плату с ложемента {current_loge}")
+                    def table_thread():
+                        try:
+                            # 3) Стол: 103 + прошивка на next_loge
+                            self._send_table_command(103)
+                            logging.info(f"[MAIN] СТОЛ {self.number} 103 — опустили прошивальщик на ложе {next_loge}")
+                            # прошивка синхронно внутри потока
+                            self.start_sewing(next_photodata, next_loge)
+                            logging.info(f"[MAIN] СТОЛ {self.number} Прошивка на ложе {next_loge} завершена")
+                        except Exception as e:
+                            thread_errors["table"] = e
 
-                        if not self._send_robot_command(241):
-                            raise TableOperationFailed("Ошибка укладки в тару")
-                        logging.info(f"[MAIN] СТОЛ {self.number} Укладываем в тару плату (с ложе {current_loge})")
+                    def robot_thread():
 
-                        Cell1 = Cell1 + 1
-                        if not self._send_robot_command(210):
-                            raise TableOperationFailed("Ошибка забора платы из тары")
-                        logging.info(f"[MAIN] СТОЛ {self.number} Забираем новую плату из тары ячейка {Cell1}")
+                        try:
+                            # Робот: на ПРОТИВОПОЛОЖНОМ (current_loge) — 23X/241/210/22X
+                            while not self.rob_manager.acquire(self.number):
+                                logging.info(f"[MAIN] СТОЛ {self.number} ждёт робота (операции на ложе {current_loge})")
+                                time.sleep(1)
+                            try:
+                                if not _robot_remove(current_loge):
+                                    raise TableOperationFailed(f"Ошибка забора с ложемента {current_loge} (231/232|230)")
+                                logging.info(f"[MAIN] СТОЛ {self.number} 23X — сняли плату с ложемента {current_loge}")
 
-                        _, dm_restocked = self._take_photo()
-                        logging.info(f"[MAIN] СТОЛ {self.number} Фотографируем новую плату {dm_restocked}")
+                                if not self._send_robot_command(241):
+                                    raise TableOperationFailed("Ошибка укладки в тару (241)")
+                                logging.info(f"[MAIN] СТОЛ {self.number} 241 — уложили в тару")
 
-                        if not self._send_robot_command(220, cell_num=current_loge):
-                            raise TableOperationFailed(f"Ошибка укладки в ложемент {current_loge}")
-                        logging.info(f"[MAIN] СТОЛ {self.number} Укладываем новую плату на ложемент {current_loge}")
-                    finally:
-                        print(f"[MAIN] Стол {self.number} Робот освобожден столом (после выгрузки+загрузки)")
-                        logging.info(f"[MAIN] Стол {self.number} Робот освобожден столом (после выгрузки+загрузки)")
-                        self.rob_manager.release(self.number)
+                                global Cell1
+                                Cell1 = Cell1 + 1
+                                if not self._send_robot_command(210):
+                                    raise TableOperationFailed("Ошибка забора платы из тары (210)")
+                                logging.info(f"[MAIN] СТОЛ {self.number} 210 — взяли новую плату, ячейка %s", Cell1)
 
-                    # 3) Запускаем прошивку на next_loge (голова уже должна опуститься)
-                    next_sewing_thread = threading.Thread(
-                        target=self.start_sewing, args=(next_photodata, next_loge), daemon=True
-                    )
-                    next_sewing_thread.start()
-                    logging.info(f"[MAIN] СТОЛ {self.number} Прошивка запущена на ложе {next_loge} (DM={next_photodata})")
+                                _, dm_loaded = self._take_photo()
+                                logging.info(f"[MAIN] СТОЛ {self.number} Фото новой платы: {dm_loaded}")
 
-                    in_flight_sewing_thread = next_sewing_thread
-                    in_flight_loge = next_loge
+                                if not _robot_place(current_loge):
+                                    raise TableOperationFailed(f"Ошибка укладки в ложемент {current_loge} (221/222|220)")
+                                logging.info(f"[MAIN] СТОЛ {self.number} 22X — уложили новую плату на ложемент {current_loge}")
 
-                    # 4) Подготовить следующий цикл:
-                    next_photodata = dm_restocked
-                    current_loge = next_loge
-                    logging.info(f"[MAIN] Стол {self.number} Подготовка к следующей итерации: current_loge={current_loge}, DM={next_photodata}")
-                    print(f"[MAIN] Следующая итерация: ложемент {current_loge}")
+                                dm_holder["dm"] = dm_loaded
+                            finally:
+                                self.rob_manager.release(self.number)
+                                logging.info(f"[MAIN] Стол {self.number} Робот освобождён (после 23X/241/210/22X)")
+                        except Exception as e:
+                            thread_errors["robot"] = e
+
+                    t_table = threading.Thread(target=table_thread, daemon=True, name=f"tbl-{self.number}")
+                    t_robot = threading.Thread(target=robot_thread, daemon=True, name=f"bot-{self.number}")
+
+                    t_table.start()
+                    t_robot.start()
+
+                    # ЖДЁМ ОКОНЧАНИЯ ОБОИХ ПОТОКОВ
+                    t_table.join(timeout=SEW_WAIT_TIMEOUT)
+                    t_robot.join(timeout=ROBOT_WAIT_TIMEOUT)
+
+                    # Проверка таймаутов
+                    if t_table.is_alive():
+                        logging.error(f"[MAIN] Таймаут потока стола (103+sew) на ложе {next_loge}")
+                        raise RuntimeError("Table thread timeout")
+                    if t_robot.is_alive():
+                        logging.error(f"[MAIN] Таймаут потока робота (23X/241/210/22X) на ложе %s", current_loge)
+                        raise RuntimeError("Robot thread timeout")
+
+                    # Прокинуть исключения из потоков
+                    if thread_errors["table"]:
+                        raise thread_errors["table"]
+                    if thread_errors["robot"]:
+                        raise thread_errors["robot"]
+
+                    # Подготовка следующей итерации
+                    if not dm_holder["dm"]:
+                        raise RuntimeError("Не получен DM с камеры при перезарядке противоположного ложемента")
+
+                    next_photodata = dm_holder["dm"]  # DM для следующей прошивки
+                    current_loge = next_loge          # мы только что шили на next_loge
+                    logging.info(f"[MAIN] Следующая итерация: current_loge={current_loge}, next_DM={next_photodata}")
 
             except Exception as e:
                 logging.error(f"Ошибка в цикле обработки: {str(e)}")
@@ -1229,6 +1274,7 @@ class Table:
                 except Exception:
                     logging.exception(f"[MAIN] СТОЛ {self.number} Не удалось сдвинуть стол в аварийной секции")
                 time.sleep(1)
+
     ####################### MAIN STOP ############################################################
 
     def testcycle(self):
@@ -1333,20 +1379,20 @@ if __name__ == "__main__":
     # Запускаем потоки
     print('__________________1 стол')
     thread1.start()
-    time.sleep(5)
+    time.sleep(1)
 
-    # print('__________________2 стол')
-    # thread2.start()
-    # time.sleep(5)
+    print('__________________2 стол')
+    thread2.start()
+    time.sleep(10)
 
-    # print('__________________3 стол')
-    # thread3.start()
-    # time.sleep(5)
+    print('__________________3 стол')
+    thread3.start()
+    time.sleep(10)
 
     # Ждем завершения всех потоков
-    # thread1.join()
-    # thread2.join()
-    # thread3.join()
+    thread1.join()
+    thread2.join()
+    thread3.join()
 
     print("Все потоки завершены.")
     opc_client.stop()

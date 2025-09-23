@@ -15,7 +15,7 @@ class DatabaseConnection:
             level=logging.INFO,
             format='%(asctime)s - SQLite - %(levelname)s - %(message)s'
         )
-        logging.info("Database connection initialized.")
+        # logging.info("Database connection initialized.")
 
     def db_connect(self):
         """ Connect to the database and create tables """
@@ -485,7 +485,7 @@ class DatabaseConnection:
         
     # Получение данных из базы для интерфейса ОПС
     def getDatafromOOPC(self, order_number):
-        logging.info("OPC Метод получения данных для ОПС запущен")
+        # logging.info("OPC Метод получения данных для ОПС запущен")
 
         try:
             self.cursor.execute('''
@@ -500,7 +500,7 @@ class DatabaseConnection:
 
             if row:
                 order_id = row[0]
-                logging.info(f"OPC Данные по заказу '{order_number}' получены успешно.")
+                # logging.info(f"OPC Данные по заказу '{order_number}' получены успешно.")
             else:
                 logging.warning(f"OPC Заказ с номером '{order_number}' не найден в базе данных.")
 
@@ -536,7 +536,7 @@ class DatabaseConnection:
                 success_count = row[5]
                 nonsuccess_count = row[6]
 
-                logging.info(f"OPC Данные по заказу '{order_number}' получены успешно.")
+                # logging.info(f"OPC Данные по заказу '{order_number}' получены успешно.")
                 return order_number, module, fw_version, last_count, common_count, success_count, nonsuccess_count
             else:
                 logging.warning(f"OPC Заказ с номером '{order_number}' не найден в базе данных.")

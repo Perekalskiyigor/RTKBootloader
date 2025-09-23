@@ -123,13 +123,14 @@ class FirmwareLoader:
                 print("Привязали Data matrix к серийному номеру")
                 # Очищаем переменные
                 self.cleanup()
-                return 200
+                # Если с ошибкой прошивка возращаем статус error_description
+                return 200, error_description
             except Exception as e:
                 logging.error(f"Ошибка при записи в БД: {e}")
                 print("Ошибка при записи в БД")
                 # Очищаем переменные
                 self.cleanup()
-                return 404
+                return 404, error_description
         else:
             print("Ошибка: не удалось получить данные, запись в БД не выполнена.")
             logging.error(f"Ошибка прошивки: {resultTest.get('error_description', 'Неизвестная ошибка')}")

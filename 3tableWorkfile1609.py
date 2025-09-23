@@ -12,6 +12,19 @@ import subprocess
 import sys
 import os
 
+# --- Глобальная аварийная остановка всего комплекса ---
+EMERGENCY_STOP = threading.Event()
+
+def trigger_emergency(reason: str):
+    """
+    Устанавливает глобальную аварийную остановку и логирует причину.
+    После срабатывания ВСЕ циклы должны завершаться/ничего не делать.
+    """
+    if not EMERGENCY_STOP.is_set():
+        logging.critical(f"[EMERGENCY STOP] {reason}")
+        print(f"[EMERGENCY STOP] {reason}")
+        EMERGENCY_STOP.set()
+
 class TableTimeoutException(Exception):
     """Исключение при превышении таймаута работы со столом"""
     pass
@@ -593,31 +606,24 @@ class Table:
 
     # The first cycle Protect Table in the start work
 
-    def _send_robot_command(self, base_command, cell_num=None):
-        """Отправляет команду роботу с явным разделением 220 (укладка) и 230 (забор).
-        
-        Args:
-            base_command (int): Базовый код:
-                - 210 → Забрать из тары общая для всех.
-                - 220 → укладка в ложемпент тестирования (221-226).
-                - 230 → забор из ложемента укладка в тару (231-236).
-                - 241 →  укладка роботом в тару (241).
-            cell_num (int, optional): Номер ячейки (1 или 2). Обязателен для 220/230.
-        
-        Returns:
-            bool: True — успех, False — ошибка/таймаут.
-        
-        Raises:
-            ValueError: Если некорректные данные.
+    def _send_robot_command(self, base_command, cell_num=None, timeout_s: int = 30):
         """
-        # Проверка входных данных
+        Отправляет команду роботу с разделением 220 (укладка) / 230 (забор).
+        Если в течение timeout_s (по умолчанию 300 сек = 5 минут) нет подтверждения — 
+        глобальная авария: останавливаем всё.
+        """
+        if EMERGENCY_STOP.is_set():
+            logging.error(f"СТОЛ {self.number} Команда роботу игнорируется: EMERGENCY_STOP активен")
+            return False
+
+        # Проверки аргументов (как у вас)
         if base_command in (220, 230):
             if cell_num not in (1, 2):
                 raise ValueError("Для команд 220/230 укажите cell_num: 1 или 2")
         if not (1 <= self.number <= 3):
             raise ValueError(f"Некорректный номер стола: {self.number}. Допустимо: 1-3")
 
-        # Формирование команды
+        # Построение команды (как у вас)
         if base_command == 210:
             command = 210
         elif base_command == 241:
@@ -629,30 +635,44 @@ class Table:
         elif base_command == 230:  # Забор
             command = 230 + (self.number - 1) * 2 + cell_num  # 231-236
         else:
-            command = base_command + self.number  # Прочие команды
+            command = base_command + self.number  # Прочие
 
-        # Отправка команды
         action_desc = "Укладка" if base_command == 220 else "Забор" if base_command == 230 else "Команда"
         logging.info(f"СТОЛ {self.number}, ЯЧЕЙКА {cell_num} → {action_desc}: {command}")
         self.change_value('Rob_Action', command)
 
-        # Ожидание ответа (таймаут 30 сек)
         start_time = time.time()
-        timeout = 90000
+        try:
+            while time.time() - start_time < timeout_s:
+                if EMERGENCY_STOP.is_set():
+                    logging.error(f"СТОЛ {self.number} Ожидание робота прервано: EMERGENCY_STOP активен")
+                    return False
 
-        while time.time() - start_time < timeout:
-            result = self.read_value("sub_Rob_Action")
-            if result == command:
-                self.change_value('Rob_Action', 0)
-                logging.info(f"Успешно: {command}")
-                return True
-            elif result == 404:
-                logging.error(f"Ошибка выполнения: {command}")
-                return False
-            time.sleep(1)
+                result = self.read_value("sub_Rob_Action")
+                if result == command:
+                    self.change_value('Rob_Action', 0)
+                    logging.info(f"Успешно: {command}")
+                    return True
+                elif result == 404:
+                    self.change_value('Rob_Action', 0)
+                    logging.error(f"Ошибка выполнения роботом: {command} (404)")
+                    return False
+                time.sleep(1)
 
-        logging.error(f"Таймаут команды: {command}")
-        return False
+            # 5 минут вышли — глобальная авария
+            self.change_value('Rob_Action', 0)
+            trigger_emergency(
+                f"Робот не ответил на команду {command} (стол {self.number}) в течение {timeout_s} сек"
+            )
+            return False
+        except Exception as e:
+            # Любая неожиданная ошибка при общении с роботом — тоже авария
+            self.change_value('Rob_Action', 0)
+            trigger_emergency(
+                f"Исключение при ожидании ответа робота на команду {command} (стол {self.number}): {e}"
+            )
+            return False
+
             
 
     def _send_table_command(self, command, timeout=30):
@@ -1051,6 +1071,9 @@ class Table:
         while True:
             try:
                 print(f"\n=== Обработка ложемента {current_loge} ===")
+                if EMERGENCY_STOP.is_set():
+                    logging.critical(f"[MAIN] СТОЛ {self.number} аварийно остановлен (EMERGENCY_STOP)")
+                    return
 
                 if in_flight_sewing_thread is None and not parallel_join_mode:
                     # ---------------- ПЕРВЫЙ ЦИКЛ (БЕЗ ИЗМЕНЕНИЙ) ----------------
@@ -1263,6 +1286,9 @@ class Table:
 
             except Exception as e:
                 logging.error(f"Ошибка в цикле обработки: {str(e)}")
+                if EMERGENCY_STOP.is_set():
+                    logging.critical(f"[MAIN] СТОЛ {self.number} аварийно остановлен во время восстановления")
+                    return
                 try:
                     self._send_table_command(104)
                     logging.info(f"[MAIN] СТОЛ {self.number} Восстановление: подняли прошивальщик")
@@ -1388,17 +1414,37 @@ if __name__ == "__main__":
     # print('__________________3 стол')
     # thread3.start()
 
-    #Ждем завершения всех потоков
-    thread1.join()
-    # thread2.join()
-    # thread3.join()
+    # Ждём глобальной аварии или завершения потоков
+try:
+    while True:
+        if EMERGENCY_STOP.is_set():
+            logging.critical("[MAIN] Поймали EMERGENCY_STOP в главном потоке. Останавливаемся.")
+            break
+        if not thread1.is_alive() and not thread2.is_alive() and not thread3.is_alive():
+            break
+        time.sleep(1)
+finally:
+    # Пытаемся штатно остановить сервисные части
+    try:
+        opc_client.stop()
+    except Exception:
+        logging.exception("Ошибка при остановке OPC клиента")
+
+    try:
+        db_sync.stop()
+    except Exception:
+        logging.exception("Ошибка при остановке потока синхронизации БД")
+
+    # Дожимаем потоки столов
+    for t in (thread1, thread2, thread3):
+        try:
+            if t.is_alive():
+                t.join(timeout=5)
+        except Exception:
+            pass
+
 
     print("Все потоки завершены.")
-    opc_client.stop()
 
-
-    ################################################# START OPC Communication class l ###################################
-    
- 
 
     

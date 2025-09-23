@@ -12,6 +12,21 @@ import subprocess
 import sys
 import os
 
+# --- Глобальная аварийная остановка всего комплекса ---
+EMERGENCY_STOP = threading.Event()
+SETUP_TABLE = 0
+SUB_SETUP_TABLE = 0
+
+def trigger_emergency(reason: str):
+    """
+    Устанавливает глобальную аварийную остановку и логирует причину.
+    После срабатывания ВСЕ циклы должны завершаться/ничего не делать.
+    """
+    if not EMERGENCY_STOP.is_set():
+        logging.critical(f"[EMERGENCY STOP] {reason}")
+        print(f"[EMERGENCY STOP] {reason}")
+        EMERGENCY_STOP.set()
+
 class TableTimeoutException(Exception):
     """Исключение при превышении таймаута работы со столом"""
     pass
@@ -59,9 +74,15 @@ import ProviderIgleTable as Igable
 import Botloader as Bot
 
 # Глобальные ящик и ясейка 
-Tray1 = 2
-Tray2 = 1
+Tray1 = 0
+Tray2 = 0
+Tray3 = 0
+
+Tray_robot = 0
+
 Cell1 = 0
+Cell2 = 0
+
 Order = "ЗНП-2160.1.1"
 # данные с платы для цикла main и сетапа
 photodata = None
@@ -392,10 +413,10 @@ class OPCClient:
 
 class ModbusProvider:
     """Class MODBUS Communication with Modbus regul"""
-    global Tray1
-    global Tray2
+    global Tray_robot
     global Cell1
     global command_toBOt
+    
     def __init__(self):
         self.store = ModbusSlaveContext(
             hr=ModbusSequentialDataBlock(0, [0] * 100)
@@ -417,7 +438,7 @@ class ModbusProvider:
             print(f"Error starting Modbus server: {e}")
 
     def update_registers(self):
-        global shared_data, Tray1, Cell1, Tray2
+        global shared_data, Tray1, Cell1, Tray2, SETUP_TABLE, SUB_SETUP_TABLE
         while True:
             try:
                 with shared_data_lock:
@@ -425,22 +446,24 @@ class ModbusProvider:
 
                     # СТОЛ 1
                     # Получаем данные из регистров и записываем в shared_data[1]
+                    SUB_SETUP_TABLE = self.store.getValues(3, 26, count=1)[0]
                     shared_data[1]['sub_Reg_move_Table'] = self.store.getValues(3, 9, count=1)[0]
                     shared_data[1]['sub_Reg_updown_Botloader'] = self.store.getValues(3, 11, count=1)[0]
                     # shared_data[1]['sub_Rob_Action'] = self.store.getValues(3, 13, count=1)[0]
                     shared_data[1]['sub_Rob_Action'] = self.store.getValues(3, 5, count=1)[0]
                     shared_data[1]['workplace1'] = self.store.getValues(3, 15, count=1)[0]
 
-                    # Логирование операций чтения регистров
-                    logging.info(
-                        "[Modbus] Команда получения данных из регистров (Стол 1):\n"
-                        f"  sub_Reg_move_Table       = {shared_data[1]['sub_Reg_move_Table']}\n"
-                        f"  sub_Reg_updown_Botloader = {shared_data[1]['sub_Reg_updown_Botloader']}\n"
-                        f"  sub_Rob_Action           = {shared_data[1]['sub_Rob_Action']}\n"
-                        f"  workplace1               = {shared_data[1]['workplace1']}"
-                    )
+                    # # Логирование операций чтения регистров
+                    # logging.info(
+                    #     "[Modbus] Команда получения данных из регистров (Стол 1):\n"
+                    #     f"  sub_Reg_move_Table       = {shared_data[1]['sub_Reg_move_Table']}\n"
+                    #     f"  sub_Reg_updown_Botloader = {shared_data[1]['sub_Reg_updown_Botloader']}\n"
+                    #     f"  sub_Rob_Action           = {shared_data[1]['sub_Rob_Action']}\n"
+                    #     f"  workplace1               = {shared_data[1]['workplace1']}"
+                    # )
 
                     # Записываем данные из shared_data[1] в регистры
+                    self.store.setValues(3, 25, [SETUP_TABLE])
                     self.store.setValues(3, 10, [shared_data[1]['Reg_move_Table']])
                     self.store.setValues(3, 12, [shared_data[1]['Reg_updown_Botloader']])
                     value = shared_data[1]["Rob_Action"]
@@ -448,13 +471,13 @@ class ModbusProvider:
                         self.store.setValues(3, 4, [value])
                     
 
-                    # Логирование операций записи регистров
-                    logging.info(
-                        "[Modbus] Команда записи данных в регистры (Стол 1):\n"
-                        f"  Reg_move_Table       = {shared_data[1]['Reg_move_Table']}\n"
-                        f"  Reg_updown_Botloader = {shared_data[1]['Reg_updown_Botloader']}\n"
-                        f"  Rob_Action           = {shared_data[1]['Rob_Action']}"
-                    )
+                    # # Логирование операций записи регистров
+                    # logging.info(
+                    #     "[Modbus] Команда записи данных в регистры (Стол 1):\n"
+                    #     f"  Reg_move_Table       = {shared_data[1]['Reg_move_Table']}\n"
+                    #     f"  Reg_updown_Botloader = {shared_data[1]['Reg_updown_Botloader']}\n"
+                    #     f"  Rob_Action           = {shared_data[1]['Rob_Action']}"
+                    # )
 
 
                     # СТОЛ 2
@@ -464,14 +487,14 @@ class ModbusProvider:
                     shared_data[2]['sub_Rob_Action'] = self.store.getValues(3, 5, count=1)[0]
                     shared_data[2]['workplace1'] = self.store.getValues(3, 7, count=1)[0]
 
-                    # Логирование операций чтения регистров
-                    logging.info(
-                        "[Modbus] Команда получения данных из регистров (Стол 2):\n"
-                        f"  sub_Reg_move_Table       = {shared_data[2]['sub_Reg_move_Table']}\n"
-                        f"  sub_Reg_updown_Botloader = {shared_data[2]['sub_Reg_updown_Botloader']}\n"
-                        f"  sub_Rob_Action           = {shared_data[2]['sub_Rob_Action']}\n"
-                        f"  workplace1               = {shared_data[2]['workplace1']}"
-                    )
+                    # # Логирование операций чтения регистров
+                    # logging.info(
+                    #     "[Modbus] Команда получения данных из регистров (Стол 2):\n"
+                    #     f"  sub_Reg_move_Table       = {shared_data[2]['sub_Reg_move_Table']}\n"
+                    #     f"  sub_Reg_updown_Botloader = {shared_data[2]['sub_Reg_updown_Botloader']}\n"
+                    #     f"  sub_Rob_Action           = {shared_data[2]['sub_Rob_Action']}\n"
+                    #     f"  workplace1               = {shared_data[2]['workplace1']}"
+                    # )
 
                     # Записываем данные из shared_data[2] в регистры
                     self.store.setValues(3, 0, [shared_data[2]['Reg_move_Table']])
@@ -481,13 +504,13 @@ class ModbusProvider:
                         self.store.setValues(3, 4, [value])
 
 
-                    # Логирование операций записи регистров
-                    logging.info(
-                        "[Modbus] Команда записи данных в регистры (Стол 2):\n"
-                        f"  Reg_move_Table       = {shared_data[2]['Reg_move_Table']}\n"
-                        f"  Reg_updown_Botloader = {shared_data[2]['Reg_updown_Botloader']}\n"
-                        f"  Rob_Action           = {shared_data[2]['Rob_Action']}"
-                    )
+                    # # Логирование операций записи регистров
+                    # logging.info(
+                    #     "[Modbus] Команда записи данных в регистры (Стол 2):\n"
+                    #     f"  Reg_move_Table       = {shared_data[2]['Reg_move_Table']}\n"
+                    #     f"  Reg_updown_Botloader = {shared_data[2]['Reg_updown_Botloader']}\n"
+                    #     f"  Rob_Action           = {shared_data[2]['Rob_Action']}"
+                    # )
 
                     # СТОЛ 3
                     # Получаем данные из регистров и записываем в shared_data[1]
@@ -522,7 +545,7 @@ class ModbusProvider:
                     # )
                     
                     # Записываем глобальные переменные
-                    self.store.setValues(3, 6, [Tray1])
+                    self.store.setValues(3, 6, [Tray_robot])
                     self.store.setValues(3, 8, [Cell1])
                     self.store.setValues(3, 24, [Tray2])
 
@@ -560,7 +583,7 @@ class ModbusProvider:
 ################################################# START TABLE CLASS #####################################################################
 class Table:
     """ TABLE CLASS"""
-    global Tray1
+    global Tray1, Tray2, Tray3, Tray_robot
     global Cell1
     global Order
     def __init__(self, name, shared_data, shared_data_lock, number, rob_manager):
@@ -593,31 +616,24 @@ class Table:
 
     # The first cycle Protect Table in the start work
 
-    def _send_robot_command(self, base_command, cell_num=None):
-        """Отправляет команду роботу с явным разделением 220 (укладка) и 230 (забор).
-        
-        Args:
-            base_command (int): Базовый код:
-                - 210 → Забрать из тары общая для всех.
-                - 220 → укладка в ложемпент тестирования (221-226).
-                - 230 → забор из ложемента укладка в тару (231-236).
-                - 241 →  укладка роботом в тару (241).
-            cell_num (int, optional): Номер ячейки (1 или 2). Обязателен для 220/230.
-        
-        Returns:
-            bool: True — успех, False — ошибка/таймаут.
-        
-        Raises:
-            ValueError: Если некорректные данные.
+    def _send_robot_command(self, base_command, cell_num=None, timeout_s: int = 600):
         """
-        # Проверка входных данных
+        Отправляет команду роботу с разделением 220 (укладка) / 230 (забор).
+        Если в течение timeout_s (по умолчанию 300 сек = 5 минут) нет подтверждения — 
+        глобальная авария: останавливаем всё.
+        """
+        if EMERGENCY_STOP.is_set():
+            logging.error(f"СТОЛ {self.number} Команда роботу игнорируется: EMERGENCY_STOP активен")
+            return False
+
+        # Проверки аргументов (как у вас)
         if base_command in (220, 230):
             if cell_num not in (1, 2):
                 raise ValueError("Для команд 220/230 укажите cell_num: 1 или 2")
         if not (1 <= self.number <= 3):
             raise ValueError(f"Некорректный номер стола: {self.number}. Допустимо: 1-3")
 
-        # Формирование команды
+        # Построение команды (как у вас)
         if base_command == 210:
             command = 210
         elif base_command == 241:
@@ -629,33 +645,49 @@ class Table:
         elif base_command == 230:  # Забор
             command = 230 + (self.number - 1) * 2 + cell_num  # 231-236
         else:
-            command = base_command + self.number  # Прочие команды
+            command = base_command + self.number  # Прочие
 
-        # Отправка команды
         action_desc = "Укладка" if base_command == 220 else "Забор" if base_command == 230 else "Команда"
         logging.info(f"СТОЛ {self.number}, ЯЧЕЙКА {cell_num} → {action_desc}: {command}")
         self.change_value('Rob_Action', command)
 
-        # Ожидание ответа (таймаут 30 сек)
         start_time = time.time()
-        timeout = 90000
+        try:
+            while time.time() - start_time < timeout_s:
+                if EMERGENCY_STOP.is_set():
+                    logging.error(f"СТОЛ {self.number} Ожидание робота прервано: EMERGENCY_STOP активен")
+                    return False
 
-        while time.time() - start_time < timeout:
-            result = self.read_value("sub_Rob_Action")
-            if result == command:
-                self.change_value('Rob_Action', 0)
-                logging.info(f"Успешно: {command}")
-                return True
-            elif result == 404:
-                logging.error(f"Ошибка выполнения: {command}")
-                return False
-            time.sleep(1)
+                result = self.read_value("sub_Rob_Action")
+                if result == command:
+                    self.change_value('Rob_Action', 0)
+                    logging.info(f"Успешно: {command}")
+                    return True
+                elif result == 404:
+                    self.change_value('Rob_Action', 0)
+                    logging.error(f"Ошибка выполнения роботом: {command} (404)")
+                    return False
+                time.sleep(1)
 
-        logging.error(f"Таймаут команды: {command}")
-        return False
+            # 5 минут вышли — глобальная авария
+            self.change_value('Rob_Action', 0)
+            trigger_emergency(
+                f"Робот не ответил на команду {command} (стол {self.number}) в течение {timeout_s} сек"
+            )
+            return False
+        except Exception as e:
+            # Любая неожиданная ошибка при общении с роботом — тоже авария
+            self.change_value('Rob_Action', 0)
+            trigger_emergency(
+                f"Исключение при ожидании ответа робота на команду {command} (стол {self.number}): {e}"
+            )
+            return False
+
             
 
-    def _send_table_command(self, command, timeout=30):
+    def _send_table_command(self, command, timeout=6000000):
+        print(f"[MAIN] СТОЛ {self.number} вызов функции отправки команды столу _send_table_command")
+        logging.info(f"[MAIN] СТОЛ {self.number} вызов функции отправки команды столу _send_table_command")
         """
         Универсальный метод для отправки команд столу
         command: код команды 
@@ -671,42 +703,59 @@ class Table:
             104: "Опустить ложе"
         }.get(command, f"Команда {command}")
 
-        print(f"СТОЛ {self.number} Регул <- {command_name}")
-        logging.info(f"СТОЛ {self.number} Отправка команды {'Reg_updown_Botloader' if command in (103, 104) else 'Reg_move_Table'} = {command}")
+        print(f"[MAIN] СТОЛ {self.number} функция _send_table_command СТОЛ {self.number} Регул <- {command_name}")
+        logging.info(f"[MAIN] СТОЛ {self.number} функция _send_table_command СТОЛ {self.number} Отправка команды {'Reg_updown_Botloader' if command in (103, 104) else 'Reg_move_Table'} = {command}")
         
+        response_reg = None
+        command_sent = False
         try: 
             # Отправляем команду
             if command in (103, 104):
                 self.change_value('Reg_updown_Botloader', command)
                 response_reg = 'sub_Reg_updown_Botloader'
+                logging.info(f"СТОЛ {self.number} [COMMAND] отправка команды столу {command}")
             else:
                 self.change_value('Reg_move_Table', command)
                 response_reg = 'sub_Reg_move_Table'
             
+            command_sent = True
+            
             # Ожидаем подтверждения
+            last_log_time = start_time
             while time.time() - start_time < timeout:
                 result = self.read_value(response_reg)
                 
                 if result == command:
-                    logging.info(f"СТОЛ {self.number} Успешное завершение: команда {command_name} выполнена")
+                    logging.info(f"СТОЛ {self.number} [COMMAND] получено подтверждение команды {command_name} значение {result}")
+                    # ТОЛЬКО при успешном подтверждении сбрасываем команду
+                    if command in (103, 104):
+                        self.change_value('Reg_updown_Botloader', 0)
+                    else:
+                        self.change_value('Reg_move_Table', 0)
+                    logging.info(f"СТОЛ {self.number} [COMMAND] Команда сброшена после подтверждения")
                     return True
                 elif result == 404:
-                    logging.warning(f"СТОЛ {self.number} От регула получен код 404")
+                    logging.error(f"СТОЛ {self.number} [COMMAND] ошибка выполнения команды: 404")
                     raise TableOperationFailed("Ошибка выполнения команды стола")
+                elif result != 0:  # Добавляем проверку на другие ошибки
+                    logging.warning(f"СТОЛ {self.number} [COMMAND] неожиданный ответ: {result}")
                 
-                logging.debug(f"СТОЛ {self.number} Ожидание ответа... Текущее значение: {result}")
+                # Логируем статус не чаще чем раз в 5 секунд
+                current_time = time.time()
+                if current_time - last_log_time >= 5:
+                    logging.debug(f"СТОЛ {self.number} [COMMAND] функция _send_table_command Ожидание ответа на команду {command_name}. Текущее значение: {result}")
+                    last_log_time = current_time
+                
                 time.sleep(0.5)
             
-            # Если дошли сюда - таймаут
-            logging.error(f"СТОЛ {self.number} ТАЙМАУТ: Стол не ответил на команду {command}")
-            raise TableTimeoutException(f"Стол не ответил за {timeout} сек")
-        finally:
-            # Всегда сбрасываем команду
-            if command in (103, 104):
-                self.change_value('Reg_updown_bootloader', 0)
-            else:
-                self.change_value('Reg_move_Table', 0)
-            logging.info(f"СТОЛ {self.number} Команда сброшена")
+            # Если дошли сюда - таймаут, НИЧЕГО НЕ СБРАСЫВАЕМ
+            logging.error(f"СТОЛ {self.number} [COMMAND] ТАЙМАУТ: Стол не ответил на команду {command}")
+            raise TableTimeoutException(f"СТОЛ {self.number} [COMMAND] не ответил за {timeout} сек")
+        
+        except Exception as e:
+            logging.error(f"СТОЛ {self.number} [COMMAND] Ошибка при отправке команды {command}: {e}")
+            # При любой ошибке НИЧЕГО НЕ СБРАСЫВАЕМ
+            raise
 
     def _take_photo(self, max_attempts=3, retry_delay=1):
         """
@@ -757,6 +806,7 @@ class Table:
             time.sleep(retry_delay)
         
     def start_sewing(self, photodata, loge, max_attempts=120, retry_delay=1):
+        global Tray1, Tray2, Tray3
         """
         Метод для инициализации процесса прошивки с обработкой ошибок
         
@@ -806,7 +856,29 @@ class Table:
         while attempt < max_attempts:
             attempt += 1
             try:
-                result = firmware_loader.loader(photodata, loge)
+                result, error_description = firmware_loader.loader(photodata, loge)
+                # Если прошивка не успешная - в отбраковку, иначе в нормальный лоток
+                print(f"**************** error_description  {error_description}")
+                if error_description != True:
+                    if self.number == 1:
+                        Tray1 = 3  # Отбраковка
+                    elif self.number == 2:
+                        Tray2 = 3  # Отбраковка
+                    elif self.number == 3:
+                        Tray3 = 3  # Отбраковка
+                    else:
+                        # Обработка неверного номера
+                        print(f"Ошибка: неверный номер лотка {self.number}")
+                else:
+                    if self.number == 1:
+                        Tray1 = 2  # Нормальный
+                    elif self.number == 2:
+                        Tray2 = 2  # Нормальный
+                    elif self.number == 3:
+                        Tray3 = 2  # Нормальный
+                    else:
+                        # Обработка неверного номера
+                        print(f"Ошибка: неверный номер лотка {self.number}")
                 print(f"Ответ от прошивальщика (попытка {attempt}): {result}")
                 logging.debug(f"Ответ от прошивальщика: {result}")
                 
@@ -866,6 +938,15 @@ class Table:
                 
                 # 3. Запускаем прошивку (используем фото, сделанное заранее)
                 self.start_sewing(next_photodata, loge=current_loge)
+                if self.number == 1:
+                    Tray_robot = Tray1  # Отбраковка
+                elif self.number == 2:
+                    Tray_robot = Tray2  # Отбраковка
+                elif self.number == 3:
+                    Tray_robot = Tray3  # Отбраковка
+                logging.info(f"[MAIN] Палата будет переложена в коробку {Tray_robot}")
+                print(f"[MAIN] *********************Палата будет переложена в коробку {Tray_robot}")
+                
                 
                 print("Получена команда поднятия ручки")
                 logging.warning(f"Получена команда поднятия ручки")
@@ -1015,12 +1096,11 @@ class Table:
     def robo_main_cycle(self):
         import threading, time, logging
         from dataclasses import dataclass
-        global Tray1, Cell1, photodata, photodata1
+        global Tray1, Cell1, photodata, photodata1, Tray_robot
 
-        SEW_WAIT_TIMEOUT = 1200  # сек
-        ROBOT_WAIT_TIMEOUT = 300 # сек
+        SEW_WAIT_TIMEOUT = 900000  # сек
+        ROBOT_WAIT_TIMEOUT = 900000 # сек
 
-        Tray1 = 2
         print(f"[MAIN] ЦИКЛ MAIN для {self.number} стола старт")
         logging.info(f"[MAIN] ЦИКЛ MAIN для {self.number} стола старт")
 
@@ -1034,6 +1114,7 @@ class Table:
 
         def _move_table_to_loge(loge: int):
             self._send_table_command(101 if loge == 1 else 102)
+
 
         def _robot_remove(loge: int) -> bool:
             # было: 231/232 -> fallback 230
@@ -1051,6 +1132,9 @@ class Table:
         while True:
             try:
                 print(f"\n=== Обработка ложемента {current_loge} ===")
+                if EMERGENCY_STOP.is_set():
+                    logging.critical(f"[MAIN] СТОЛ {self.number} аварийно остановлен (EMERGENCY_STOP)")
+                    return
 
                 if in_flight_sewing_thread is None and not parallel_join_mode:
                     # ---------------- ПЕРВЫЙ ЦИКЛ (БЕЗ ИЗМЕНЕНИЙ) ----------------
@@ -1058,7 +1142,7 @@ class Table:
 
                     # 1) Поднять голову (страховка), подвести current_loge
                     self._send_table_command(104)
-                    logging.info(f"[MAIN] СТОЛ {self.number} Подняли прошивальщик (перед подводом текущего ложемента)")
+                    logging.info(f"[MAIN][COMMAND->Regul->104] СТОЛ {self.number} Подняли прошивальщик (перед подводом текущего ложемента)")
 
                     _move_table_to_loge(current_loge)
                     logging.info(f"[MAIN] Сдвигаем стол {self.number} под прошивальщик (под головкой ложе {current_loge})")
@@ -1073,6 +1157,7 @@ class Table:
                     try:
                         global Cell1
                         Cell1 = Cell1 + 1
+                        time.sleep(1) # А то модбас читать не успевает
                         if not self._send_robot_command(210):
                             raise TableOperationFailed("Ошибка забора платы из тары")
                         logging.info(f"[MAIN] СТОЛ {self.number} Забираем новую плату из тары ячейка {Cell1}")
@@ -1102,7 +1187,7 @@ class Table:
                         logging.error(f"[MAIN] СТОЛ {self.number} Таймаут прошивки на ложе {current_loge}")
                         raise RuntimeError("Sewing timeout (initial cycle)")
                     logging.info(f"[MAIN] СТОЛ {self.number} Прошивка на ложе {current_loge} завершена")
-
+                    
                     # 5) Поднять голову, перейти на free_loge
                     self._send_table_command(104)
                     logging.info(f"[MAIN] СТОЛ {self.number} Подняли прошивальщик с ложе {current_loge}")
@@ -1118,6 +1203,15 @@ class Table:
                         logging.info(f"[MAIN] СТОЛ {self.number} ждет освобождения робота (выгрузка+загрузка на ложе {current_loge})")
                         time.sleep(1)
                     try:
+                        print(f" В стол {self.number}")
+                        if self.number == 1:
+                            Tray_robot = Tray1  # Отбраковка
+                        elif self.number == 2:
+                            Tray_robot = Tray2  # Отбраковка
+                        elif self.number == 3:
+                            Tray_robot = Tray3  # Отбраковка
+                        logging.info(f"[MAIN] Палата будет переложена в коробку {Tray_robot}")
+
                         # снять обработанную
                         if not self._send_robot_command(230, cell_num=current_loge):
                             raise TableOperationFailed(f"Ошибка забора с ложемента {current_loge}")
@@ -1129,6 +1223,7 @@ class Table:
 
                         # сразу взять новую и уложить на только что освобождённое ложе
                         Cell1 = Cell1 + 1
+                        time.sleep(1) # А то модбас читать не успевает
                         if not self._send_robot_command(210):
                             raise TableOperationFailed("Ошибка забора платы из тары")
                         logging.info(f"[MAIN] СТОЛ {self.number} Забираем новую плату из тары ячейка {Cell1}")
@@ -1157,6 +1252,14 @@ class Table:
                     parallel_join_mode = True          # со 2-й итерации — новый режим
                     logging.info(f"[MAIN] Подготовка к 2-й итерации: current_loge={current_loge}, next_DM={next_photodata}")
 
+                    if self.number == 1:
+                        Tray_robot = Tray1  # Отбраковка
+                    elif self.number == 2:
+                        Tray_robot = Tray2  # Отбраковка
+                    elif self.number == 3:
+                        Tray_robot = Tray3  # Отбраковка
+                    logging.info(f"[MAIN] Палата будет переложена в коробку {Tray_robot}")
+
                 else:
                     # ---------------- СО 2-Й ИТЕРАЦИИ: ДВА ПАРАЛЛЕЛЬНЫХ ПОТОКА ----------------
                     # 0) Дождаться завершения in-flight на current_loge (с конца 1-й итерации)
@@ -1183,6 +1286,7 @@ class Table:
                     thread_errors = {"table": None, "robot": None}
 
                     def table_thread():
+                        global Tray1, Tray2, Tray3, Tray_robot
                         try:
                             # 3) Стол: 103 + прошивка на next_loge
                             self._send_table_command(103)
@@ -1192,6 +1296,16 @@ class Table:
                             logging.info(f"[MAIN] СТОЛ {self.number} Прошивка на ложе {next_loge} завершена")
                         except Exception as e:
                             thread_errors["table"] = e
+
+                        if self.number == 1:
+                            Tray_robot = Tray1  # Отбраковка
+                        elif self.number == 2:
+                            Tray_robot = Tray2  # Отбраковка
+                        elif self.number == 3:
+                            Tray_robot = Tray3  # Отбраковка
+                        logging.info(f"[MAIN] Палата будет переложена в коробку {Tray_robot}")
+                        
+                        # снять обработанную
 
                     def robot_thread():
 
@@ -1211,6 +1325,8 @@ class Table:
 
                                 global Cell1
                                 Cell1 = Cell1 + 1
+                                time.sleep(1) # А то модбас читать не успевает
+
                                 if not self._send_robot_command(210):
                                     raise TableOperationFailed("Ошибка забора платы из тары (210)")
                                 logging.info(f"[MAIN] СТОЛ {self.number} 210 — взяли новую плату, ячейка %s", Cell1)
@@ -1263,6 +1379,9 @@ class Table:
 
             except Exception as e:
                 logging.error(f"Ошибка в цикле обработки: {str(e)}")
+                if EMERGENCY_STOP.is_set():
+                    logging.critical(f"[MAIN] СТОЛ {self.number} аварийно остановлен во время восстановления")
+                    return
                 try:
                     self._send_table_command(104)
                     logging.info(f"[MAIN] СТОЛ {self.number} Восстановление: подняли прошивальщик")
@@ -1366,6 +1485,7 @@ if __name__ == "__main__":
     #     table.setup_robo_cycle()
 
     # Создаем потоки для основного цикла
+    
     thread1 = threading.Thread(target=table1.robo_main_cycle)
     thread2 = threading.Thread(target=table2.robo_main_cycle)
     thread3 = threading.Thread(target=table3.robo_main_cycle)
@@ -1375,30 +1495,63 @@ if __name__ == "__main__":
     # thread2 = threading.Thread(target=table2.test_botloader)
     # thread3 = threading.Thread(target=table3.test_botloader)
 
+    while True:
+        print (f'Ожидание от регула, что столы в начальной позиции')
+        logging.info(f"Ожидание от регула, что столы в начальной позиции")
+        time.sleep(1)
+        SETUP_TABLE = 1
+        if SUB_SETUP_TABLE == 1:
+            SETUP_TABLE = 0
+            logging.info(f"получен ответ от регула, что столы приведены в нулевое положении")
+            print (f'получен ответ от регула, что столы приведены в нулевое положении ')
+            break
+        
+
 
     # Запускаем потоки
     print('__________________1 стол')
+    time.sleep(20)
     thread1.start()
-    time.sleep(15)
+    time.sleep(5)
 
-    # print('__________________2 стол')
-    # thread2.start()
-    # time.sleep(15)
+    print('__________________2 стол')
+    thread2.start()
+    time.sleep(5)
 
-    # print('__________________3 стол')
-    # thread3.start()
+    print('__________________3 стол')
+    thread3.start()
 
-    #Ждем завершения всех потоков
-    thread1.join()
-    # thread2.join()
-    # thread3.join()
+    # Ждём глобальной аварии или завершения потоков
+    try:
+        while True:
+            if EMERGENCY_STOP.is_set():
+                logging.critical("[MAIN] Поймали EMERGENCY_STOP в главном потоке. Останавливаемся.")
+                break
+            if not thread1.is_alive() and not thread2.is_alive() and not thread3.is_alive():
+                break
+            time.sleep(1)
+    finally:
+        # Пытаемся штатно остановить сервисные части
+        try:
+            opc_client.stop()
+        except Exception:
+            logging.exception("Ошибка при остановке OPC клиента")
 
-    print("Все потоки завершены.")
-    opc_client.stop()
+        try:
+            db_sync.stop()
+        except Exception:
+            logging.exception("Ошибка при остановке потока синхронизации БД")
+
+        # Дожимаем потоки столов
+        for t in (thread1, thread2, thread3):
+            try:
+                if t.is_alive():
+                    t.join(timeout=5)
+            except Exception:
+                pass
 
 
-    ################################################# START OPC Communication class l ###################################
-    
- 
+        print("Все потоки завершены.")
+
 
     

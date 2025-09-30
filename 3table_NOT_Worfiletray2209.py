@@ -90,16 +90,6 @@ Order = "ЗНП-2160.1.1"
 photodata = None
 
 
-dict_Table1 = {
-    'Reg_move_Table': 0,
-    'sub_Reg_move_Table': 0,
-    'Reg_updown_Botloader': 0,
-    'sub_Reg_updown_Botloader': 0,
-    'Rob_Action': 0,
-    'sub_Rob_Action': 0
-    
-}
-
 shared_data = {
     1: {
         'DICT1': 0,

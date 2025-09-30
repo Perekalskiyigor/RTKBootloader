@@ -373,7 +373,7 @@ class OPCClient:
                                 if ButtonLoadOrders:
                                     try:
                                         orders = Provider1C.getOrders() or ['']  # Default empty list
-                                        node = self.client.get_node('ns=2;s=Application.UserInterface.search_result')
+                                        node = self.client.get_node('ns=2;s=Application.UserInterface.OPC_search_result')
                                         node.set_value(ua.DataValue(ua.Variant(orders, ua.VariantType.String)))
                                     except Exception as e:
                                         print(f"Error handling ButtonLoadOrders: {e}")

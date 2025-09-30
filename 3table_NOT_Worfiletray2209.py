@@ -181,8 +181,9 @@ shared_data = {
 
         'OPC_ButtonLoadOrders': False,
         'OPC_ButtonSelectOrder': False,
-        'OPC_Order': "ЗНП-2160.1.1",
-        'OPC_Orders': ""
+        'OPC_Order': "",
+        'OPC_Orders': "",
+        'OPC_load_t1': 0,
         },
 
 }
@@ -304,6 +305,7 @@ class OPCClient:
         self.my_data.setdefault("OPC_ButtonLoadOrders", False)
         self.my_data.setdefault("OPC_ButtonSelectOrder", False)
         self.my_data.setdefault("OPC_Order", "")
+        self.my_data.setdefault("OPC_load_t1", 0)
         
         self.client = None
         self.connected = False
@@ -354,7 +356,7 @@ class OPCClient:
                             # Read ButtonLoadOrders with protection
                             ButtonLoadOrders = False  # Default value
                             try:
-                                node = self.client.get_node('ns=2;s=Application.UserInterface.ButtonLoadOrders')
+                                node = self.client.get_node('ns=2;s=Application.UserInterface.OPC_ButtonLoadOrders')
                                 ButtonLoadOrders = node.get_value() or False
                             except Exception as e:
                                 print(f"Error reading ButtonLoadOrders: {e}")
@@ -366,17 +368,29 @@ class OPCClient:
                             if self.connected:
                                 # Write interface values with protection
                                 try:
-                                    node = self.client.get_node('ns=2;s=Application.UserInterface.name_board')
+                                    node = self.client.get_node('ns=2;s=Application.UserInterface.OPC_nameboard')
                                     node.set_value(ua.DataValue(ua.Variant(shared_data['OPC-DB']['DB_module'], ua.VariantType.String)))
                                 except Exception as e:
                                     print(f"Error setting name_board: {e}")
 
                                 try:
-                                    node = self.client.get_node('ns=2;s=Application.UserInterface.fw_version')
+                                    node = self.client.get_node('ns=2;s=Application.UserInterface.OPC_firmware')
                                     node.set_value(ua.DataValue(ua.Variant(shared_data['OPC-DB']['DB_fw_version'], ua.VariantType.String)))
                                 except Exception as e:
                                     print(f"Error setting fw_version: {e}")
-
+                                # Получаем OPC_Order
+                                try:
+                                    node = self.client.get_node('ns=2;s=Application.UserInterface.OPC_Order')
+                                    shared_data['OPC-DB']['OPC_Order'] = node.get_value()
+                                    print(f"Получен заказ: {shared_data['OPC-DB']['OPC_Order']}")
+                                except Exception as e:
+                                    print(f"Error setting OPC_Order: {e}")
+                                # Высылаем OPC_load_t1
+                                try:
+                                    node = self.client.get_node('ns=2;s=Application.GVL.OPC_load_t1')
+                                    node.set_value(ua.DataValue(ua.Variant(shared_data['OPC-DB']['OPC_load_t1'], ua.VariantType.Int16)))
+                                except Exception as e:
+                                    print(f"Error setting fw_version: {e}")
                                 # Other write operations similarly protected...
 
                                 # Handle ButtonLoadOrders logic
@@ -829,6 +843,9 @@ class Table:
 
         # Выбор параметра "stand_id"  в прошивку в зависимости от номера стола
 
+        with shared_data_lock:
+            shared_data['OPC-DB']['OPC_load_t1'] = 1
+
         if self.number == 1:
             stand_id = "table_1"
             igle_table_choose = igle_table
@@ -900,7 +917,7 @@ class Table:
             
             if attempt < max_attempts:
                 time.sleep(retry_delay)
-        
+        shared_data['OPC-DB']['OPC_load_t1'] = 0
         return False
     
     #  # 1. Сдвигаем плату (ложе1)
@@ -938,6 +955,8 @@ class Table:
 
                 time.sleep(3)
                 
+                
+
                 # 3. Запускаем прошивку (используем фото, сделанное заранее)
                 self.start_sewing(next_photodata, loge=current_loge)
                 if self.number == 1:
@@ -948,7 +967,8 @@ class Table:
                     Tray_robot = Tray3  # Отбраковка
                 logging.info(f"[MAIN] Палата будет переложена в коробку {Tray_robot}")
                 print(f"[MAIN] *********************Палата будет переложена в коробку {Tray_robot}")
-                
+
+              
                 
                 print("Получена команда поднятия ручки")
                 logging.warning(f"Получена команда поднятия ручки")
@@ -1540,7 +1560,7 @@ if __name__ == "__main__":
     thread2 = threading.Thread(target=table2.robo_main_cycle)
     thread3 = threading.Thread(target=table3.robo_main_cycle)
 
-    # Тестовые циклы только прошивка
+    # # Тестовые циклы только прошивка
     # thread1 = threading.Thread(target=table1.test_botloader)
     # thread2 = threading.Thread(target=table2.test_botloader)
     # thread3 = threading.Thread(target=table3.test_botloader)
@@ -1563,12 +1583,11 @@ if __name__ == "__main__":
     time.sleep(10)
     thread1.start()
 
-    time.sleep(10)
 
     print('__________________2 стол')
     thread2.start()
 
-    time.sleep(10)
+    time.sleep(15)
 
     print('__________________3 стол')
     thread3.start()
@@ -1595,7 +1614,7 @@ if __name__ == "__main__":
             logging.exception("Ошибка при остановке потока синхронизации БД")
 
         # Дожимаем потоки столов
-        for t in (thread1, thread2, thread3):
+        for t in ("thread1", thread2, thread3):
             try:
                 if t.is_alive():
                     t.join(timeout=5)

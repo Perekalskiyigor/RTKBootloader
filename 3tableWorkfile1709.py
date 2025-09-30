@@ -616,7 +616,7 @@ class Table:
 
     # The first cycle Protect Table in the start work
 
-    def _send_robot_command(self, base_command, cell_num=None, timeout_s: int = 600):
+    def _send_robot_command(self, base_command, cell_num=None, timeout_s: int = 32000):
         """
         Отправляет команду роботу с разделением 220 (укладка) / 230 (забор).
         Если в течение timeout_s (по умолчанию 300 сек = 5 минут) нет подтверждения — 
@@ -710,7 +710,7 @@ class Table:
         command_sent = False
         try: 
             # Отправляем команду
-            if command in (103, 104):
+            if command in (103, 104): 
                 self.change_value('Reg_updown_Botloader', command)
                 response_reg = 'sub_Reg_updown_Botloader'
                 logging.info(f"СТОЛ {self.number} [COMMAND] отправка команды столу {command}")
@@ -1486,14 +1486,14 @@ if __name__ == "__main__":
 
     # Создаем потоки для основного цикла
     
-    thread1 = threading.Thread(target=table1.robo_main_cycle)
-    thread2 = threading.Thread(target=table2.robo_main_cycle)
-    thread3 = threading.Thread(target=table3.robo_main_cycle)
+    # thread1 = threading.Thread(target=table1.robo_main_cycle)
+    # thread2 = threading.Thread(target=table2.robo_main_cycle)
+    # thread3 = threading.Thread(target=table3.robo_main_cycle)
 
     # Тестовые циклы только прошивка
     # thread1 = threading.Thread(target=table1.test_botloader)
-    # thread2 = threading.Thread(target=table2.test_botloader)
-    # thread3 = threading.Thread(target=table3.test_botloader)
+    thread2 = threading.Thread(target=table2.test_botloader)
+    thread3 = threading.Thread(target=table3.test_botloader)
 
     while True:
         print (f'Ожидание от регула, что столы в начальной позиции')
@@ -1511,7 +1511,7 @@ if __name__ == "__main__":
     # Запускаем потоки
     print('__________________1 стол')
     time.sleep(20)
-    thread1.start()
+    # thread1.start()
     time.sleep(5)
 
     print('__________________2 стол')
@@ -1543,7 +1543,7 @@ if __name__ == "__main__":
             logging.exception("Ошибка при остановке потока синхронизации БД")
 
         # Дожимаем потоки столов
-        for t in (thread1, thread2, thread3):
+        for t in ("""thread1""", thread2, thread3):
             try:
                 if t.is_alive():
                     t.join(timeout=5)

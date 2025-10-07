@@ -313,8 +313,8 @@ class OPCClient:
         self.my_data = shared_dict.get(client_id, {})
 
         # значения по умолчанию
-        self.my_data.setdefault("OPC_ButtonLoadOrders", False)
-        self.my_data.setdefault("OPC_ButtonSelectOrder", False)
+        self.my_data.setdefault("OPC_ButtonLoadOrders", 0)
+        self.my_data.setdefault("OPC_ButtonSelectOrder", 0)
         self.my_data.setdefault("OPC_Order", "")
 
         # кэш OPC-узлов
@@ -355,13 +355,13 @@ class OPCClient:
         except Exception as e:
             print(f"[OPC] write fail {nodeid}: {e}")
 
-    def _read_bool(self, nodeid, default=False):
+    def _read_bool(self, nodeid, default=0):
         node = self._get_node(nodeid)
         if not node:
             return default
         try:
             v = node.get_value()
-            return bool(v)
+            return int(v)
         except Exception as e:
             print(f"[OPC] read bool fail {nodeid}: {e}")
             return default
@@ -390,35 +390,22 @@ class OPCClient:
 
                     # при коннекте можно заранее прогреть часто используемые узлы
                     warm_ids = [
-                        'ns=2;s=Application.UserInterface.ButtonLoadOrders',
-                        'ns=2;s=Application.UserInterface.ButtonSelectOrder',
-                        'ns=2;s=Application.UserInterface.selected_order',     # попробуем оба варианта
-                        'ns=2;s=Application.UserInterface.SelectedOrder',
-                        'ns=2;s=Application.UserInterface.name_board',
-                        'ns=2;s=Application.UserInterface.fw_version',
-                        'ns=2;s=Application.UserInterface.search_result',
-                        # статусы столов (примерные пути — поправьте под свои nodeId при необходимости)
-                        'ns=2;s=Application.UserInterface.Table1.State',
-                        'ns=2;s=Application.UserInterface.Table1.Sewing',
-                        'ns=2;s=Application.UserInterface.Table1.Loge',
-                        'ns=2;s=Application.UserInterface.Table1.DM',
-                        'ns=2;s=Application.UserInterface.Table1.Progress',
-                        'ns=2;s=Application.UserInterface.Table1.Result',
-                        'ns=2;s=Application.UserInterface.Table1.Error',
-                        'ns=2;s=Application.UserInterface.Table2.State',
-                        'ns=2;s=Application.UserInterface.Table2.Sewing',
-                        'ns=2;s=Application.UserInterface.Table2.Loge',
-                        'ns=2;s=Application.UserInterface.Table2.DM',
-                        'ns=2;s=Application.UserInterface.Table2.Progress',
-                        'ns=2;s=Application.UserInterface.Table2.Result',
-                        'ns=2;s=Application.UserInterface.Table2.Error',
-                        'ns=2;s=Application.UserInterface.Table3.State',
-                        'ns=2;s=Application.UserInterface.Table3.Sewing',
-                        'ns=2;s=Application.UserInterface.Table3.Loge',
-                        'ns=2;s=Application.UserInterface.Table3.DM',
-                        'ns=2;s=Application.UserInterface.Table3.Progress',
-                        'ns=2;s=Application.UserInterface.Table3.Result',
-                        'ns=2;s=Application.UserInterface.Table3.Error',
+                        'ns=2;s=Application.UserInterface.OPC_ButtonLoadOrders',
+                        #'ns=2;s=Application.UserInterface.OPC_ButtonSelectOrder',
+                        'ns=2;s=Application.UserInterface.OPC_selected_order', 
+                        'ns=2;s=Application.UserInterface.OPC_SelectedOrder',
+                        'ns=2;s=Application.UserInterface.OPC_nameboard',
+                        'ns=2;s=Application.UserInterface.OPC_firmware',
+                        'ns=2;s=Application.UserInterface.OPC_search_result',
+                        # Прошивка
+                        'ns=2;s=Application.GVL.OPC_load_t1',
+                        'ns=2;s=Application.GVL.OPC_load_t2',
+                        'ns=2;s=Application.GVL.OPC_load_t3',
+                        'ns=2;s=Application.GVL.OPC_load_t1',
+                        'ns=2;s=Application.GVL.OPC_load_t2',
+                        'ns=2;s=Application.GVL.OPC_load_t3'
+                        # статусы столов
+                        
                     ]
                     for nid in warm_ids:
                         self._get_node(nid)
@@ -443,14 +430,14 @@ class OPCClient:
     def update_registers(self):
         """Раз в секунду читает кнопки, пишет статусы из shared_data в OPC"""
         global shared_data
-        BUTTON_LOAD = 'ns=2;s=Application.UserInterface.ButtonLoadOrders'
-        BUTTON_SELECT = 'ns=2;s=Application.UserInterface.ButtonSelectOrder'
-        SELECTED_ORDER_A = 'ns=2;s=Application.UserInterface.selected_order'
-        SELECTED_ORDER_B = 'ns=2;s=Application.UserInterface.SelectedOrder'
+        BUTTON_LOAD = 'ns=2;s=Application.UserInterface.OPC_ButtonLoadOrders'
+        # BUTTON_SELECT = 'ns=2;s=Application.UserInterface.OPC_ButtonSelectOrder'
+        SELECTED_ORDER_A = 'ns=2;s=Application.UserInterface.OPC_selected_order'
+        SELECTED_ORDER_B = 'ns=2;s=Application.UserInterface.OPC_SelectedOrder'
 
-        NAME_BOARD = 'ns=2;s=Application.UserInterface.name_board'
-        FW_VERSION = 'ns=2;s=Application.UserInterface.fw_version'
-        SEARCH_RESULT = 'ns=2;s=Application.UserInterface.search_result'
+        NAME_BOARD = 'ns=2;s=Application.UserInterface.OPC_nameboard'
+        FW_VERSION = 'ns=2;s=Application.UserInterface.OPC_firmware'
+        SEARCH_RESULT = 'ns=2;s=Application.UserInterface.OPC_search_result'
 
         # шаблон nodeId для столов
         def T(n, leaf):
@@ -466,16 +453,16 @@ class OPCClient:
                     # ---------- 1) READ: кнопки из OPC ----------
                     try:
                         btn_load = self._read_bool(BUTTON_LOAD, False)
-                        btn_select = self._read_bool(BUTTON_SELECT, False)
+                        #  btn_select = self._read_bool(BUTTON_SELECT, False)
 
                         # отражаем в словаре (по желанию)
                         with shared_data_lock:
                             shared_data['OPC-DB']["OPC_ButtonLoadOrders"] = btn_load
-                            shared_data['OPC-DB']["OPC_ButtonSelectOrder"] = btn_select
+                            # shared_data['OPC-DB']["OPC_ButtonSelectOrder"] = btn_select
                     except Exception as e:
                         print(f"[OPC] read buttons failed: {e}")
                         btn_load = False
-                        btn_select = False
+                        # btn_select = False
 
                     # ---------- 2) WRITE: витрина DB полей ----------
                     try:
@@ -500,34 +487,34 @@ class OPCClient:
                         except Exception as e:
                             print(f"[OPC] handle ButtonLoadOrders failed: {e}")
 
-                    # ---------- 4) ButtonSelectOrder: читаем выбранный заказ ----------
-                    if btn_select:
-                        # пробуем оба возможных имени узла
-                        selected = self._read_str(SELECTED_ORDER_A, "")
-                        if not selected:
-                            selected = self._read_str(SELECTED_ORDER_B, "")
-                        if selected:
-                            with shared_data_lock:
-                                shared_data['OPC-DB']['OPC_Order'] = selected
-                            logging.info(f"[OPC] Selected order: {selected}")
+                    # # ---------- 4) ButtonSelectOrder: читаем выбранный заказ ----------
+                    # if btn_select:
+                    #     # пробуем оба возможных имени узла
+                    #     selected = self._read_str(SELECTED_ORDER_A, "")
+                    #     if not selected:
+                    #         selected = self._read_str(SELECTED_ORDER_B, "")
+                    #     if selected:
+                    #         with shared_data_lock:
+                    #             shared_data['OPC-DB']['OPC_Order'] = selected
+                    #         logging.info(f"[OPC] Selected order: {selected}")
 
                     # ---------- 5) Пушим статусы столов (1..3) ----------
-                    try:
-                        with shared_data_lock:
-                            t1 = dict(self.shared_dict.get(1, {}))
-                            t2 = dict(self.shared_dict.get(2, {}))
-                            t3 = dict(self.shared_dict.get(3, {}))
+                    # try:
+                    #     with shared_data_lock:
+                    #         t1 = dict(self.shared_dict.get(1, {}))
+                    #         t2 = dict(self.shared_dict.get(2, {}))
+                    #         t3 = dict(self.shared_dict.get(3, {}))
 
-                        for n, td in ((1, t1), (2, t2), (3, t3)):
-                            self._write(T(n, 'State'),    str(td.get('STATE', 'idle')),         ua.VariantType.String)
-                            self._write(T(n, 'Sewing'),   int(td.get('SEWING', 0)),             ua.VariantType.Int16)
-                            self._write(T(n, 'Loge'),     int(td.get('SEW_LOGE', 0)),           ua.VariantType.Int16)
-                            self._write(T(n, 'DM'),       str(td.get('SEW_DM', '')),            ua.VariantType.String)
-                            self._write(T(n, 'Progress'), int(td.get('SEW_PROGRESS', 0)),       ua.VariantType.Int16)
-                            self._write(T(n, 'Result'),   int(td.get('SEW_RESULT', 0)),         ua.VariantType.Int16)
-                            self._write(T(n, 'Error'),    str(td.get('SEW_ERROR', '')),         ua.VariantType.String)
-                    except Exception as e:
-                        print(f"[OPC] push table states failed: {e}")
+                    #     for n, td in ((1, t1), (2, t2), (3, t3)):
+                    #         self._write(T(n, 'State'),    str(td.get('STATE', 'idle')),         ua.VariantType.String)
+                    #         self._write(T(n, 'Sewing'),   int(td.get('SEWING', 0)),             ua.VariantType.Int16)
+                    #         self._write(T(n, 'Loge'),     int(td.get('SEW_LOGE', 0)),           ua.VariantType.Int16)
+                    #         self._write(T(n, 'DM'),       str(td.get('SEW_DM', '')),            ua.VariantType.String)
+                    #         self._write(T(n, 'Progress'), int(td.get('SEW_PROGRESS', 0)),       ua.VariantType.Int16)
+                    #         self._write(T(n, 'Result'),   int(td.get('SEW_RESULT', 0)),         ua.VariantType.Int16)
+                    #         self._write(T(n, 'Error'),    str(td.get('SEW_ERROR', '')),         ua.VariantType.String)
+                    # except Exception as e:
+                    #     print(f"[OPC] push table states failed: {e}")
 
             except Exception as e:
                 print(f"Critical error in update loop: {e}")
@@ -1128,6 +1115,7 @@ class Table:
         while not self.rob_manager.acquire(self.number):
             logging.info(f"СТОЛ {self.number} ждет освобождения робота")
             time.sleep(1)  # Подождать 1 секунду
+            
 
         try:
             print(f"[Начало] Стол {self.number} Захват робота столом")
@@ -1678,17 +1666,16 @@ if __name__ == "__main__":
         
 
 
-    # Запускаем потоки
+    #Запускаем потоки
     print('__________________1 стол')
-    time.sleep(10)
     thread1.start()
 
-    time.sleep(10)
+    time.sleep(15)
 
     print('__________________2 стол')
     thread2.start()
 
-    time.sleep(10)
+    time.sleep(15)
 
     print('__________________3 стол')
     thread3.start()

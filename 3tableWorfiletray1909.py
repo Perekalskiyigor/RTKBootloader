@@ -1536,14 +1536,14 @@ if __name__ == "__main__":
 
     # Создаем потоки для основного цикла
     
-    thread1 = threading.Thread(target=table1.robo_main_cycle)
-    thread2 = threading.Thread(target=table2.robo_main_cycle)
-    thread3 = threading.Thread(target=table3.robo_main_cycle)
+    # thread1 = threading.Thread(target=table1.robo_main_cycle)
+    # thread2 = threading.Thread(target=table2.robo_main_cycle)
+    # thread3 = threading.Thread(target=table3.robo_main_cycle)
 
     # Тестовые циклы только прошивка
-    # thread1 = threading.Thread(target=table1.test_botloader)
-    # thread2 = threading.Thread(target=table2.test_botloader)
-    # thread3 = threading.Thread(target=table3.test_botloader)
+    thread1 = threading.Thread(target=table1.test_botloader)
+    thread2 = threading.Thread(target=table2.test_botloader)
+    thread3 = threading.Thread(target=table3.test_botloader)
 
     while True:
         print (f'Ожидание от регула, что столы в начальной позиции')

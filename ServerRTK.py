@@ -2,6 +2,10 @@ from flask import Flask, request, jsonify
 import logging
 import socket
 
+import threading
+import os
+import time
+
 # Глобальная переменная для хранения последних данных
 latest_data = None
 # Хранилище данных для каждого стенда
@@ -104,8 +108,17 @@ def get_test_results3():
 
 
 if __name__ == '__main__':
-    app.run(host="192.168.1.100", port=5003)
     # app.run(host="172.21.10.182", port=5003)
+    # проверка на то что у этого экземпляра сервера существует свой родитель если нет его надо убить иначе данные будут попадать в него.
+    parent_pid = os.getppid()
+    def monitor_parent():
+        while True:
+            # На Windows и Unix: если родительский процесс сменился — завершаемся
+            if os.getppid() != parent_pid:
+                os._exit(0)
+            time.sleep(1)
+    threading.Thread(target=monitor_parent, daemon=True).start()
+    app.run(host="192.168.1.100", port=5003)
 
 
 """

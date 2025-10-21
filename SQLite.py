@@ -2,6 +2,7 @@
 import datetime
 import sqlite3
 import logging
+from datetime import datetime
 
 class DatabaseConnection:
     def __init__(self):
@@ -545,7 +546,8 @@ class DatabaseConnection:
         except Exception as e:
             logging.error(f"OPC Ошибка при получении данных по заказу '{order_number}': {e}", exc_info=True)
             return None
-
+        
+        
         
         
     def close_connection(self):
@@ -554,6 +556,39 @@ class DatabaseConnection:
         self.conn.close()
         logging.info("Database connection closed.")
 
+
+# Функция отправки логов в таблицу базы данных
+def insert_log(description: str, user: str, status: int = 0):
+    try:
+        conn = sqlite3.connect("orders.db")
+        cursor = conn.cursor()
+
+        # создаём таблицу, если её нет
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS Logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                description TEXT,
+                data TEXT,
+                status INTEGER,
+                user TEXT
+            )
+        """)
+
+        # текущая дата/время
+        data = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # вставка записи
+        cursor.execute(
+            "INSERT INTO Logs (description, data, status, user) VALUES (?, ?, ?, ?)",
+            (description, data, status, user)
+        )
+
+        conn.commit()
+    except sqlite3.Error as e:
+        print("Ошибка при работе с БД:", e)
+    finally:
+        if conn:
+            conn.close()
 
     
 
@@ -594,3 +629,5 @@ if result:
 else:
     print("Данные по заказу не найдены или произошла ошибка.")
 """
+
+# insert_log(f"Для стола получено фото datamatrix платы значение =", 0)

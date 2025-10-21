@@ -10,6 +10,7 @@ import yaml
 import subprocess
 import sys
 import os
+import SQLite
 
 # --- Глобальная аварийная остановка всего комплекса ---
 EMERGENCY_STOP = threading.Event()
@@ -194,10 +195,10 @@ shared_data = {
         'OPC_Order': "ЗНП-2160.1.1", # № Заказа (строка)
         'OPC_Orders': "",
         'OPC_search_result':"", # Узел для хранения списка с заказами
-        'OPC_dataOrder': "", # Узел для хранения списка плат в заказе
+        'OPC_dataOrder': [], # Узел для хранения списка плат в заказе
         'OPC_firmware' :"", # версия прошивки
         'OPC_nameboard': "", # имя платы
-        'OPC_cnt_newBoard':"", # колво непрошитых плат
+        'OPC_cnt_newBoard':0, # колво непрошитых плат
         'OPC_load_t1':0, # 1-старт прошивки 0-конец прошивки стол1
         'OPC_load_t2':0, # 1-старт прошивки 0-конец прошивки стол2
         'OPC_load_t3': 0, # 1-старт прошивки 0-конец прошивки стол3
@@ -207,12 +208,9 @@ shared_data = {
         'OPC_strat_t1': False, # единичный сигнал true - запускаем поток стол1
         'OPC_strat_t2': False, # единичный сигнал true - запускаем поток стол2
         'OPC_strat_t3':False, # единичный сигнал true - запускаем поток стол3
-
-
-
-
-
-
+        'OPC_START_RTK':False, # общий старт потоков\
+        'OPC_log':'', #хранение текущего лога
+        'OPC_res_brak': False, # Сброс брака
         },
 
 }
@@ -222,13 +220,47 @@ shared_data_lock = threading.Lock()
 
 
 
-
+##################################Логеры##########################################################################
 # Set up basic logging configuration
 logging.basicConfig(
     filename='RTK.log',
     level=logging.INFO,
     format=' %(asctime)s - MAIN - %(levelname)s - %(message)s'
 )
+
+
+# Логгер 1
+logger1 = logging.getLogger('LoggerTable1')
+fh1 = logging.FileHandler('LoggerTable1.txt')
+logger1.addHandler(fh1)
+logger1.setLevel(logging.INFO)
+
+# Логгер 2
+logger2 = logging.getLogger('LoggerTable2')
+fh2 = logging.FileHandler('LoggerTable2.txt')
+logger2.addHandler(fh2)
+logger2.setLevel(logging.DEBUG)
+
+# Логгер 3
+logger3 = logging.getLogger('LoggerTable3')
+fh3 = logging.FileHandler('LoggerTable3.txt')
+logger3.addHandler(fh3)
+logger3.setLevel(logging.WARNING)
+
+# функция разброски логов
+loggers = {1: logger1, 2: logger2, 3: logger3}
+
+def log_message(logger_num, log_type, message):
+    """Логирует сообщение в выбранный логгер по номеру и типу"""
+    logger = loggers.get(logger_num)
+    if not logger:
+        raise ValueError('Неверный номер логгера')
+    if log_type == 'info':
+        logger.info(message)
+    elif log_type == 'warning':
+        logger.warning(message)
+    else:
+        raise ValueError('Неверный тип сообщения (используй "info" или "warning")')
 
 ################################################# IgleTable Communication Class ###################################
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -291,13 +323,13 @@ class DatabaseSynchronizer:
                     # Обновление глобального словаря с данными из базы
                     with self.lock:
                         with shared_data_lock:
-                            self.my_data["DB_order_number"] = order_number          # номер заказа
-                            self.my_data["DB_module"] = module                      # имя платы
-                            self.my_data["DB_fw_version"] = fw_version              # версия прошивки
+                            self.my_data["OPC_Order"] = order_number          # номер заказа
+                            self.my_data["OPC_nameboard"] = module                      # имя платы
+                            self.my_data["OPC_firmware"] = fw_version              # версия прошивки
                             self.my_data["DB_last_count"] = last_count              # колво непрошитых
                             self.my_data["DB_common_count"] = common_count          # общее колво плат
                             self.my_data["DB_success_count"] = success_count        # прошито ок
-                            self.my_data["DB_nonsuccess_count"] = nonsuccess_count  # не прошито    
+                            self.my_data["DB_nonsuccess_count"] = last_count  # не прошито
                 else:
                     print(f"[DBSync] Данные по заказу не найдены.")
 
@@ -420,19 +452,22 @@ class OPCClient:
                         'ns=2;s=Application.UserInterface.OPC_Order', # № Заказа (строка)
                         'ns=2;s=Application.UserInterface.OPC_cnt_newBoard', # колво непрошитых плат
                         'ns=2;s=Application.UserInterface.OPC_dataOrder', # Узел для хранения списка плат в заказе
-                        'ns=2;s=Application.UserInterface.OPC_strat_t1', # единичный сигнал true - запускаем поток стол1
-                        'ns=2;s=Application.UserInterface.OPC_strat_t2', # единичный сигнал true - запускаем поток стол1
-                        'ns=2;s=Application.UserInterface.OPC_strat_t3', # единичный сигнал true - запускаем поток стол1
-
-
+                        'ns=2;s=Application.UserInterface.OPC_strat_t1', # true - берем стол1 в работу
+                        'ns=2;s=Application.UserInterface.OPC_strat_t2', # true - берем стол2 в работу
+                        'ns=2;s=Application.UserInterface.OPC_strat_t3', # true - берем стол3 в работу
+                        'ns=2;s=Application.UserInterface.OPC_start_RTK' # единичный сигнал true - запуск основного цикла ртк
+                        'ns=2;s=Application.UserInterface.OPC_log' # от питона приходит текущего лога
                         # Прошивка
                         'ns=2;s=Application.GVL.OPC_load_t1',
                         'ns=2;s=Application.GVL.OPC_load_t2',
                         'ns=2;s=Application.GVL.OPC_load_t3',
                         'ns=2;s=Application.GVL.OPC_res_load_t1',
                         'ns=2;s=Application.GVL.OPC_res_load_t2',
-                        'ns=2;s=Application.GVL.OPC_res_load_t3'
-                        # статусы столов
+                        'ns=2;s=Application.GVL.OPC_res_load_t3',
+
+                        # брак
+                        'ns=2;s=Application.UserInterface.OPC_res_brak'
+
                         
                     ]
                     for nid in warm_ids:
@@ -483,8 +518,11 @@ class OPCClient:
         START_T1 = 'ns=2;s=Application.UserInterface.OPC_strat_t1'
         START_T2 = 'ns=2;s=Application.UserInterface.OPC_strat_t2'
         START_T3 = 'ns=2;s=Application.UserInterface.OPC_strat_t3'
+        START_RTK = 'ns=2;s=Application.UserInterface.OPC_start_RTK'
 
+        OPC_RES_BRAK = 'ns=2;s=Application.UserInterface.OPC_res_brak'
 
+        LOG = 'ns=2;s=Application.UserInterface.OPC_log'
         # шаблон nodeId для столов
         def T(n, leaf):
             return f'ns=2;s=Application.UserInterface.Table{n}.{leaf}'
@@ -516,12 +554,13 @@ class OPCClient:
                             opcdb = dict(shared_data.get('OPC-DB', {}))
 
                         # Базовые поля
-                        self._write(NAME_BOARD, opcdb.get('DB_module', 'пусто'), ua.VariantType.String)
-                        self._write(FW_VERSION, opcdb.get('DB_fw_version', 'пусто'), ua.VariantType.String)
+                        self._write(NAME_BOARD, opcdb.get('OPC_nameboard', 'пусто'), ua.VariantType.String)
+                        self._write(FW_VERSION, opcdb.get('OPC_firmware', 'пусто'), ua.VariantType.String)
 
                         # Кол-во непрошитых (берём OPC_cnt_newBoard, иначе DB_last_count как запасной источник)
-                        cnt_new = opcdb.get('OPC_cnt_newBoard', opcdb.get('DB_last_count', 0))
-                        self._write(CNT_NEW_BOARD, cnt_new, ua.VariantType.Int16)  # при необходимости замените тип
+                        cnt_new = opcdb.get('DB_nonsuccess_count', "")
+                        cnt_new = [str(cnt_new)]
+                        self._write(CNT_NEW_BOARD, cnt_new, ua.VariantType.String)  # при необходимости замените тип
 
                         # Список заказов (строка/массив строк)
                         sr = opcdb.get('OPC_search_result', "")
@@ -531,7 +570,7 @@ class OPCClient:
                             self._write(SEARCH_RESULT, [sr], ua.VariantType.String)
 
                         # Список плат в заказе (строка/массив строк)
-                        data_order = opcdb.get('OPC_dataOrder', "")
+                        data_order = opcdb.get('OPC_dataOrder', [])
                         if isinstance(data_order, (list, tuple)):
                             self._write(DATA_ORDER, list(data_order), ua.VariantType.String)
                         else:
@@ -545,11 +584,35 @@ class OPCClient:
                         self._write(RES_T1,  opcdb.get('OPC_res_load_t1', 0), ua.VariantType.Int16)
                         self._write(RES_T2,  opcdb.get('OPC_res_load_t2', 0), ua.VariantType.Int16)
                         self._write(RES_T3,  opcdb.get('OPC_res_load_t3', 0), ua.VariantType.Int16)
-
                         # Флаги запуска столов (булевы)
-                        self._write(START_T1, opcdb.get('OPC_strat_t1', False), ua.VariantType.Boolean)
-                        self._write(START_T2, opcdb.get('OPC_strat_t2', False), ua.VariantType.Boolean)
-                        self._write(START_T3, opcdb.get('OPC_strat_t3', False), ua.VariantType.Boolean)
+                        # self._write(START_T1, opcdb.get('OPC_strat_t1', False), ua.VariantType.Boolean)
+                        # self._write(START_T2, opcdb.get('OPC_strat_t2', False), ua.VariantType.Boolean)
+                        # self._write(START_T3, opcdb.get('OPC_strat_t3', False), ua.VariantType.Boolean)
+
+                        # Логи на панель
+                        self._write(LOG,  opcdb.get('OPC_log', ""), ua.VariantType.String)
+
+
+                        # --- читаем флаги запуска из OPC и зеркалим в shared_data ---
+                        try:
+                            st1 = bool(self._read_bool(START_T1, False))
+                            st2 = bool(self._read_bool(START_T2, False))
+                            st3 = bool(self._read_bool(START_T3, False))
+                            st4 = bool(self._read_bool(START_RTK, False))
+                            st5 = bool(self._read_bool(OPC_RES_BRAK, False))
+
+                            with shared_data_lock:
+                                shared_data['OPC-DB']['OPC_START_RTK'] = st4
+                                shared_data['OPC-DB']['OPC_strat_t1'] = st1
+                                shared_data['OPC-DB']['OPC_strat_t2'] = st2
+                                shared_data['OPC-DB']['OPC_strat_t3'] = st3
+                                shared_data['OPC-DB']['OPC_res_brak'] = st5
+                        except Exception as e:
+                            print(f"[OPC] read START_T* failed: {e}")
+
+                            # Обнуляем ячейку брака есл иполучили истину в OPC_res_brak
+                            if st5 is True:
+                                Cell2 = 0
 
                         # ВАЖНО: OPC_Order обратно НЕ пишем, только читаем в отдельном блоке-детекторе выбора
                     except Exception as e:
@@ -638,12 +701,6 @@ class ModbusProvider:
         )
         self.lock = threading.Lock()
 
-        self.server_thread = threading.Thread(target=self.run_modbus_server, daemon=True)
-        self.server_thread.start()
-
-        self.update_thread = threading.Thread(target=self.update_registers, daemon=True)
-        self.update_thread.start()
-
         self.last_out = {
             # адрес : последнее записанное значение
             # холдинговые регистры (func=3) и адреса вы используете постоянные:
@@ -653,6 +710,14 @@ class ModbusProvider:
             18: None, 20: None,  4: None,   # стол 3
             6: None,  8: None, 24: None,   # глобальные
         }
+
+        self.server_thread = threading.Thread(target=self.run_modbus_server, daemon=True)
+        self.server_thread.start()
+
+        self.update_thread = threading.Thread(target=self.update_registers, daemon=True)
+        self.update_thread.start()
+
+        
 
     def _set_if_changed(self, addr, value):
         """Пишем в Modbus только если значение поменялось (минимум трафика и задержек)."""
@@ -718,7 +783,8 @@ class ModbusProvider:
                     t1_move = sd1['Reg_move_Table']; t1_updn = sd1['Reg_updown_Botloader']; t1_rob = sd1['Rob_Action']
                     t2_move = sd2['Reg_move_Table']; t2_updn = sd2['Reg_updown_Botloader']; t2_rob = sd2['Rob_Action']
                     t3_move = sd3['Reg_move_Table']; t3_updn = sd3['Reg_updown_Botloader']; t3_rob = sd3['Rob_Action']
-
+                    print('--------------------------------------------------------------------------')
+                    print(f'Rob action ={t1_rob}')
                     setup_table_local = SETUP_TABLE
                     tray_robot_local  = Tray_robot
                     cell_local        = Cell
@@ -770,8 +836,31 @@ class Table:
         self.lock = shared_data_lock
         self.number = number
         self.rob_manager = rob_manager
+        self._loge_state_lock = threading.Lock()   # ← вот этого не хватало
+        # Переменные хранения состояний прошивки на ложе
+        self._loge_outcome = {1: None, 2: None}  # 2=успех(норм), 3=брак
+        self._loge_dm      = {1: None, 2: None}  # опционально: DM последней прошивки на ложе
 
+    # Утилиты для записи/чтения результатов прошивки на ложе
+    def _set_loge_outcome(self, loge: int, tray_code: int, dm: str | None = None):
+        # tray_code: 2 = норм, 3 = брак (как у вас)
+        with self._loge_state_lock:
+            self._loge_outcome[loge] = tray_code
+            if dm is not None:
+                self._loge_dm[loge] = dm
 
+    def _consume_loge_outcome(self, loge: int) -> int | None:
+        # атомарно прочитать И ОБНУЛИТЬ
+        with self._loge_state_lock:
+            tr = self._loge_outcome.get(loge)
+            self._loge_outcome[loge] = None
+            return tr
+
+    def _get_loge_dm(self, loge: int) -> str | None:
+        with self._loge_state_lock:
+            return self._loge_dm.get(loge)
+        
+    # Методы работы с глобальным словарем
 
     # Method write registers in modbus through modbus_provider
     def change_value(self, key, new_value):
@@ -802,16 +891,17 @@ class Table:
         """
         if EMERGENCY_STOP.is_set():
             logging.error(f"СТОЛ {self.number} Команда роботу игнорируется: EMERGENCY_STOP активен")
+            SQLite.insert_log(f"Для стола {self.number} получен аварийный стоп, останавливаем все процессы", 0)
             return False
 
-        # Проверки аргументов (как у вас)
+        # Проверки аргументов 
         if base_command in (220, 230):
             if cell_num not in (1, 2):
                 raise ValueError("Для команд 220/230 укажите cell_num: 1 или 2")
         if not (1 <= self.number <= 3):
             raise ValueError(f"Некорректный номер стола: {self.number}. Допустимо: 1-3")
 
-        # Построение команды (как у вас)
+        # Построение команды 
         if base_command == 210:
             command = 210
         elif base_command == 241:
@@ -828,6 +918,7 @@ class Table:
         action_desc = "Укладка" if base_command == 220 else "Забор" if base_command == 230 else "Команда"
         logging.info(f"СТОЛ {self.number}, ЯЧЕЙКА {cell_num} → {action_desc}: {command}")
         self.change_value('Rob_Action', command)
+        SQLite.insert_log(f"Роботу отправлена команда {command}", 0)
 
         start_time = time.time()
         try:
@@ -952,6 +1043,7 @@ class Table:
                 res, photodata = CameraSocket.photo()
                 print(f"Стол {self.number} С камеры получен ID {photodata}")
                 logging.debug(f"Стол {self.number} Успех: получен ID фото {photodata}")
+                SQLite.insert_log(f"Для стола {self.number} получено фото datamatrix платы значение = {photodata}", 0)
                 
                 # Если фото получено успешно, возвращаем результат
                 if res == 200 and photodata != "NoRead":
@@ -982,7 +1074,7 @@ class Table:
                 logging.error(f"Стол {self.number} Ошибка при запросе фото: {str(e)}")
                 
             time.sleep(retry_delay)
-        
+        # метод прошивки
     def start_sewing(self, photodata, loge, max_attempts=120, retry_delay=1):
         global Tray1, Tray2, Tray3
         """
@@ -1000,16 +1092,9 @@ class Table:
         Raises:
             TableOperationFailed: Если прошивка не удалась после всех попыток
         """
-        #######OPC
-        with self.lock:
-            self.data['SEWING'] = 1
-            self.data['SEW_LOGE'] = loge
-            self.data['SEW_DM'] = str(photodata)
-            self.data['SEW_PROGRESS'] = 0
-            self.data['SEW_RESULT'] = 0
-            self.data['SEW_ERROR'] = ''
-            self.data['SEW_TS'] = int(time.time())
-            self.data['STATE'] = 'sewing'
+        #######OPC#######
+        self.opc_set(shared_data, f'OPC_load_t{self.number}', 1) # 1-старт прошивки 0-конец прошивки
+        self.opc_set(shared_data, f'OPC_res_load_t{self.number}', 0) # сброс состояния прошивки
 
         print(f"СТОЛ {self.number} Сервер <- Начни шить (ложемент {loge})")
         logging.info(f"[START2] Прошивка для стола {self.number}, ложемент {loge}")
@@ -1046,34 +1131,35 @@ class Table:
             attempt += 1
             try:
                 result, error_description = firmware_loader.loader(photodata, loge)
+                SQLite.insert_log(f"Завершена прошивка платы {photodata} на {loge} с результатом {error_description}", 0)
+                
                 # Если прошивка не успешная - в отбраковку, иначе в нормальный лоток
                 print(f"**************** error_description  {error_description}")
-                if error_description != True:
-                    if self.number == 1:
-                        Tray1 = 3  # Отбраковка
-                    elif self.number == 2:
-                        Tray2 = 3  # Отбраковка
-                    elif self.number == 3:
-                        Tray3 = 3  # Отбраковка
-                    else:
-                        # Обработка неверного номера
-                        print(f"Ошибка: неверный номер лотка {self.number}")
+                if error_description is True:
+                    tray_code = 2  # норм
                 else:
-                    if self.number == 1:
-                        Tray1 = 2  # Нормальный
-                    elif self.number == 2:
-                        Tray2 = 2  # Нормальный
-                    elif self.number == 3:
-                        Tray3 = 2  # Нормальный
-                    else:
-                        # Обработка неверного номера
-                        print(f"Ошибка: неверный номер лотка {self.number}")
-                print(f"Ответ от прошивальщика (попытка {attempt}): {result}")
-                logging.debug(f"Ответ от прошивальщика: {result}")
+                    tray_code = 3  # брак
 
-                ####OPC 
-                with self.lock:
-                    self.data['SEW_RESULT'] = 2 if error_description is True else 3
+                self._set_loge_outcome(loge, tray_code, photodata)
+
+                # (опционально оставьте обратную совместимость с OPC/UI,
+                if self.number == 1:
+                    Tray1 = tray_code
+                elif self.number == 2:
+                    Tray2 = tray_code
+                elif self.number == 3:
+                    Tray3 = tray_code
+
+                ####OPC####
+                if error_description is True:
+                    self.opc_set(shared_data, f'OPC_res_load_t{self.number}', 1) # # 2-успех 1-брак
+                    self.opc_set(shared_data, f'OPC_log', f"Стол {self.number} ложе {loge} плата не прошла прошивку или тестирование") # # 2-успех 1-брак
+                     
+                else:
+                    self.opc_set(shared_data, f'OPC_res_load_t{self.number}', 2) # # 2-успех 1-брак
+                    self.opc_set(shared_data, f'OPC_log', f"Стол {self.number} ложе {loge} плата прошла прошивку и тестирование успешно") # # 2-успех 1-брак
+                self.opc_set(shared_data, f'OPC_load_t{self.number}', 0) # 1-старт прошивки 0-конец прошивки
+                
                 
                 if result == 200:
                     print(f"Прошивка успешно начата для ложемента {loge}")
@@ -1100,6 +1186,12 @@ class Table:
                 self.data['STATE'] = 'idle'
         
         return False
+    
+    def opc_set(self, shared, key, value):
+        # безопасно пишем в OPC-DB под одним локом
+        with shared_data_lock:
+            shared['OPC-DB'][key] = value
+
     
     #  # 1. Сдвигаем плату (ложе1)
     #     self._send_table_command(101)
@@ -1306,7 +1398,7 @@ class Table:
         ROBOT_WAIT_TIMEOUT = 900000 # сек
 
         print(f"[MAIN] ЦИКЛ MAIN для {self.number} стола старт")
-        logging.info(f"[MAIN] ЦИКЛ MAIN для {self.number} стола старт")
+        log_message(self.number, "info", f"[MAIN] ЦИКЛ MAIN для {self.number} стола старт")
 
         # Стартуем: на ложе 2 уже есть плата — начнём шить с него
         current_loge = 2
@@ -1334,29 +1426,34 @@ class Table:
         parallel_join_mode = False
 
         while True:
+            SQLite.insert_log(f"Начало работы с РТК", "user", 0)
             try:
                 print(f"\n=== Обработка ложемента {current_loge} ===")
                 if EMERGENCY_STOP.is_set():
-                    logging.critical(f"[MAIN] СТОЛ {self.number} аварийно остановлен (EMERGENCY_STOP)")
+                    log_message(self.number, "critical", f"[MAIN] СТОЛ {self.number} аварийно остановлен (EMERGENCY_STOP)")
                     return
 
                 if in_flight_sewing_thread is None and not parallel_join_mode:
                     # ---------------- ПЕРВЫЙ ЦИКЛ (БЕЗ ИЗМЕНЕНИЙ) ----------------
                     free_loge = 2 if current_loge == 1 else 1
+                    log_message(self.number, "info", f"[MAIN] Старт первого цикла free_loge = {free_loge} current_loge = {current_loge}")
 
                     # 1) Поднять голову (страховка), подвести current_loge
                     self._send_table_command(104)
-                    logging.info(f"[MAIN][COMMAND->Regul->104] СТОЛ {self.number} Подняли прошивальщик (перед подводом текущего ложемента)")
+                    log_message(self.number, "info", f"[MAIN] Подняли прошивальщик (перед подводом текущего ложемента)")
+                    
 
                     _move_table_to_loge(current_loge)
-                    logging.info(f"[MAIN] Сдвигаем стол {self.number} под прошивальщик (под головкой ложе {current_loge})")
+                    log_message(self.number, "info", f"[MAIN] Сдвигаем стол {self.number} под прошивальщик (под головкой ложе {current_loge})")
 
                     # 2) ОДНОВРЕМЕННО: опускаем прошивальщик И работаем с роботом на free_loge
                     self._send_table_command(103)
-                    logging.info(f"[MAIN] Опускаем прошивальщик стол {self.number} (параллельно с операциями робота)")
+                    log_message(self.number, "info", f"[MAIN] Опускаем прошивальщик стол {self.number} (параллельно с операциями робота)")
+
 
                     while not self.rob_manager.acquire(self.number):
                         logging.info(f"[MAIN] СТОЛ {self.number} ждет освобождения робота (загрузка новой на ложе {free_loge})")
+                        log_message(self.number, "info", f"[MAIN] Робот захвачен столом идет загрузка платы на )")
                         time.sleep(1)
                     try:
                         Tray_robot = 1          # <-- Тара с новыми плаами
@@ -1413,13 +1510,19 @@ class Table:
                         time.sleep(1)
                     try:
                         print(f" В стол {self.number}")
-                        # выбрать итог прошивки для текущего стола
-                        if self.number == 1:
-                            tr = Tray1
-                        elif self.number == 2:
-                            tr = Tray2
-                        else:
-                            tr = Tray3
+                        # стало: взять и обнулить исход ровно для того ложемента, с которого снимаем
+                        tr = self._consume_loge_outcome(current_loge)
+
+                        if tr is None:
+                            # страховка: исход не найден — можно:
+                            # 1) считать брак/оставить как есть, 2) кинуть исключение, 3) повторить опрос.
+                            # Я бы явно зафейлил, чтобы не перепутать партии:
+                            tr = 3
+                            logging.warning(
+                                f"[MAIN] СТОЛ {self.number} Нет исхода прошивки для ложемента {current_loge}; "
+                                f"помечаем как БРАК и уносим в 242."
+                            )
+                            raise RuntimeError(f"Не найден исход прошивки для ложемента {current_loge}")
 
                         Tray_robot = tr  # 2 или 3
 
@@ -1679,6 +1782,55 @@ class Table:
     def pause(self):
         time.sleep(2)
 
+
+#########################Блок логики запуска потоков#####################################################################################
+# Глобальные переменные (у тебя уже есть)
+# shared_data, shared_data_lock
+
+# держим ссылки на запущенные потоки
+running_threads = {}
+
+def start_threads_if_needed(targets: dict, do_defence=False, do_setup=False):
+    with shared_data_lock:
+        opc_db = shared_data.get('OPC-DB', {})
+        if not opc_db.get('OPC_START_RTK', False):
+            return
+        flags = {
+            1: opc_db.get('OPC_strat_t1', False),
+            2: opc_db.get('OPC_strat_t2', False),
+            3: opc_db.get('OPC_strat_t3', False),
+        }
+
+    for tid, need_start in flags.items():
+        if need_start and tid not in running_threads:
+            table = targets[tid]
+            t = threading.Thread(
+                target=run_table_pipeline,
+                args=(table, do_defence, do_setup),
+                name=f"Table{tid}",
+                daemon=False  # Лучше НЕ daemon, чтобы процесс не умер раньше времени
+            )
+            t.start()
+            running_threads[tid] = t
+            print(f"__________________{tid} стол")
+            time.sleep(15)  # <-- пауза между столами
+
+    # with shared_data_lock:
+    #     shared_data['OPC-DB']['OPC_START'] = False
+
+
+def run_table_pipeline(table: Table, do_defence=True, do_setup=True):
+    try:
+        if do_defence:
+            table.defence_robo_cycle()
+        if do_setup:
+            table.setup_robo_cycle()
+    except Exception:
+        logging.exception(f"[PIPELINE] prep failed for table {table.number}")
+        # по ситуации можно вызвать trigger_emergency(...)
+    # после подготовки уходим в основной бесконечный цикл
+    table.robo_main_cycle()
+
     
 
 
@@ -1715,13 +1867,9 @@ if __name__ == "__main__":
         print("Test stopped")
     """
 
-    # Полный путь к исполняемому скрипту
-    script_path = os.path.abspath("ServerRTK.py")
-
-    # Открытие нового окна консоли и запуск скрипта
-    subprocess.Popen([
-        "start", "cmd", "/k", f"{sys.executable} {script_path}"
-    ], shell=True)
+    # Стартуем вспосогательный сервер перепарвки данных от прошивальщика в основной скрпит. 
+    # делаем его как дочерний подпроцесс
+    proc = subprocess.Popen([sys.executable, "ServerRTK.py"])
 
     # Создаём столы
     table1 = Table("Table1", shared_data, shared_data_lock, 1, rob_manager)
@@ -1757,28 +1905,42 @@ if __name__ == "__main__":
         
 
 
-    #Запускаем потоки
-    print('__________________1 стол')
-    thread1.start()
+    ##############################################Запускаем потоки#######################################
 
-    time.sleep(15)
+    # выставляешь флаги...
+    # with shared_data_lock:
+    #     shared_data['OPC-DB']['OPC_START_RTK'] = True
+    #     shared_data['OPC-DB']['OPC_strat_t1'] = True
+    #     shared_data['OPC-DB']['OPC_strat_t2'] = True
+    #     shared_data['OPC-DB']['OPC_strat_t3'] = True
 
-    print('__________________2 стол')
-    thread2.start()
-
-    time.sleep(15)
-
-    print('__________________3 стол')
-    thread3.start()
+    # и запускаешь реальные циклы:
+    # старт пайплайна (сейчас defence/setup можно выключить False/False, потом включишь True/True)
+    start_threads_if_needed(
+        {1: table1, 2: table2, 3: table3},
+        do_defence=False,
+        do_setup=False
+    )
 
     # Ждём глобальной аварии или завершения потоков
     try:
         while True:
             if EMERGENCY_STOP.is_set():
-                logging.critical("[MAIN] Поймали EMERGENCY_STOP в главном потоке. Останавливаемся.")
+                logging.critical("[MAIN] Поймали EMERGENCY_STOP. Останавливаемся.")
                 break
-            if not thread1.is_alive() and not thread2.is_alive() and not thread3.is_alive():
+
+            # Если хочешь поддержать «поздний старт по OPC», можно периодически вызывать:
+            start_threads_if_needed({
+                1: table1,
+                2: table2,
+                3: table3
+            })
+
+            # Если все запущенные потоки умерли — выходим
+            if running_threads and all(not t.is_alive() for t in running_threads.values()):
+                logging.error("[MAIN] Все потоки столов завершились")
                 break
+
             time.sleep(1)
     finally:
         # Пытаемся штатно остановить сервисные части
@@ -1802,6 +1964,8 @@ if __name__ == "__main__":
 
 
         print("Все потоки завершены.")
+
+    proc.terminate()  # По выходу из main завершить сервер
 
 
     

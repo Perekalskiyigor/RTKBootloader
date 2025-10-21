@@ -703,7 +703,7 @@ class Table:
 
     # The first cycle Protect Table in the start work
 
-    def _send_robot_command(self, base_command, cell_num=None, timeout_s: int = 600):
+    def _send_robot_command(self, base_command, cell_num=None, timeout_s: int = 18000):
         """
         Отправляет команду роботу с разделением 220 (укладка) / 230 (забор).
         Если в течение timeout_s (по умолчанию 300 сек = 5 минут) нет подтверждения — 
@@ -957,7 +957,7 @@ class Table:
                 result, error_description = firmware_loader.loader(photodata, loge)
                 # Если прошивка не успешная - в отбраковку, иначе в нормальный лоток
                 print(f"**************** error_description  {error_description}")
-                if error_description != True:
+                if error_description != False:
                     if self.number == 1:
                         Tray1 = 3  # Отбраковка
                     elif self.number == 2:
@@ -1348,12 +1348,12 @@ class Table:
                             raise TableOperationFailed(f"Ошибка забора с ложемента {current_loge}")
                         logging.info(f"[MAIN] СТОЛ {self.number} Забираем обработанную плату с ложемента {current_loge}")
                         if tr == 2:
-                            if not self._send_robot_command(241): 
+                            if not self._send_robot_command(242): 
                                 raise TableOperationFailed("Ошибка укладки в тару")
                             logging.info(f"[MAIN] СТОЛ {self.number} Укладываем плату в тару с упешно прошитыми платами (с ложе {current_loge})")
                             Cell=0 # чистим CEll модбаса
                         else:
-                            if not self._send_robot_command(242):
+                            if not self._send_robot_command(241):
                                 raise TableOperationFailed("Ошибка укладки в тару")
                             logging.info(f"[MAIN] СТОЛ {self.number} Укладываем плату в тару брака (с ложе {current_loge})")
                             Cell=0 # чистим CEll модбаса
@@ -1468,12 +1468,12 @@ class Table:
                                 time.sleep(1)  # дать Modbus прочитать
                                 
                                 if tr == 2:
-                                    if not self._send_robot_command(241): 
+                                    if not self._send_robot_command(242): 
                                         raise TableOperationFailed("Ошибка укладки в тару")
                                     logging.info(f"[MAIN] СТОЛ {self.number} Укладываем плату в тару с упешно прошитыми платами (с ложе {current_loge})")
                                     Cell=0 # чистим CEll модбаса
                                 else:
-                                    if not self._send_robot_command(242):
+                                    if not self._send_robot_command(241):
                                         raise TableOperationFailed("Ошибка укладки в тару")
                                     logging.info(f"[MAIN] СТОЛ {self.number} Укладываем плату в тару брака (с ложе {current_loge})")
                                     Cell=0 # чистим CEll модбаса

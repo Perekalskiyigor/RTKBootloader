@@ -6,9 +6,10 @@ from datetime import datetime
 import SQLite
 import configparser
 
+
 # Загрузка конфигурации
-config = configparser.ConfigParser()
-config.read('config.ini')
+config = configparser.ConfigParser(interpolation=None)
+config.read(r"config.ini", encoding="utf-8")
 
 getOrders_url = config['serverOrder']['getOrders_url']
 username = config['serverOrder']['password']
@@ -23,13 +24,12 @@ logging.basicConfig(
 )
 
 def getOrders():
-    url = "https://black/erp_game_ivshin255/hs/rtk/orderlist/RTK_R050"
     headers = {
         'Authorization': 'Basic bWFya19EUEE6MTIzNDU2elo='
     }
 
     try:
-        response = requests.get(url, headers=headers, verify=False)
+        response = requests.get(getOrders_url, headers=headers, verify=False)
         response.raise_for_status()  # выбросит исключение для кода ответа != 200
 
         data = response.json()  # преобразуем в словарь
@@ -55,7 +55,7 @@ def fetch_data(order):
     logging.info("Вызвана функция получения данных по заказу в бд def fetch_data(order) и провайдера SQL")
 
     try:
-        url = f"https://black/erp_game_ivshin255/hs/rtk/order/RTK_R050/{order}"
+        url = f"{fetch_data_url}{order}"
         payload = {}
         headers = {
         'Authorization': 'Basic bWFya19EUEE6MTIzNDU2elo='
@@ -139,12 +139,12 @@ def fetch_data(order):
 dict = fetch_data("ЗНП-5972.1.1")
 db_connection = SQLite.DatabaseConnection()
 db_connection.get_order_insert_orders_frm1C(dict)
- 
-getOrders()
 
-
-"""
+""" 
 #getOrders()
-# fetch_data("ЗНП-5972.1.1")
+
+
+# getOrders()
+fetch_data("ЗНП-24576.1.1")
 
 

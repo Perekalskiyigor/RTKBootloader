@@ -211,6 +211,8 @@ shared_data = {
         'OPC_START_RTK':False, # общий старт потоков\
         'OPC_log':'', #хранение текущего лога
         'OPC_res_brak': False, # Сброс брака
+        'OPC_pause_RTK':False, # Постановка на паузу
+        'OPC_restart_RTK':False # Перезапуск ртк
         },
 
 }
@@ -455,8 +457,10 @@ class OPCClient:
                         'ns=2;s=Application.UserInterface.OPC_strat_t1', # true - берем стол1 в работу
                         'ns=2;s=Application.UserInterface.OPC_strat_t2', # true - берем стол2 в работу
                         'ns=2;s=Application.UserInterface.OPC_strat_t3', # true - берем стол3 в работу
-                        'ns=2;s=Application.UserInterface.OPC_start_RTK' # единичный сигнал true - запуск основного цикла ртк
-                        'ns=2;s=Application.UserInterface.OPC_log' # от питона приходит текущего лога
+                        'ns=2;s=Application.UserInterface.OPC_start_RTK', # единичный сигнал true - запуск основного цикла ртк
+                        'ns=2;s=Application.UserInterface.OPC_log', # от питона приходит текущего лога
+                        'ns=2;s=Application.UserInterface.OPC_pause_RTK', #пауза от ртк
+                        'ns=2;s=Application.UserInterface.OPC_restart_RTK',# рестарт
                         # Прошивка
                         'ns=2;s=Application.GVL.OPC_load_t1',
                         'ns=2;s=Application.GVL.OPC_load_t2',
@@ -523,6 +527,9 @@ class OPCClient:
         OPC_RES_BRAK = 'ns=2;s=Application.UserInterface.OPC_res_brak'
 
         LOG = 'ns=2;s=Application.UserInterface.OPC_log'
+        OPC_PAUSE_RTK = 'ns=2;s=Application.UserInterface.OPC_pause_RTK'
+        OPC_RESTART_RTK = 'ns=2;s=Application.UserInterface.OPC_restart_RTK'
+        
         # шаблон nodeId для столов
         def T(n, leaf):
             return f'ns=2;s=Application.UserInterface.Table{n}.{leaf}'
@@ -559,8 +566,8 @@ class OPCClient:
 
                         # Кол-во непрошитых (берём OPC_cnt_newBoard, иначе DB_last_count как запасной источник)
                         cnt_new = opcdb.get('DB_nonsuccess_count', "")
-                        cnt_new = [str(cnt_new)]
-                        self._write(CNT_NEW_BOARD, cnt_new, ua.VariantType.String)  # при необходимости замените тип
+                        cnt_new = cnt_new
+                        self._write(CNT_NEW_BOARD, cnt_new, ua.VariantType.Int16)  # при необходимости замените тип
 
                         # Список заказов (строка/массив строк)
                         sr = opcdb.get('OPC_search_result', "")
@@ -600,6 +607,8 @@ class OPCClient:
                             st3 = bool(self._read_bool(START_T3, False))
                             st4 = bool(self._read_bool(START_RTK, False))
                             st5 = bool(self._read_bool(OPC_RES_BRAK, False))
+                            st6 = bool(self._read_bool(OPC_PAUSE_RTK, False))
+                            st7 = bool(self._read_bool(OPC_RESTART_RTK, False))
 
                             with shared_data_lock:
                                 shared_data['OPC-DB']['OPC_START_RTK'] = st4
@@ -607,6 +616,10 @@ class OPCClient:
                                 shared_data['OPC-DB']['OPC_strat_t2'] = st2
                                 shared_data['OPC-DB']['OPC_strat_t3'] = st3
                                 shared_data['OPC-DB']['OPC_res_brak'] = st5
+                                shared_data['OPC-DB']['OPC_pause_RTK'] = st6
+                                shared_data['OPC-DB']['OPC_restart_RTK'] = st7
+
+
                         except Exception as e:
                             print(f"[OPC] read START_T* failed: {e}")
 

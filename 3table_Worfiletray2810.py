@@ -726,7 +726,7 @@ class ModbusProvider:
     global Tray_robot
     global Cell, Cell2, Cell3, Cell1
     global command_toBOt
-    
+
     def __init__(self):
         self.store = ModbusSlaveContext(
             hr=ModbusSequentialDataBlock(0, [0] * 100)
@@ -757,6 +757,7 @@ class ModbusProvider:
             if self.last_out.get(addr) != value:
                 self.store.setValues(3, addr, [value])
                 self.last_out[addr] = value
+
         except Exception as e:
             print(f"[Modbus] write fail addr {addr}: {e}")
 
@@ -1090,9 +1091,14 @@ class Table:
 
         for _ in range(max_new_board_tries):
             # 1) взять новую плату из тары
-            Tray_robot = 1
-            Cell1 += 1
-            Cell = Cell1
+            Tray_robot = 2
+            with shared_data_lock:
+                if shared_data['OPC-DB']['OPC_res_brak'] == False:
+                    Cell1 += 1
+                    Cell = Cell1
+                else:
+                    Cell1 = 0
+                    Cell = Cell1
             time.sleep(1)  # дать Modbus прочитать
 
             if not self._send_robot_command(210):
@@ -1464,7 +1470,7 @@ class Table:
             # 1. Забираем первую плату из тары
             print(f"1 Стол {self.number} Робот <- Забери плату из тары")
             logging.info(f"Стол {self.number} Робот <- Забери плату из тары")
-            Tray_robot = 1          # Ящик с новыми платами
+            Tray_robot = 2          # Ящик с новыми платами
             Cell1 += 1              # <-- счётчик тары новых
             Cell = Cell1            # <-- отдаём ячейку в Modbus
             time.sleep(1)           # чтобы Modbus успел прочитать

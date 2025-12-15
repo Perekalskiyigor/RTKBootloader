@@ -11,11 +11,13 @@ import yaml
 import subprocess
 import sys
 import os
+import Mertech_scanner
 
 # --- Глобальная аварийная остановка всего комплекса ---
 EMERGENCY_STOP = threading.Event()
 SETUP_TABLE = 0
 SUB_SETUP_TABLE = 0
+BARCODETRAY = ""
 
 def trigger_emergency(reason: str):
     """
@@ -1437,7 +1439,6 @@ if __name__ == "__main__":
 
     modbus_provider = ModbusProvider()
     rob_manager = RobActionManager()
-    
 
     # Создаем и запускаем процесс синхронизации с БД
     db_sync = DatabaseSynchronizer(Order, 1, shared_data)
@@ -1486,28 +1487,51 @@ if __name__ == "__main__":
 
     # Создаем потоки для основного цикла
     
-    # thread1 = threading.Thread(target=table1.robo_main_cycle)
-    # thread2 = threading.Thread(target=table2.robo_main_cycle)
-    # thread3 = threading.Thread(target=table3.robo_main_cycle)
+    thread1 = threading.Thread(target=table1.robo_main_cycle)
+    thread2 = threading.Thread(target=table2.robo_main_cycle)
+    thread3 = threading.Thread(target=table3.robo_main_cycle)
 
     # Тестовые циклы только прошивка
     # thread1 = threading.Thread(target=table1.test_botloader)
-    thread2 = threading.Thread(target=table2.test_botloader)
-    thread3 = threading.Thread(target=table3.test_botloader)
+    # thread2 = threading.Thread(target=table2.test_botloader)
+    # thread3 = threading.Thread(target=table3.test_botloader)
 
     while True:
-        print (f'Ожидание от регула, что столы в начальной позиции')
-        logging.info(f"Ожидание от регула, что столы в начальной позиции")
+        print('Ожидание от регула, что столы в начальной позиции')
+        logging.info('Ожидание от регула, что столы в начальной позиции')
         time.sleep(1)
+
         SETUP_TABLE = 1
+
+        # --- Считывание тары ---
+        print('Ожидание, что тара на месте и штрихкод тары считан')
+        try:
+            BARCODETRAY = Mertech_scanner.scan_barcode()
+        except Exception as e:
+            logging.error(f"Ошибка при сканировании тары: {e}")
+            continue   # ⬅ НЕ продолжаем логику, ждём дальше
+
+        if not BARCODETRAY:
+            print('Штрихкод не считан, ожидание...')
+            logging.warning('Штрихкод тары не считан')
+            continue   # ⬅ ключевая строка
+
+        # --- УСПЕХ ---
+        print("Штрихкод:", BARCODETRAY)
+        logging.info(f"Считан штрихкод тары: {BARCODETRAY}")
+
+
+        # --- Проверка регула ---
         if SUB_SETUP_TABLE == 1:
             SETUP_TABLE = 0
-            logging.info(f"получен ответ от регула, что столы приведены в нулевое положении")
-            print (f'получен ответ от регула, что столы приведены в нулевое положении ')
+            logging.info('Получен ответ от регула: столы в нулевом положении')
+            print('Получен ответ от регула, что столы приведены в нулевое положение')
             break
+
         
 
 
+    
     # Запускаем потоки
     print('__________________1 стол')
     time.sleep(20)
@@ -1552,6 +1576,7 @@ if __name__ == "__main__":
 
 
         print("Все потоки завершены.")
+        BARCODETRAY = ""
 
 
     

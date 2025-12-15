@@ -1,13 +1,9 @@
 import requests
 import json
 import logging
-import sqlite3
-from datetime import datetime
-import SQLite
 import configparser
-import os
-from requests.auth import HTTPBasicAuth
 import datetime
+from requests.auth import HTTPBasicAuth
 
 # Загрузка конфигурации
 config = configparser.ConfigParser()
@@ -18,7 +14,6 @@ username = config['server']['username']
 password = config['server']['password']
 url_token = config['server']['url_token']
 
-# Функция для получения токена
 def get_token():
     payload = 'grant_type=CLIENT_CREDENTIALS'
     headers = {
@@ -26,7 +21,6 @@ def get_token():
         'Authorization': 'Basic VnFuaHFPd1pGak16Y0czTFY5d3VSLXhtdlgxX29oWFBjbDRCWXc3cXJSND06N08zNFV6QXpuaVAxOE9RM0VQUGNqWFlya3BmUEFySkpfeHdMcmNDdXRsOD0='
     }
     try:
-        # Отключение проверки SSL сертификата, если необходимо
         response = requests.post(url_token, data=payload, headers=headers, verify=False)
 
         if response.status_code == 200:
@@ -42,52 +36,75 @@ def get_token():
         return None
 
 
-
-# УСПЕШНАЯ прошивка. Отпроавка лога по успешной прошивке платы РЕГЛАБ
-# Функция для отправки лога о успешной прошивке
+# ====================== УСПЕШНАЯ ПРОШИВКА ======================
 def send_success_log(board_dict):
-    now = datetime.datetime.now().isoformat()
-    token = get_token()
+    """
+    Формируем JSON вида:
 
+    {
+      "rtk_id": "...",
+      "order": "...",
+      "version": "...",
+      "good": [{
+        "board": {
+          "number": "Z00390116",
+          "tray_number": "123455"
+        },
+        "operator": "A.Eliseeva",
+        "error": 0,
+        "dm_code_time": "...",
+        "firmware_finished_time": "...",
+        "board_output_time": "..."
+      }],
+      "bad": []
+    }
+    """
+
+    token = get_token()
     if not token:
         logging.error("Не удалось получить токен")
         print("Не удалось получить токен")
         return None
 
+    now = datetime.datetime.now().isoformat()
+
+    good_item = board_dict["good"][0]
+
+    # Берём таймстемпы из словаря, если есть, иначе ставим now
+    ts = good_item.get("timestamps", {})
+    dm_code_time = ts.get("dm_code_time", now)
+    firmware_finished_time = ts.get("firmware_finished_time", now)
+    board_output_time = ts.get("board_output_time", now)
+
     payload = {
-    "rtk_id": board_dict["rtk_id"],
-    "order": board_dict["order"],
-    "version": board_dict["version"],
-    "message_type": board_dict["message_type"],
-    "good": [
-        {
-            "module": {
-                "number":   board_dict["good"][0]["module"]["number"],
-                "number8":  board_dict["good"][0]["module"]["number8"],
-                "number15": board_dict["good"][0]["module"]["number15"]
-            },
-            "board": {
-                "number": board_dict["good"][0]["board"]["number"]
-            },
-            "operator": board_dict["good"][0]["operator"],
-            "error": 0,
-            "timestamps": {
-                "dm_code_time": now,
-                "firmware_finished_time": now,
-                "board_output_time": now
+        "rtk_id": board_dict["rtk_id"],
+        "order": board_dict["order"],
+        "version": board_dict["version"],
+        "message_type": board_dict.get("message_type"),  # если нужно — раскомментировать
+        "good": [
+            {
+                "board": {
+                    "number": good_item["board"]["number"],
+                    # tray_number можем брать, если он есть
+                    "tray_number": good_item["board"].get("tray_number")
+                },
+                "operator": good_item["operator"],
+                "error": good_item.get("error", 0),
+                "timestamps":ts,
+                "dm_code_time": dm_code_time,
+                "firmware_finished_time": firmware_finished_time,
+                "board_output_time": board_output_time
             }
-        }
-    ],
-    "bad": []
-}
+        ],
+        "bad": []
+    }
 
-
-    print("== JSON Request Body ==")
+    print("== JSON Request Body (SUCCESS) ==")
     print(json.dumps(payload, indent=2, ensure_ascii=False))
 
     headers = {
         'Content-Type': 'application/json',
-        'Authorization': f'Bearer {token}'
+        'Authorization': f'Bearer {token}',
     }
 
     try:
@@ -116,45 +133,78 @@ def send_success_log(board_dict):
         return None
 
 
-
-# Ртправка лога по неуспешной прошивке платы РЕГЛАБ
-# Функция для отправки неуспешного лога
+# ====================== НЕУСПЕШНАЯ ПРОШИВКА ======================
 def send_unsuccess_log(board_dict):
+    """
+    Формируем JSON вида:
+
+    {
+      "rtk_id": "...",
+      "order": "...",
+      "version": "...",
+      "good": [],
+      "bad": [{
+        "board": {"number": "Z01137499"},
+        "error": 6,
+        "operator": "A.Eliseeva",
+        "dm_code_time": "...",
+        "firmware_finished_time": "...",
+        "board_output_time": "..."
+      }]
+    }
+    """
+
     now = datetime.datetime.now().isoformat()
 
-    # Подготовка данных для JSON-запроса
+    bad_item = board_dict["bad"][0]
+
+    ts = bad_item.get("timestamps", {})
+    dm_code_time = ts.get("dm_code_time", now)
+    firmware_finished_time = ts.get("firmware_finished_time", now)
+    board_output_time = ts.get("board_output_time", now)
+
     payload = {
         "rtk_id": board_dict["rtk_id"],
         "order": board_dict["order"],
         "version": board_dict["version"],
-        "message_type": board_dict["message_type"],
+        "message_type": board_dict.get("message_type"),
         "good": [],
         "bad": [
             {
                 "board": {
-                    "number": board_dict["bad"][0]["board"]["number"]
+                    "number": bad_item["board"]["number"]
                 },
-                "operator": board_dict["bad"][0]["operator"],
-                "error": board_dict["bad"][0]["error"],
-                "timestamps": {
-                    "dm_code_time": now,
-                    "firmware_finished_time": now,
-                    "board_output_time": now
-                }
+                "operator": bad_item["operator"],
+                "error": bad_item["error"],
+                "timestamps":ts,
+                "dm_code_time": dm_code_time,
+                "firmware_finished_time": firmware_finished_time,
+                "board_output_time": board_output_time
             }
         ]
     }
 
-
-    # Печатаем JSON-запрос в консоль
-    print("== JSON Request Body ==")
+    print("== JSON Request Body (UNSUCCESS) ==")
     print(json.dumps(payload, indent=2, ensure_ascii=False))
+
+    # Лучше тоже через токен, чтобы было одинаково,
+    # но если сервер ждёт BasicAuth — можно вернуть как у тебя было.
+    token = get_token()
+    if not token:
+        logging.error("Не удалось получить токен")
+        print("Не удалось получить токен")
+        return None
+
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {token}',
+    }
 
     try:
         response = requests.post(
             url_send_data,
             json=payload,
-            auth=HTTPBasicAuth(username, password),
+            headers=headers,
             verify=False,
             timeout=10
         )
@@ -164,9 +214,6 @@ def send_unsuccess_log(board_dict):
         logging.info("Response: %s", response.text)
         print(f"\nУспешно отправлено: {response.status_code}")
 
-        # Логика для отметки в базе данных о неуспешной отправке лога
-        # (например, можно записывать в БД информацию об ошибке)
-
         return response.json()
     except requests.exceptions.RequestException as e:
         logging.error("Error sending request: %s", str(e))
@@ -174,88 +221,57 @@ def send_unsuccess_log(board_dict):
         return None
 
 
-
-############################Тестирование
-
-# Пример использования:
-board_dict = {
-  "rtk_id": "RTK_R050_BoardsIO_2",
-  "order": "ЗНП-25778.1.1",
-  "version": "1.0.15.6",
-  "message_type": "firmware_log",
-  "good": [
-    {
-      "module": {
-        "number": "V01250888",
-        "number8": "25052859",
-        "number15": "089391025052859"
-      },
-      "board": {
-        "number": "S00390116"
-      },
-      "operator": "A.Eliseeva",
-      "error": 0,
-      "timestamps": {
-        "dm_code_time": "2025-10-17 10:51:35.798732",
-        "firmware_finished_time": "2025-10-17 10:52:12.725689",
-        "board_output_time": "2025-10-17 10:52:15.725689"
-      }
-    }
-  ],
-  "bad": []
+board_dict_success = {
+    "rtk_id": "RTK_R050_BoardsIO_1",
+    "order": "ЗНП-25466.1.1",
+    "version": "",
+    "message_type": "firmware_log",
+    "good": [
+        {
+            "board": {
+                "number": "Z01777327",
+                "tray_number": "123455"
+            },
+            "operator": "A.Eliseeva",
+            "error": 0,
+            "timestamps": {
+                "dm_code_time": "2025-11-28 10:51:35.798732",
+                "firmware_finished_time": "2025-11-28 10:52:12.725689",
+                "board_output_time": "2025-11-28 10:52:15.725689"
+            }
+        }
+    ],
+    "bad": []
 }
 
+# Вызов
+# response = send_success_log(board_dict_success)
+# print("Ответ сервера:", response)
 
 
-# Пример вызова функции
-response = send_success_log(board_dict)
-
-
-"""
-
-# Пример использования:
-board_dict = {
-    "product_info": {
-        "rtk_id": "RTK_R500_CH_1",
-        "order": "ЗНП-9176.1.1",
-        "version": "1.0.15.6",
-        "components": {
-            "3.182.922": "Крепление к DIN-рейке DF700 модуля ввода-вывода, ИП R050",
-            "3.182.928": "Корпус (правая половина с экстрактором) DF700 модуля ввода-вывода, ИП R050",
-            "3.182.927": "Корпус (левая половина) DF700 модуля ввода-вывода, ИП R050",
-            "3.220.168": "Коробка из картона для модуля ввода/вывода R050",
-            "2.180.531": "Световод 18 пин (с сепаратором) DF700 модуля ввода-вывода, ИП R050",
-            "2.211.823": "Клеммник R050 с маркировкой",
-            "3.182.921": "Лепесток извлечения DF700 модуля ввода-вывода, ИП R050",
-            "2.142.935": "Плата PLC050_DI16_011_V4A"
-        },
-        "marking_templates": [
-            {
-                "type": "front",
-                "type_RU": "Передняя сторона",
-                "path": "\\\\prosyst.ru@ssl\\davwwwroot\\1cfiles\\ERP\\20250709\\3.210.707 - Лицевая правая крышка R500 CU 00 151 с фрезеровкой и маркировкой (без GNS).le"
-            }
-        ]
-    },
+board_dict_fail = {
+    "rtk_id": "RTK_R050_BoardsIO_1",
+    "order": "ЗНП-25466.1.1",
+    "version": "",
+    "message_type": "firmware_log",
     "good": [],
     "bad": [
         {
             "board": {
-                "number": "Z01137499T"
+                "number": "Z01777339",
+                "tray_number": "123455"
             },
-            "error": 3,
             "operator": "A.Eliseeva",
+            "error": 6,
             "timestamps": {
-                "dm_code_time": "2025-03-14 08:21:02.653260",
-                "firmware_finished_time": "2025-03-14 08:21:33.371907",
-                "board_output_time": "2025-03-11 15:00:33.587027"
+                "dm_code_time": "2025-11-28 08:21:02.653260",
+                "firmware_finished_time": "2025-11-28 08:21:33.371907",
+                "board_output_time": "2025-11-28 15:00:33.587027"
             }
         }
     ]
 }
-"""
-# Пример вызова функции
-# response = send_unsuccess_log(board_dict)
 
-# token = get_token()
-# print("Полученный токен:", token)
+# Вызов
+response = send_unsuccess_log(board_dict_fail)
+print("Ответ сервера:", response)

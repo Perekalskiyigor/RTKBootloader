@@ -1,4 +1,3 @@
-# python -m PyInstaller --onefile 3table_Worfiletray2810.py
 import logging
 import time
 from pymodbus.server import StartTcpServer
@@ -18,9 +17,6 @@ EMERGENCY_STOP = threading.Event()
 SETUP_TABLE = 0
 SUB_SETUP_TABLE = 0
 
-
-
-    
 def trigger_emergency(reason: str):
     """
     Устанавливает глобальную аварийную остановку и логирует причину.
@@ -66,6 +62,7 @@ class RobActionManager:
 # Пользовательский класс камеры
 # mport CameraClass as CAM
 import CameraSocket
+ 
  # Пользовательский класс БД
 import Provider1C
 import SQLite as SQL
@@ -233,51 +230,33 @@ logging.basicConfig(
     format=' %(asctime)s - MAIN - %(levelname)s - %(message)s'
 )
 
+
 # Логгер 1
 logger1 = logging.getLogger('LoggerTable1')
 fh1 = logging.FileHandler('LoggerTable1.txt')
-formatter1 = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-fh1.setFormatter(formatter1)
 logger1.addHandler(fh1)
 logger1.setLevel(logging.INFO)
 
 # Логгер 2
 logger2 = logging.getLogger('LoggerTable2')
 fh2 = logging.FileHandler('LoggerTable2.txt')
-formatter2 = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-fh2.setFormatter(formatter2)
 logger2.addHandler(fh2)
 logger2.setLevel(logging.DEBUG)
 
 # Логгер 3
 logger3 = logging.getLogger('LoggerTable3')
 fh3 = logging.FileHandler('LoggerTable3.txt')
-formatter3 = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-fh3.setFormatter(formatter3)
 logger3.addHandler(fh3)
-logger3.setLevel(logging.DEBUG)
-
-# Логгер 4
-logger4 = logging.getLogger('LoggerMAIN')
-fh4 = logging.FileHandler('LoggerMAIN.txt')
-formatter4 = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-fh4.setFormatter(formatter4)
-logger4.addHandler(fh4)
-logger4.setLevel(logging.DEBUG)
+logger3.setLevel(logging.WARNING)
 
 # функция разброски логов
-loggers = {
-    1: logger1,
-    2: logger2,
-    3: logger3,
-    4: logger4,
-}
+loggers = {1: logger1, 2: logger2, 3: logger3}
 
 def log_message(logger_num, log_type, message):
     """Логирует сообщение в выбранный логгер по номеру и типу"""
     logger = loggers.get(logger_num)
     if not logger:
-        raise ValueError('Неверный номер логгера (доступны 1..4)')
+        raise ValueError('Неверный номер логгера')
     if log_type == 'info':
         logger.info(message)
     elif log_type == 'warning':
@@ -728,7 +707,7 @@ class ModbusProvider:
     global Tray_robot
     global Cell, Cell2, Cell3, Cell1
     global command_toBOt
-
+    
     def __init__(self):
         self.store = ModbusSlaveContext(
             hr=ModbusSequentialDataBlock(0, [0] * 100)
@@ -759,7 +738,6 @@ class ModbusProvider:
             if self.last_out.get(addr) != value:
                 self.store.setValues(3, addr, [value])
                 self.last_out[addr] = value
-
         except Exception as e:
             print(f"[Modbus] write fail addr {addr}: {e}")
 
@@ -875,12 +853,7 @@ class Table:
         # Переменные хранения состояний прошивки на ложе
         self._loge_outcome = {1: None, 2: None}  # 2=успех(норм), 3=брак
         self._loge_dm      = {1: None, 2: None}  # опционально: DM последней прошивки на ложе
-    def pause_mode(self):
-             while True:
-                print('ПАУЗА - по красной кнопке регула')
-                time.sleep(1)
-                if shared_data['OPC-DB']["OPC_ButtonLoadOrders"] == True:
-                    break
+
     # Утилиты для записи/чтения результатов прошивки на ложе
     def _set_loge_outcome(self, loge: int, tray_code: int, dm: str | None = None):
         # tray_code: 2 = норм, 3 = брак (как у вас)
@@ -1098,14 +1071,9 @@ class Table:
 
         for _ in range(max_new_board_tries):
             # 1) взять новую плату из тары
-            Tray_robot = 2
-            with shared_data_lock:
-                if shared_data['OPC-DB']['OPC_res_brak'] == False:
-                    Cell1 += 1
-                    Cell = Cell1
-                else:
-                    Cell1 = 0
-                    Cell = Cell1
+            Tray_robot = 1
+            Cell1 += 1
+            Cell = Cell1
             time.sleep(1)  # дать Modbus прочитать
 
             if not self._send_robot_command(210):
@@ -1477,7 +1445,7 @@ class Table:
             # 1. Забираем первую плату из тары
             print(f"1 Стол {self.number} Робот <- Забери плату из тары")
             logging.info(f"Стол {self.number} Робот <- Забери плату из тары")
-            Tray_robot = 2          # Ящик с новыми платами
+            Tray_robot = 1          # Ящик с новыми платами
             Cell1 += 1              # <-- счётчик тары новых
             Cell = Cell1            # <-- отдаём ячейку в Modbus
             time.sleep(1)           # чтобы Modbus успел прочитать
@@ -1515,10 +1483,7 @@ class Table:
 
         print(f"[MAIN] ЦИКЛ MAIN для {self.number} стола старт")
         log_message(self.number, "info", f"[MAIN] ЦИКЛ MAIN для {self.number} стола старт")
-        
-        
 
-            
         # Стартуем: на ложе 2 уже есть плата — начнём шить с него
         current_loge = 2
         photodata1 = '111'                     # DM для первой прошивки (если требуется)
@@ -1560,15 +1525,15 @@ class Table:
                     # 1) Поднять голову (страховка), подвести current_loge
                     self._send_table_command(104)
                     log_message(self.number, "info", f"[MAIN] Подняли прошивальщик (перед подводом текущего ложемента)")
-                    self.pause_mode()
                     
+
                     _move_table_to_loge(current_loge)
                     log_message(self.number, "info", f"[MAIN] Сдвигаем стол {self.number} под прошивальщик (под головкой ложе {current_loge})")
 
                     # 2) ОДНОВРЕМЕННО: опускаем прошивальщик И работаем с роботом на free_loge
                     self._send_table_command(103)
                     log_message(self.number, "info", f"[MAIN] Опускаем прошивальщик стол {self.number} (параллельно с операциями робота)")
-                    self.pause_mode()
+
 
                     while not self.rob_manager.acquire(self.number):
                         logging.info(f"[MAIN] СТОЛ {self.number} ждет освобождения робота (загрузка новой на ложе {free_loge})")
@@ -1586,21 +1551,21 @@ class Table:
                     )
                     sewing_thread.start()
                     logging.info(f"[MAIN] СТОЛ {self.number} Прошивка запущена на ложе {current_loge} (DM={next_photodata})")
-                    self.pause_mode()
+
                     # 4) Дождаться завершения прошивки current_loge
                     sewing_thread.join(timeout=SEW_WAIT_TIMEOUT)
                     if sewing_thread.is_alive():
                         logging.error(f"[MAIN] СТОЛ {self.number} Таймаут прошивки на ложе {current_loge}")
                         raise RuntimeError("Sewing timeout (initial cycle)")
                     logging.info(f"[MAIN] СТОЛ {self.number} Прошивка на ложе {current_loge} завершена")
-                    self.pause_mode()
+                    
                     # 5) Поднять голову, перейти на free_loge
                     self._send_table_command(104)
                     logging.info(f"[MAIN] СТОЛ {self.number} Подняли прошивальщик с ложе {current_loge}")
 
                     _move_table_to_loge(free_loge)
                     logging.info(f"[MAIN] СТОЛ {self.number} сдвинут по оси X (под головкой теперь ложе {free_loge})")
-                    self.pause_mode()
+
                     # 6) ОДНОВРЕМЕННО: опускаем прошивальщик И работаем с роботом на старом ложе
                     self._send_table_command(103)
                     logging.info(f"[MAIN] Опускаем прошивальщик на ложе {free_loge} (параллельно с операциями робота)")
@@ -1659,7 +1624,7 @@ class Table:
                         print(f"[MAIN] Стол {self.number} Робот освобожден столом (после выгрузки+загрузки старого ложемента)")
                         logging.info(f"[MAIN] Стол {self.number} Робот освобожден столом (после выгрузки+загрузки старого ложемента)")
                         self.rob_manager.release(self.number)
-                    self.pause_mode()
+
                     # 7) Запускаем прошивку на free_loge как in-flight к началу 2-й итерации
                     next_sewing_thread = threading.Thread(
                         target=self.start_sewing, args=(dm_for_free, free_loge), daemon=True
@@ -1672,7 +1637,7 @@ class Table:
                     next_photodata = dm_for_old        # DM на противоположном (перезаряженном) ложе
                     parallel_join_mode = True          # со 2-й итерации — новый режим
                     logging.info(f"[MAIN] Подготовка к 2-й итерации: current_loge={current_loge}, next_DM={next_photodata}")
-                
+
                 else:
                     # ---------------- СО 2-Й ИТЕРАЦИИ: ДВА ПАРАЛЛЕЛЬНЫХ ПОТОКА ----------------
                     # 0) Дождаться завершения in-flight на current_loge (с конца 1-й итерации)
@@ -1954,8 +1919,6 @@ if __name__ == "__main__":
     # Стартуем вспосогательный сервер перепарвки данных от прошивальщика в основной скрпит. 
     # делаем его как дочерний подпроцесс
     proc = subprocess.Popen([sys.executable, "ServerRTK.py"])
-
-
 
     # Создаём столы
     table1 = Table("Table1", shared_data, shared_data_lock, 1, rob_manager)

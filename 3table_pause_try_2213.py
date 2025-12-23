@@ -12,15 +12,13 @@ import subprocess
 import sys
 import os
 import SQLite
+import Mertech_scanner
 
 # --- Глобальная аварийная остановка всего комплекса ---
 EMERGENCY_STOP = threading.Event()
 SETUP_TABLE = 0
 SUB_SETUP_TABLE = 0
 
-
-
-    
 def trigger_emergency(reason: str):
     """
     Устанавливает глобальную аварийную остановку и логирует причину.
@@ -66,6 +64,7 @@ class RobActionManager:
 # Пользовательский класс камеры
 # mport CameraClass as CAM
 import CameraSocket
+ 
  # Пользовательский класс БД
 import Provider1C
 import SQLite as SQL
@@ -91,7 +90,6 @@ Cell3 = 0  # ячейка тары БРАКА (242)
 Order = "ЗНП-2160.1.1"
 # данные с платы для цикла main и сетапа
 photodata = None
-
 
 shared_data = {
     1: {
@@ -818,10 +816,9 @@ class ModbusProvider:
                     t1_move = sd1['Reg_move_Table']; t1_updn = sd1['Reg_updown_Botloader']; t1_rob = sd1['Rob_Action']
                     t2_move = sd2['Reg_move_Table']; t2_updn = sd2['Reg_updown_Botloader']; t2_rob = sd2['Rob_Action']
                     t3_move = sd3['Reg_move_Table']; t3_updn = sd3['Reg_updown_Botloader']; t3_rob = sd3['Rob_Action']
-                    print('--------------------------------------------------------------------------')
-                    print(f'Rob action ={t1_rob}')
+                
                     setup_table_local = SETUP_TABLE
-                    tray_robot_local  = Tray_robot
+                    tray_robot_local  = Tray_robot                   
                     cell_local        = Cell
                     tray2_local       = Tray2
 
@@ -875,11 +872,13 @@ class Table:
         # Переменные хранения состояний прошивки на ложе
         self._loge_outcome = {1: None, 2: None}  # 2=успех(норм), 3=брак
         self._loge_dm      = {1: None, 2: None}  # опционально: DM последней прошивки на ложе
+    # остановка скрпита по кнопке от регула (Max)
     def pause_mode(self):
-             while True:
-                print('ПАУЗА - по красной кнопке регула')
-                time.sleep(1)
-                if shared_data['OPC-DB']["OPC_ButtonLoadOrders"] == True:
+        while True:
+            print('ПАУЗА - по красной кнопке регула')
+            time.sleep(1)
+            with shared_data_lock:
+                if shared_data['OPC-DB']["OPC_ButtonLoadOrders"] == False:
                     break
     # Утилиты для записи/чтения результатов прошивки на ложе
     def _set_loge_outcome(self, loge: int, tray_code: int, dm: str | None = None):
@@ -1098,7 +1097,7 @@ class Table:
 
         for _ in range(max_new_board_tries):
             # 1) взять новую плату из тары
-            Tray_robot = 2
+            Tray_robot = 1
             with shared_data_lock:
                 if shared_data['OPC-DB']['OPC_res_brak'] == False:
                     Cell1 += 1
@@ -1515,10 +1514,7 @@ class Table:
 
         print(f"[MAIN] ЦИКЛ MAIN для {self.number} стола старт")
         log_message(self.number, "info", f"[MAIN] ЦИКЛ MAIN для {self.number} стола старт")
-        
-        
 
-            
         # Стартуем: на ложе 2 уже есть плата — начнём шить с него
         current_loge = 2
         photodata1 = '111'                     # DM для первой прошивки (если требуется)
@@ -1561,7 +1557,7 @@ class Table:
                     self._send_table_command(104)
                     log_message(self.number, "info", f"[MAIN] Подняли прошивальщик (перед подводом текущего ложемента)")
                     self.pause_mode()
-                    
+
                     _move_table_to_loge(current_loge)
                     log_message(self.number, "info", f"[MAIN] Сдвигаем стол {self.number} под прошивальщик (под головкой ложе {current_loge})")
 
@@ -1625,7 +1621,7 @@ class Table:
                             raise RuntimeError(f"Не найден исход прошивки для ложемента {current_loge}")
 
                         Tray_robot = tr  # 2 или 3
-
+                        self.pause_mode()
                         if tr == 2:
                             Cell2 += 1
                             Cell = Cell2
@@ -1672,7 +1668,7 @@ class Table:
                     next_photodata = dm_for_old        # DM на противоположном (перезаряженном) ложе
                     parallel_join_mode = True          # со 2-й итерации — новый режим
                     logging.info(f"[MAIN] Подготовка к 2-й итерации: current_loge={current_loge}, next_DM={next_photodata}")
-                
+                    self.pause_mode()
                 else:
                     # ---------------- СО 2-Й ИТЕРАЦИИ: ДВА ПАРАЛЛЕЛЬНЫХ ПОТОКА ----------------
                     # 0) Дождаться завершения in-flight на current_loge (с конца 1-й итерации)
@@ -1684,16 +1680,16 @@ class Table:
                             raise RuntimeError("Sewing join timeout (parallel mode)")
                         in_flight_sewing_thread = None
                         logging.info(f"[MAIN] Прошивка на ложе {current_loge} завершена (in-flight)")
-
+                    self.pause_mode()
                     # 1) Поднять голову 104 — ОТДЕЛЬНО
                     self._send_table_command(104)
                     logging.info(f"[MAIN] СТОЛ {self.number} 104 — подняли прошивальщик")
-
+                    self.pause_mode()
                     # 2) Подвести противоположное ложе 10X — ОТДЕЛЬНО
                     next_loge = 2 if current_loge == 1 else 1
                     _move_table_to_loge(next_loge)
                     logging.info(f"[MAIN] СТОЛ {self.number} 10{'1' if next_loge==1 else '2'} — подвели ложе {next_loge}")
-
+                    self.pause_mode()
                     # --- Запускаем 2 параллельных потока ---
                     dm_holder = {"dm": None}
                     thread_errors = {"table": None, "robot": None}
@@ -1709,7 +1705,7 @@ class Table:
                             logging.info(f"[MAIN] СТОЛ {self.number} Прошивка на ложе {next_loge} завершена")
                         except Exception as e:
                             thread_errors["table"] = e
-
+                        self.pause_mode()
 
                         # снять обработанную
 
@@ -1727,7 +1723,7 @@ class Table:
                                     raise TableOperationFailed(f"Ошибка забора с ложемента {current_loge} (23X/230)")
 
                                 logging.info(f"[MAIN] СТОЛ {self.number} сняли плату с ложемента {current_loge}")
-
+                                self.pause_mode()
                                 # 2) Получить итог прошивки АТОМАРНО для этого ложемента
                                 tr = self._consume_loge_outcome(current_loge)
                                 if tr is None:
@@ -1737,7 +1733,7 @@ class Table:
                                         f"[MAIN] СТОЛ {self.number}: нет исхода прошивки для ложемента {current_loge}; "
                                         f"помечаем как БРАК (242)."
                                     )
-
+                                self.pause_mode()
                                 # 3) Разложить по лоткам (успех -> 241, брак -> 242) и корректно проставить Cell
                                 Tray_robot = tr  # 2 или 3
                                 if tr == 2:
@@ -1761,7 +1757,7 @@ class Table:
                                 Tray_robot = 0
                                 Cell = 0
                                 tr = 0
-
+                                self.pause_mode()
                                 # 4) ВЗЯТЬ НОВУЮ ПЛАТУ и УЛОЖИТЬ НА current_loge
                                 #    — с ограниченными попытками фото; если DM не читается, плата уходит в брак и берём следующую
                                 dm_loaded = self._place_new_board_with_photo(
@@ -1770,7 +1766,7 @@ class Table:
                                     max_new_board_tries=5   # предохранитель от бесконечного цикла брака
                                 )
                                 logging.info(f"[MAIN] СТОЛ {self.number} новая плата уложена на ложе {current_loge}, DM={dm_loaded}")
-
+                                self.pause_mode()
                                 # 5) Передаём DM в общий держатель для следующей итерации
                                 dm_holder["dm"] = dm_loaded
 
@@ -1920,6 +1916,8 @@ def run_table_pipeline(table: Table, do_defence=True, do_setup=True):
 
 if __name__ == "__main__":
 
+    
+
     modbus_provider = ModbusProvider()
     rob_manager = RobActionManager()
     
@@ -1983,10 +1981,26 @@ if __name__ == "__main__":
         logging.info(f"Ожидание от регула, что столы в начальной позиции")
         time.sleep(1)
         SETUP_TABLE = 1
+        print (f'Сканирование штрих кода тары')
+        logging.info(f"Сканирование штрих кода тары")
+        barcode = Mertech_scanner.scan_barcode()
+        print(barcode)
         if SUB_SETUP_TABLE == 1:
             SETUP_TABLE = 0
             logging.info(f"получен ответ от регула, что столы приведены в нулевое положении")
             print (f'получен ответ от регула, что столы приведены в нулевое положении ')
+            break
+
+    while True:
+        print (f'Сканирование штрих кода тары')
+        logging.info(f"Сканирование штрих кода тары")
+        barcode = Mertech_scanner.scan_barcode()
+        print(barcode)
+        time.sleep(1)
+        if barcode:
+            SETUP_TABLE = 0
+            logging.info(f"Штрих кода тары успешно получен {barcode}")
+            print (f"Штрих кода тары успешно получен {barcode}")
             break
         
 

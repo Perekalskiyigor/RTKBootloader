@@ -11,7 +11,8 @@ import yaml
 import subprocess
 import sys
 import os
-import Mertech_scanner
+#import Mertech_scanner
+
 
 # --- Глобальная аварийная остановка всего комплекса ---
 EMERGENCY_STOP = threading.Event()
@@ -354,7 +355,7 @@ class OPCClient:
                             # Read ButtonLoadOrders with protection
                             ButtonLoadOrders = False  # Default value
                             try:
-                                node = self.client.get_node('ns=2;s=Application.UserInterface.ButtonLoadOrders')
+                                node = self.client.get_node('ns=2;s=Application.UserInterface.OPC_ButtonLoadOrders')
                                 ButtonLoadOrders = node.get_value() or False
                             except Exception as e:
                                 print(f"Error reading ButtonLoadOrders: {e}")
@@ -366,13 +367,13 @@ class OPCClient:
                             if self.connected:
                                 # Write interface values with protection
                                 try:
-                                    node = self.client.get_node('ns=2;s=Application.UserInterface.name_board')
+                                    node = self.client.get_node('ns=2;s=Application.UserInterface.OPC_nameboard')
                                     node.set_value(ua.DataValue(ua.Variant(shared_data['OPC-DB']['DB_module'], ua.VariantType.String)))
                                 except Exception as e:
                                     print(f"Error setting name_board: {e}")
 
                                 try:
-                                    node = self.client.get_node('ns=2;s=Application.UserInterface.fw_version')
+                                    node = self.client.get_node('ns=2;s=Application.UserInterface.OPC_firmware')
                                     node.set_value(ua.DataValue(ua.Variant(shared_data['OPC-DB']['DB_fw_version'], ua.VariantType.String)))
                                 except Exception as e:
                                     print(f"Error setting fw_version: {e}")
@@ -449,6 +450,7 @@ class ModbusProvider:
                     # СТОЛ 1
                     # Получаем данные из регистров и записываем в shared_data[1]
                     SUB_SETUP_TABLE = self.store.getValues(3, 26, count=1)[0]
+                    print(f"----------------------------------{SUB_SETUP_TABLE}")
                     shared_data[1]['sub_Reg_move_Table'] = self.store.getValues(3, 9, count=1)[0]
                     shared_data[1]['sub_Reg_updown_Botloader'] = self.store.getValues(3, 11, count=1)[0]
                     # shared_data[1]['sub_Rob_Action'] = self.store.getValues(3, 13, count=1)[0]
@@ -1503,13 +1505,13 @@ if __name__ == "__main__":
 
         SETUP_TABLE = 1
 
-        # --- Считывание тары ---
-        print('Ожидание, что тара на месте и штрихкод тары считан')
-        try:
-            BARCODETRAY = Mertech_scanner.scan_barcode()
-        except Exception as e:
-            logging.error(f"Ошибка при сканировании тары: {e}")
-            continue   # ⬅ НЕ продолжаем логику, ждём дальше
+        # # --- Считывание тары ---
+        # print('Ожидание, что тара на месте и штрихкод тары считан')
+        # try:
+        #     BARCODETRAY = Mertech_scanner.scan_barcode()
+        # except Exception as e:
+        #     logging.error(f"Ошибка при сканировании тары: {e}")
+        #     continue   # ⬅ НЕ продолжаем логику, ждём дальше
 
         if not BARCODETRAY:
             print('Штрихкод не считан, ожидание...')

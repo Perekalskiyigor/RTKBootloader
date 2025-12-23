@@ -3,7 +3,7 @@ import time
 
 
 def scan_barcode(
-    port: str = "COM7",
+    port: str = "COM3",
     baudrate: int = 115200,
     timeout: float = 1.0,
     scan_timeout: float = 2.0,

@@ -1,4 +1,3 @@
-# python -m PyInstaller --onefile 3table_Worfiletray2810.py
 import logging
 import time
 from pymodbus.server import StartTcpServer
@@ -18,9 +17,6 @@ EMERGENCY_STOP = threading.Event()
 SETUP_TABLE = 0
 SUB_SETUP_TABLE = 0
 
-
-
-    
 def trigger_emergency(reason: str):
     """
     Устанавливает глобальную аварийную остановку и логирует причину.
@@ -66,6 +62,7 @@ class RobActionManager:
 # Пользовательский класс камеры
 # mport CameraClass as CAM
 import CameraSocket
+ 
  # Пользовательский класс БД
 import Provider1C
 import SQLite as SQL
@@ -233,51 +230,33 @@ logging.basicConfig(
     format=' %(asctime)s - MAIN - %(levelname)s - %(message)s'
 )
 
+
 # Логгер 1
 logger1 = logging.getLogger('LoggerTable1')
 fh1 = logging.FileHandler('LoggerTable1.txt')
-formatter1 = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-fh1.setFormatter(formatter1)
 logger1.addHandler(fh1)
 logger1.setLevel(logging.INFO)
 
 # Логгер 2
 logger2 = logging.getLogger('LoggerTable2')
 fh2 = logging.FileHandler('LoggerTable2.txt')
-formatter2 = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-fh2.setFormatter(formatter2)
 logger2.addHandler(fh2)
 logger2.setLevel(logging.DEBUG)
 
 # Логгер 3
 logger3 = logging.getLogger('LoggerTable3')
 fh3 = logging.FileHandler('LoggerTable3.txt')
-formatter3 = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-fh3.setFormatter(formatter3)
 logger3.addHandler(fh3)
-logger3.setLevel(logging.DEBUG)
-
-# Логгер 4
-logger4 = logging.getLogger('LoggerMAIN')
-fh4 = logging.FileHandler('LoggerMAIN.txt')
-formatter4 = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-fh4.setFormatter(formatter4)
-logger4.addHandler(fh4)
-logger4.setLevel(logging.DEBUG)
+logger3.setLevel(logging.WARNING)
 
 # функция разброски логов
-loggers = {
-    1: logger1,
-    2: logger2,
-    3: logger3,
-    4: logger4,
-}
+loggers = {1: logger1, 2: logger2, 3: logger3}
 
 def log_message(logger_num, log_type, message):
     """Логирует сообщение в выбранный логгер по номеру и типу"""
     logger = loggers.get(logger_num)
     if not logger:
-        raise ValueError('Неверный номер логгера (доступны 1..4)')
+        raise ValueError('Неверный номер логгера')
     if log_type == 'info':
         logger.info(message)
     elif log_type == 'warning':
@@ -728,7 +707,7 @@ class ModbusProvider:
     global Tray_robot
     global Cell, Cell2, Cell3, Cell1
     global command_toBOt
-
+    
     def __init__(self):
         self.store = ModbusSlaveContext(
             hr=ModbusSequentialDataBlock(0, [0] * 100)
@@ -759,7 +738,6 @@ class ModbusProvider:
             if self.last_out.get(addr) != value:
                 self.store.setValues(3, addr, [value])
                 self.last_out[addr] = value
-
         except Exception as e:
             print(f"[Modbus] write fail addr {addr}: {e}")
 
@@ -845,7 +823,9 @@ class ModbusProvider:
 
                 self._set_if_changed(6,  tray_robot_local)
                 self._set_if_changed(8,  cell_local)
+                print(f"--------------------------------------------------ячейка {cell_local}")
                 self._set_if_changed(24, tray2_local)
+                print(f"--------------------------------------------------тара {tray2_local}")
 
                 # Отладочные принты можно пореже:
                 # print(f"t1: Rob={t1_rob}/{t1_sub_rob} t2: Rob={t2_rob}/{t2_sub_rob} t3: Rob={t3_rob}/{t3_sub_rob}")
@@ -875,11 +855,13 @@ class Table:
         # Переменные хранения состояний прошивки на ложе
         self._loge_outcome = {1: None, 2: None}  # 2=успех(норм), 3=брак
         self._loge_dm      = {1: None, 2: None}  # опционально: DM последней прошивки на ложе
+    # остановка скрпита по кнопке от регула (Max)
     def pause_mode(self):
-             while True:
-                print('ПАУЗА - по красной кнопке регула')
-                time.sleep(1)
-                if shared_data['OPC-DB']["OPC_ButtonLoadOrders"] == True:
+        while True:
+            print('ПАУЗА - по красной кнопке регула')
+            time.sleep(1)
+            with shared_data_lock:
+                if shared_data['OPC-DB']["OPC_ButtonLoadOrders"] == False:
                     break
     # Утилиты для записи/чтения результатов прошивки на ложе
     def _set_loge_outcome(self, loge: int, tray_code: int, dm: str | None = None):
@@ -1099,13 +1081,8 @@ class Table:
         for _ in range(max_new_board_tries):
             # 1) взять новую плату из тары
             Tray_robot = 2
-            with shared_data_lock:
-                if shared_data['OPC-DB']['OPC_res_brak'] == False:
-                    Cell1 += 1
-                    Cell = Cell1
-                else:
-                    Cell1 = 0
-                    Cell = Cell1
+            Cell1 += 1
+            Cell = Cell1
             time.sleep(1)  # дать Modbus прочитать
 
             if not self._send_robot_command(210):
@@ -1125,7 +1102,7 @@ class Table:
             else:
                 # 3b) отправляем в брак и пробуем ещё одну плату
                 logging.warning(f"Стол {self.number}: DM не прочитан за {max_photo_attempts} попыток — уводим в брак")
-                Tray_robot = 3
+                Tray_robot = 0
                 Cell3 += 1
                 Cell = Cell3
                 time.sleep(1)  # дать Modbus прочитать
@@ -1252,9 +1229,9 @@ class Table:
                 # Если прошивка не успешная - в отбраковку, иначе в нормальный лоток
                 print(f"**************** error_description  {error_description}")
                 if error_description is True:
-                    tray_code = 2  # норм
+                    tray_code = 1  # норм
                 else:
-                    tray_code = 3  # брак
+                    tray_code = 0  # брак
 
                 self._set_loge_outcome(loge, tray_code, photodata)
 
@@ -1515,10 +1492,7 @@ class Table:
 
         print(f"[MAIN] ЦИКЛ MAIN для {self.number} стола старт")
         log_message(self.number, "info", f"[MAIN] ЦИКЛ MAIN для {self.number} стола старт")
-        
-        
 
-            
         # Стартуем: на ложе 2 уже есть плата — начнём шить с него
         current_loge = 2
         photodata1 = '111'                     # DM для первой прошивки (если требуется)
@@ -1561,7 +1535,7 @@ class Table:
                     self._send_table_command(104)
                     log_message(self.number, "info", f"[MAIN] Подняли прошивальщик (перед подводом текущего ложемента)")
                     self.pause_mode()
-                    
+
                     _move_table_to_loge(current_loge)
                     log_message(self.number, "info", f"[MAIN] Сдвигаем стол {self.number} под прошивальщик (под головкой ложе {current_loge})")
 
@@ -1617,7 +1591,7 @@ class Table:
                             # страховка: исход не найден — можно:
                             # 1) считать брак/оставить как есть, 2) кинуть исключение, 3) повторить опрос.
                             # Я бы явно зафейлил, чтобы не перепутать партии:
-                            tr = 3
+                            tr = 0
                             logging.warning(
                                 f"[MAIN] СТОЛ {self.number} Нет исхода прошивки для ложемента {current_loge}; "
                                 f"помечаем как БРАК и уносим в 242."
@@ -1641,7 +1615,7 @@ class Table:
                         if not self._send_robot_command(230, cell_num=current_loge):
                             raise TableOperationFailed(f"Ошибка забора с ложемента {current_loge}")
                         logging.info(f"[MAIN] СТОЛ {self.number} Забираем обработанную плату с ложемента {current_loge}")
-                        if tr == 2:
+                        if tr == 1:
                             if not self._send_robot_command(241): 
                                 raise TableOperationFailed("Ошибка укладки в тару")
                             logging.info(f"[MAIN] СТОЛ {self.number} Укладываем плату в тару с упешно прошитыми платами (с ложе {current_loge})")
@@ -1659,8 +1633,9 @@ class Table:
                         print(f"[MAIN] Стол {self.number} Робот освобожден столом (после выгрузки+загрузки старого ложемента)")
                         logging.info(f"[MAIN] Стол {self.number} Робот освобожден столом (после выгрузки+загрузки старого ложемента)")
                         self.rob_manager.release(self.number)
-                    self.pause_mode()
+
                     # 7) Запускаем прошивку на free_loge как in-flight к началу 2-й итерации
+                    self.pause_mode()
                     next_sewing_thread = threading.Thread(
                         target=self.start_sewing, args=(dm_for_free, free_loge), daemon=True
                     )
@@ -1672,10 +1647,11 @@ class Table:
                     next_photodata = dm_for_old        # DM на противоположном (перезаряженном) ложе
                     parallel_join_mode = True          # со 2-й итерации — новый режим
                     logging.info(f"[MAIN] Подготовка к 2-й итерации: current_loge={current_loge}, next_DM={next_photodata}")
-                
+
                 else:
                     # ---------------- СО 2-Й ИТЕРАЦИИ: ДВА ПАРАЛЛЕЛЬНЫХ ПОТОКА ----------------
                     # 0) Дождаться завершения in-flight на current_loge (с конца 1-й итерации)
+                    self.pause_mode()
                     if in_flight_sewing_thread is not None:
                         logging.info(f"[MAIN] Ожидаем завершения прошивки (in-flight) на ложе {current_loge}")
                         in_flight_sewing_thread.join(timeout=SEW_WAIT_TIMEOUT)
@@ -1686,10 +1662,12 @@ class Table:
                         logging.info(f"[MAIN] Прошивка на ложе {current_loge} завершена (in-flight)")
 
                     # 1) Поднять голову 104 — ОТДЕЛЬНО
+                    self.pause_mode()
                     self._send_table_command(104)
                     logging.info(f"[MAIN] СТОЛ {self.number} 104 — подняли прошивальщик")
 
                     # 2) Подвести противоположное ложе 10X — ОТДЕЛЬНО
+                    self.pause_mode()
                     next_loge = 2 if current_loge == 1 else 1
                     _move_table_to_loge(next_loge)
                     logging.info(f"[MAIN] СТОЛ {self.number} 10{'1' if next_loge==1 else '2'} — подвели ложе {next_loge}")
@@ -1697,9 +1675,9 @@ class Table:
                     # --- Запускаем 2 параллельных потока ---
                     dm_holder = {"dm": None}
                     thread_errors = {"table": None, "robot": None}
-
                     def table_thread():
                         global Tray1, Tray2, Tray3, Tray_robot, Cell,Cell1, Cell2, Cell3
+                        self.pause_mode()
                         try:
                             # 3) Стол: 103 + прошивка на next_loge
                             self._send_table_command(103)
@@ -1715,7 +1693,7 @@ class Table:
 
                     def robot_thread():
                         global Cell, Cell2, Cell3, Tray_robot
-
+                        self.pause_mode()
                         try:
                             # Захватываем робота на весь блок операций current_loge
                             while not self.rob_manager.acquire(self.number):
@@ -1725,7 +1703,7 @@ class Table:
                                 # 1) Снять обработанную плату с current_loge
                                 if not self._send_robot_command(230, cell_num=current_loge):
                                     raise TableOperationFailed(f"Ошибка забора с ложемента {current_loge} (23X/230)")
-
+                                self.pause_mode()
                                 logging.info(f"[MAIN] СТОЛ {self.number} сняли плату с ложемента {current_loge}")
 
                                 # 2) Получить итог прошивки АТОМАРНО для этого ложемента
@@ -1737,17 +1715,17 @@ class Table:
                                         f"[MAIN] СТОЛ {self.number}: нет исхода прошивки для ложемента {current_loge}; "
                                         f"помечаем как БРАК (242)."
                                     )
-
+                                self.pause_mode()
                                 # 3) Разложить по лоткам (успех -> 241, брак -> 242) и корректно проставить Cell
                                 Tray_robot = tr  # 2 или 3
-                                if tr == 2:
+                                if tr == 1:
                                     Cell2 += 1
                                     Cell = Cell2
                                     time.sleep(1)  # дать Modbus прочитать
                                     if not self._send_robot_command(241):
                                         raise TableOperationFailed("Ошибка укладки в тару успеха (241)")
                                     logging.info(f"[MAIN] СТОЛ {self.number} уложили плату в тару успеха (с ложе {current_loge})")
-                                elif tr == 3:
+                                elif tr == 0:
                                     Cell3 += 1
                                     Cell = Cell3
                                     time.sleep(1)  # дать Modbus прочитать
@@ -1756,7 +1734,7 @@ class Table:
                                     logging.info(f"[MAIN] СТОЛ {self.number} уложили плату в тару брака (с ложе {current_loge})")
                                 else:
                                     raise RuntimeError(f"Неожиданный номер трея для укладки: {tr}")
-
+                                self.pause_mode()
                                 # очистка отображаемых ячеек после укладки
                                 Tray_robot = 0
                                 Cell = 0
@@ -1770,7 +1748,7 @@ class Table:
                                     max_new_board_tries=5   # предохранитель от бесконечного цикла брака
                                 )
                                 logging.info(f"[MAIN] СТОЛ {self.number} новая плата уложена на ложе {current_loge}, DM={dm_loaded}")
-
+                                self.pause_mode()
                                 # 5) Передаём DM в общий держатель для следующей итерации
                                 dm_holder["dm"] = dm_loaded
 
@@ -1779,7 +1757,7 @@ class Table:
                                 logging.info(f"[MAIN] Стол {self.number} Робот освобождён (после 23X → сортировка → новая плата)")
                         except Exception as e:
                             thread_errors["robot"] = e
-
+                        self.pause_mode()
 
                     t_table = threading.Thread(target=table_thread, daemon=True, name=f"tbl-{self.number}")
                     t_robot = threading.Thread(target=robot_thread, daemon=True, name=f"bot-{self.number}")
@@ -1954,8 +1932,6 @@ if __name__ == "__main__":
     # Стартуем вспосогательный сервер перепарвки данных от прошивальщика в основной скрпит. 
     # делаем его как дочерний подпроцесс
     proc = subprocess.Popen([sys.executable, "ServerRTK.py"])
-
-
 
     # Создаём столы
     table1 = Table("Table1", shared_data, shared_data_lock, 1, rob_manager)

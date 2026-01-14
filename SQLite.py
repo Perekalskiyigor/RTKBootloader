@@ -546,6 +546,43 @@ class DatabaseConnection:
         except Exception as e:
             logging.error(f"OPC Ошибка при получении данных по заказу '{order_number}': {e}", exc_info=True)
             return None
+    # Функция роверки платы в 1с
+    def setCheckboardResult(self, record_id: int, check_result: bool):
+        """
+        Устанавливает результат проверки платы (Checkboard)
+        для конкретной записи order_details.
+
+        record_id   — id записи в order_details
+        check_result — True / False
+        """
+
+        value = 1 if check_result else 0
+
+        try:
+            self.cursor.execute(
+                '''
+                UPDATE order_details
+                SET Checkboard = ?
+                WHERE id = ?
+                ''',
+                (value, record_id)
+            )
+
+            self.conn.commit()
+
+            # logging.info(
+            #     f"OPC Checkboard обновлён: record_id={record_id}, Checkboard={value}"
+            # )
+
+            return True
+
+        except Exception as e:
+            self.conn.rollback()
+            logging.error(
+                f"OPC Ошибка обновления Checkboard для record_id={record_id}: {e}",
+                exc_info=True
+            )
+            return False
         
         
         
@@ -631,3 +668,17 @@ else:
 """
 
 # insert_log(f"Для стола получено фото datamatrix платы значение =", 0)
+
+
+# erp_response = {
+#     'order': 'ЗНП-24576.1.1',
+#     'board': 'V01240234',
+#     'result': False
+# }
+
+# record_id = 1  # id записи order_details
+# db_connection = DatabaseConnection()
+# db_connection.setCheckboardResult(
+#     record_id=record_id,
+#     check_result=erp_response["result"]
+# )

@@ -1,246 +1,200 @@
-import subprocess
-import threading
-import time
-import signal
+# python -m PyInstaller --onefile StrarterBotloader.py
+
 import os
+import sys
+import time
+import subprocess
+from pathlib import Path
 from opcua import Client, ua
 
-# === Настройки ===
-BRIDGE_DIR  = r"C:\nails_table_bridge_v_0_2_0_for_rtk\nails_table_bridge"
-BRIDGE_EXE  = "nails_table_bridge.exe"
-WORKER_EXE  = r"C:\Users\i.perekalskii\Desktop\DEV\RTKBootloader\3table_Worfiletray2810.exe"
+OPC_URL = "opc.tcp://192.168.1.3:48010"
+NODE_START   = "ns=2;s=Application.UserInterface.OPC_start_python"
+NODE_RUNNING = "ns=2;s=Application.UserInterface.OPC_log"
+POLL_SEC = 0.5
 
-# === Глобальные процессы ===
-proc_bridge = None
-proc_worker = None
+EXE1 = r"C:\nails_table_bridge_v_0_2_0_for_rtk\nails_table_bridge\nails_table_bridge.exe"
+EXE2 = r"C:\Users\i.perekalskii\Desktop\DEV\RTKBootloader\dist\WORK_FILE_22_12.exe"
+EXE3 = r"C:\Users\i.perekalskii\Desktop\DEV\RTKBootloader\dist\ServerRTK.exe"
 
-# === Флаги OPC (глобальные) ===
-PLAY = False
-STOP = False
-RESTART = False
+CONNECT_TIMEOUT_SEC = 8.0
+RECONNECT_DELAY_SEC = 2.0
+
+proc1 = None
+proc2 = None
+proc3 = None
 
 
+def _app_dir() -> Path:
+    # для pyinstaller onefile: sys.executable = путь к exe
+    return Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
 
-# ===================== OPC UA КЛИЕНТ =====================
 
-class OPCClient:
-    def __init__(self, url):
-        self.url = url
-        self.lock = threading.Lock()
-        self.nodes = {}  # {nodeid: Node}
-        self.client = None
-        self.connected = False
-        self.stop_event = threading.Event()
+LOG_DIR = _app_dir() / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE = LOG_DIR / "starter.log"
 
-        # Имена узлов
-        self.OPC_RESTART_RTK = 'ns=2;s=Application.UserInterface.OPC_restart_RTK'
-        self.OPC_STOP_RTK    = 'ns=2;s=Application.UserInterface.OPC_pause_RTK'
-        self.OPC_PLAY_RTK    = 'ns=2;s=Application.UserInterface.OPC_start_RTK'
 
-        # Заготовки под обратную связь (раскомментируешь при необходимости):
-        # self.OPC_STATUS_TEXT = 'ns=2;s=Application.UserInterface.OPC_status_text'
-        # self.OPC_BUSY        = 'ns=2;s=Application.UserInterface.OPC_busy'
-
-        self.server_thread = threading.Thread(target=self.connection_manager, daemon=True)
-        self.update_thread = threading.Thread(target=self.update_registers, daemon=True)
-        self.server_thread.start()
-        self.update_thread.start()
-
-    # -------------------- утилиты OPC --------------------
-    def _get_node(self, nodeid):
-        if nodeid is None:
-            return None
-        node = self.nodes.get(nodeid)
-        if node is None and self.client:
-            try:
-                node = self.client.get_node(nodeid)
-                self.nodes[nodeid] = node
-            except Exception as e:
-                print(f"[OPC] can't resolve node {nodeid}: {e}")
-                return None
-        return node
-
-    def _write(self, nodeid, value, vtype):
-        node = self._get_node(nodeid)
-        if not node:
-            return
-        try:
-            node.set_value(ua.DataValue(ua.Variant(value, vtype)))
-        except Exception as e:
-            print(f"[OPC] write fail {nodeid}: {e}")
-
-    def _read_bool(self, nodeid, default=0):
-        node = self._get_node(nodeid)
-        if not node:
-            return default
-        try:
-            v = node.get_value()
-            return bool(int(v))
-        except Exception as e:
-            print(f"[OPC] read bool fail {nodeid}: {e}")
-            return default
-
-    # -------------------- соединение --------------------
-    def connection_manager(self):
-        while not self.stop_event.is_set():
-            try:
-                if not self.connected:
-                    self.client = Client(self.url)
-                    self.client.connect()
-                    self.connected = True
-                    print(f"Connected to {self.url}")
-
-                    # прогрев узлов
-                    for nid in (self.OPC_RESTART_RTK, self.OPC_STOP_RTK, self.OPC_PLAY_RTK):
-                        self._get_node(nid)
-                    # self._get_node(self.OPC_STATUS_TEXT)
-                    # self._get_node(self.OPC_BUSY)
-                time.sleep(1)
-            except Exception as e:
-                print(f"Connection error: {e}")
-                self.connected = False
-                if self.client:
-                    try:
-                        self.client.disconnect()
-                    except:
-                        pass
-                self.client = None
-                time.sleep(5)
-
-    def is_connected(self):
-        return self.connected and self.client is not None
-
-    # -------------------- опрос флагов --------------------
-    def update_registers(self):
-        global RESTART, STOP, PLAY
-        while not self.stop_event.is_set():
-            try:
-                if not self.is_connected():
-                    time.sleep(0.5)
-                    continue
-                with self.lock:
-                    try:
-                        STOP    = self._read_bool(self.OPC_STOP_RTK, False)
-                        RESTART = self._read_bool(self.OPC_RESTART_RTK, False)
-                        PLAY    = self._read_bool(self.OPC_PLAY_RTK, False)
-                    except Exception as e:
-                        print(f"[OPC] read START/STOP/RESTART failed: {e}")
-            except Exception as e:
-                print(f"Critical error in update loop: {e}")
-            time.sleep(1)
-
-    def stop(self):
-        self.stop_event.set()
-        if self.client:
-            try:
-                self.client.disconnect()
-            except:
-                pass
-
-# ===================== ГЛАВНЫЙ ЦИКЛ =====================
-
-# --- запуск процесса с выводом в общую консоль ---
-def start_process(path, cwd=None, tag="[PROC]"):
+def log(msg: str):
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    line = f"{ts} {msg}"
+    print(line, flush=True)
     try:
-        proc = subprocess.Popen(
-            [path],
-            cwd=cwd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
-        )
-        threading.Thread(
-            target=pipe_output,
-            args=(proc, tag),
-            daemon=True
-        ).start()
-        print(f"{tag} started pid={proc.pid}")
-        return proc
-    except Exception as e:
-        print(f"{tag} failed to start: {e}")
-        return None
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass
 
 
-# --- поток вывода ---
-def pipe_output(proc, tag):
-    for line in proc.stdout:
-        print(f"{tag} {line.strip()}")
-    print(f"{tag} exited with code {proc.wait()}")
+def is_running(p: subprocess.Popen | None) -> bool:
+    return p is not None and p.poll() is None
 
 
-# --- мягкая остановка ---
-def stop_process(proc, tag):
-    if proc and proc.poll() is None:
-        print(f"{tag} stopping pid={proc.pid}")
-        try:
-            os.kill(proc.pid, signal.CTRL_BREAK_EVENT)
-            proc.wait(timeout=2)
-        except Exception:
-            try:
-                proc.terminate()
-                proc.wait(timeout=2)
-            except Exception:
-                try:
-                    proc.kill()
-                except Exception:
-                    pass
-        print(f"{tag} stopped")
+def _popen_new_console(exe_path: str):
+    exe = Path(exe_path)
+    return subprocess.Popen(
+        [str(exe)],  # Запускаем напрямую, без cmd
+        cwd=str(exe.parent),
+        creationflags=subprocess.CREATE_NEW_CONSOLE,  # Всё равно откроет новое окно
+    )
 
 
-# --- запуск обеих программ ---
-def start_both():
-    global proc_bridge, proc_worker
-    proc_bridge = start_process(os.path.join(BRIDGE_DIR, BRIDGE_EXE), BRIDGE_DIR, "[BRIDGE]")
-    time.sleep(1)
-    proc_worker = start_process(WORKER_EXE, None, "[WORKER]")
+def start_procs_once():
+    global proc1, proc2, proc3
+
+    if not is_running(proc1):
+        proc1 = _popen_new_console(EXE1)
+        log(f"[APPS] started nails_table_bridge (new console), launcher pid={proc1.pid}")
+
+    time.sleep(10)
+
+    if not is_running(proc3):
+        proc3 = _popen_new_console(EXE3)
+        log(f"[APPS] started ServerRTK (new console), launcher pid={proc3.pid}")
+
+    time.sleep(3)
+
+    if not is_running(proc2):
+        proc2 = _popen_new_console(EXE2)
+        log(f"[APPS] started main.exe (new console), launcher pid={proc2.pid}")
 
 
-# --- остановка обеих ---
-def stop_both():
-    stop_process(proc_worker, "[WORKER]")
-    stop_process(proc_bridge, "[BRIDGE]")
+def _taskkill_pid(pid: int):
+    subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
 
 
-# --- рестарт обеих ---
-def restart_both():
-    print("[MAIN] Restart requested")
-    stop_both()
-    time.sleep(1)
-    start_both()
+def _taskkill_name(name: str):
+    subprocess.run(["taskkill", "/IM", name, "/T", "/F"],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
 
 
-# === Главный цикл с OPC ===
-def main_loop():
-    global PLAY, STOP, RESTART
+def stop_procs_once():
+    global proc1, proc2, proc3
 
-    url = "opc.tcp://192.168.1.3:48010"
-    opc_client = OPCClient(url)
+    if is_running(proc2):
+        log("[APPS] stopping main.exe (launcher PID)")
+        _taskkill_pid(proc2.pid)
 
-    # стартуем сразу
-    start_both()
+    if is_running(proc3):
+        log("[APPS] stopping ServerRTK (launcher PID)")
+        _taskkill_pid(proc3.pid)
 
-    prev_restart = False
+    if is_running(proc1):
+        log("[APPS] stopping nails_table_bridge (launcher PID)")
+        _taskkill_pid(proc1.pid)
+
+    # добиваем по именам (на случай если PID уже другой/порожденные процессы)
+    _taskkill_name(Path(EXE2).name)
+    _taskkill_name(Path(EXE3).name)
+    _taskkill_name(Path(EXE1).name)
+
+    proc1 = None
+    proc2 = None
+    proc3 = None
+
+
+def read_bool(node) -> int:
+    v = node.get_value()
+    try:
+        return 1 if int(v) == 1 else 0
+    except Exception:
+        return 1 if bool(v) else 0
+
+
+def write_string(node, text: str):
+    node.set_value(ua.DataValue(ua.Variant(text, ua.VariantType.String)))
+
+
+def connect_with_timeout(url: str, timeout_sec: float) -> Client:
+    client = Client(url)
+    t0 = time.time()
+    log(f"[OPC] connecting to {url} ...")
+
+    # connect() может зависать, поэтому контролируем временем
+    # (в python-opcua нет простого параметра timeout на connect во всех версиях)
     while True:
-        time.sleep(0.5)
+        try:
+            client.connect()
+            log("[OPC] connected")
+            return client
+        except Exception as e:
+            # если сразу ошибка — выходим по таймауту
+            if time.time() - t0 >= timeout_sec:
+                raise TimeoutError(f"connect timeout after {timeout_sec}s: {e}")
+            time.sleep(0.2)
 
-        if RESTART and not prev_restart:
-            restart_both()
 
-        prev_restart = RESTART
+def main():
+    log(f"[BOOT] pid={os.getpid()} exe={sys.executable}")
+
+    last_log = None
+
+    while True:
+        client = None
+        try:
+            client = connect_with_timeout(OPC_URL, CONNECT_TIMEOUT_SEC)
+
+            node_start = client.get_node(NODE_START)
+            node_log = client.get_node(NODE_RUNNING)
+
+            last_state = None
+            t_heartbeat = 0.0
+
+            while True:
+                state = read_bool(node_start)
+
+                if state != last_state:
+                    log(f"[OPC] START changed: {last_state} -> {state}")
+                    if state == 1:
+                        start_procs_once()
+                    else:
+                        stop_procs_once()
+                    last_state = state
+
+                running = is_running(proc1) and is_running(proc3) and is_running(proc2)
+                msg = "RUNNING" if running else "STOPPED"
+                if msg != last_log:
+                    write_string(node_log, msg)
+                    log(f"[OPC] wrote OPC_log='{msg}'")
+                    last_log = msg
+
+                # каждые 5 сек пишем что цикл жив
+                if time.time() - t_heartbeat > 5:
+                    log("[HB] alive")
+                    t_heartbeat = time.time()
+
+                time.sleep(POLL_SEC)
+
+        except Exception as e:
+            log(f"[OPC] error: {e}")
+            stop_procs_once()
+            try:
+                if client:
+                    client.disconnect()
+            except Exception:
+                pass
+            time.sleep(RECONNECT_DELAY_SEC)
 
 
 if __name__ == "__main__":
-    main_loop()
-
-
-
-
-# #nssm install Botloader
-# Удаление службы
-# Для удаления службы выполните:
-
-# text
-# nssm remove MyPythonService confirm
-# & "C:/Program Files/Python311/python.exe" -m pip install opcua
+    main()

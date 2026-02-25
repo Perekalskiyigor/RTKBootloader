@@ -213,7 +213,8 @@ shared_data = {
         'OPC_log':'', #хранение текущего лога
         'OPC_res_brak': False, # Сброс брака
         'OPC_pause_RTK':False, # Постановка на паузу
-        'OPC_restart_RTK':False # Перезапуск ртк
+        'OPC_restart_RTK':False, # Перезапуск ртк
+        'OPC_end_order':False # true - вкл режим без 210 команды false - выкл режим без 210 команды
         },
 
 }
@@ -1106,9 +1107,9 @@ class Table:
                     Cell1 = 0
                     Cell = Cell1
             time.sleep(1)  # дать Modbus прочитать
-
-            if not self._send_robot_command(210):
-                raise TableOperationFailed("Ошибка забора платы из тары (210)")
+            if shared_data['OPC-DB']['OPC_end_order'] == False:
+                if not self._send_robot_command(210):
+                    raise TableOperationFailed("Ошибка забора платы из тары (210)")
 
             # 2) пробуем получить DM ограниченно
             ok, dm = self._try_take_photo_limited(max_attempts=max_photo_attempts, retry_delay=1.0)

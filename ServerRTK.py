@@ -1,3 +1,5 @@
+# python -m PyInstaller --onefile ServerRTK.py
+
 from flask import Flask, request, jsonify
 import logging
 import socket

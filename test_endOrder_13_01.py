@@ -121,6 +121,9 @@ shared_data = {
         'OPC_SEW_RESULT': 0,          # 0 – нет, 2 – успех, 3 – брак (как у вас Tray*)
         'OPC_SEW_ERROR': '',          # текст последней ошибки, если была
         'OPC_SEW_TS': 0,              # timestamp старта текущей прошивки (time.time())
+    
+        'loge_left':   "",              #передаю состояние ложе
+        'loge_right':  "",
         },
     2: {
         'DICT2': 0,
@@ -151,6 +154,9 @@ shared_data = {
         'OPC_SEW_RESULT': 0,          # 0 – нет, 2 – успех, 3 – брак (как у вас Tray*)
         'OPC_SEW_ERROR': '',          # текст последней ошибки, если была
         'OPC_SEW_TS': 0,              # timestamp старта текущей прошивки (time.time())
+        
+        'loge_left':   "",              #передаю состояние ложе
+        'loge_right':  "",
         },
     3: {
         'DICT3': 0,
@@ -181,6 +187,9 @@ shared_data = {
         'OPC_SEW_RESULT': 0,          # 0 – нет, 2 – успех, 3 – брак (как у вас Tray*)
         'OPC_SEW_ERROR': '',          # текст последней ошибки, если была
         'OPC_SEW_TS': 0,              # timestamp старта текущей прошивки (time.time())
+        
+        'loge_left':   "",              #передаю состояние ложе
+        'loge_right':  "",
         },
     'OPC-DB': {
         'DB_order_number': "пусто",
@@ -215,7 +224,7 @@ shared_data = {
         'OPC_pause_RTK':False, # Постановка на паузу
         'OPC_restart_RTK':False # Перезапуск ртк
         },
-
+    
 }
 
 shared_data_lock = threading.Lock()
@@ -517,8 +526,10 @@ class OPCClient:
     # -------------------- основной цикл OPC витрины --------------------
     def update_registers(self):
         """Раз в секунду читает кнопки, пишет статусы из shared_data в OPC"""
+       
+    
         global shared_data, Cell2
-
+        
         # Адреса узлов в перменные
         BUTTON_LOAD = 'ns=2;s=Application.UserInterface.OPC_ButtonLoadOrders'
 
@@ -849,7 +860,11 @@ class ModbusProvider:
 
             except Exception as e:
                 print(f"Error updating registers: {e}")
-
+            
+            print(f"table 1: left {shared_data[1]['loge_left']} | right {shared_data[1]['loge_right']}")
+            print(f"table 2: left {shared_data[2]['loge_left']} | right {shared_data[2]['loge_right']}")
+            print(f"table 3: left {shared_data[3]['loge_left']} | right {shared_data[3]['loge_right']}")
+            
             time.sleep(1)  # быстрее цикл Modbus, чтобы управление было шустрее (20 Гц)
 
 
@@ -1560,7 +1575,9 @@ class Table:
 
                     _move_table_to_loge(current_loge)
                     log_message(self.number, "info", f"[MAIN] Сдвигаем стол {self.number} под прошивальщик (под головкой ложе {current_loge})")
-
+                    with shared_data_lock:
+                        shared_data[self.number]['loge_left'] = "-"
+                        shared_data[self.number]['loge_right'] = "непрошитая плата"
                     # 2) ОДНОВРЕМЕННО: опускаем прошивальщик И работаем с роботом на free_loge
                     self._send_table_command(103)
                     log_message(self.number, "info", f"[MAIN] Опускаем прошивальщик стол {self.number} (параллельно с операциями робота)")
@@ -1575,6 +1592,9 @@ class Table:
                     finally:
                         logging.info(f"[MAIN] Стол {self.number} Робот освобожден столом (после загрузки новой на free_loge)")
                         self.rob_manager.release(self.number)
+                    with shared_data_lock:
+                        shared_data[self.number]['loge_left'] = "непрошитая плата"
+                        shared_data[self.number]['loge_right'] = "непрошитая плата"
                     # 3) Запускаем прошивку current_loge
                     print(f"-------------------------------------------{current_loge}")
                     sewing_thread = threading.Thread(
@@ -1583,6 +1603,9 @@ class Table:
                     sewing_thread.start()
                     logging.info(f"[MAIN] СТОЛ {self.number} Прошивка запущена на ложе {current_loge} (DM={next_photodata})")
                     self.pause_mode()
+                    with shared_data_lock:
+                        shared_data[self.number]['loge_left'] = "непрошитая плата"
+                        shared_data[self.number]['loge_right'] = "прошивка"
                     # 4) Дождаться завершения прошивки current_loge
                     sewing_thread.join(timeout=SEW_WAIT_TIMEOUT)
                     if sewing_thread.is_alive():
@@ -1590,6 +1613,7 @@ class Table:
                         raise RuntimeError("Sewing timeout (initial cycle)")
                     logging.info(f"[MAIN] СТОЛ {self.number} Прошивка на ложе {current_loge} завершена")
                     self.pause_mode()
+
                     # 5) Поднять голову, перейти на free_loge
                     self._send_table_command(104)
                     logging.info(f"[MAIN] СТОЛ {self.number} Подняли прошивальщик с ложе {current_loge}")
@@ -1597,6 +1621,7 @@ class Table:
                     _move_table_to_loge(free_loge)
                     logging.info(f"[MAIN] СТОЛ {self.number} сдвинут по оси X (под головкой теперь ложе {free_loge})")
                     self.pause_mode()
+
                     # 6) ОДНОВРЕМЕННО: опускаем прошивальщик И работаем с роботом на старом ложе
                     self._send_table_command(103)
                     logging.info(f"[MAIN] Опускаем прошивальщик на ложе {free_loge} (параллельно с операциями робота)")
@@ -1656,13 +1681,18 @@ class Table:
                         logging.info(f"[MAIN] Стол {self.number} Робот освобожден столом (после выгрузки+загрузки старого ложемента)")
                         self.rob_manager.release(self.number)
                     self.pause_mode()
+                    with shared_data_lock:
+                        shared_data[self.number]['loge_left'] = "непрошитая плата"
+                        shared_data[self.number]['loge_right'] = "непрошитая плата"
                     # 7) Запускаем прошивку на free_loge как in-flight к началу 2-й итерации
                     next_sewing_thread = threading.Thread(
                         target=self.start_sewing, args=(dm_for_free, free_loge), daemon=True
                     )
                     next_sewing_thread.start()
                     logging.info(f"[MAIN] СТОЛ {self.number} Прошивка запущена на ложе {free_loge} (DM={dm_for_free})")
-
+                    with shared_data_lock:
+                        shared_data[self.number]['loge_left'] = "прошивка"
+                        shared_data[self.number]['loge_right'] = "непрошитая плата"
                     in_flight_sewing_thread = next_sewing_thread
                     current_loge = free_loge           # на нём сейчас идёт in-flight
                     next_photodata = dm_for_old        # DM на противоположном (перезаряженном) ложе
@@ -1681,6 +1711,7 @@ class Table:
                         in_flight_sewing_thread = None
                         logging.info(f"[MAIN] Прошивка на ложе {current_loge} завершена (in-flight)")
                     self.pause_mode()
+
                     # 1) Поднять голову 104 — ОТДЕЛЬНО
                     self._send_table_command(104)
                     logging.info(f"[MAIN] СТОЛ {self.number} 104 — подняли прошивальщик")
@@ -1693,18 +1724,24 @@ class Table:
                     # --- Запускаем 2 параллельных потока ---
                     dm_holder = {"dm": None}
                     thread_errors = {"table": None, "robot": None}
-
+                    with shared_data_lock:
+                        shared_data[self.number]['loge_left'] = "непрошитая плата"
+                        shared_data[self.number]['loge_right'] = "непрошитая плата"
                     def table_thread():
                         global Tray1, Tray2, Tray3, Tray_robot, Cell,Cell1, Cell2, Cell3
                         try:
                             # 3) Стол: 103 + прошивка на next_loge
                             self._send_table_command(103)
                             logging.info(f"[MAIN] СТОЛ {self.number} 103 — опустили прошивальщик на ложе {next_loge}")
+                            with shared_data_lock:
+                                shared_data[self.number]['loge_left' if next_loge == 1 else 'loge_right'] = "прошивка"
+                            
                             # прошивка синхронно внутри потока
                             self.start_sewing(next_photodata, next_loge)
                             logging.info(f"[MAIN] СТОЛ {self.number} Прошивка на ложе {next_loge} завершена")
                         except Exception as e:
                             thread_errors["table"] = e
+
                         self.pause_mode()
 
                         # снять обработанную
@@ -1721,11 +1758,13 @@ class Table:
                                 # 1) Снять обработанную плату с current_loge
                                 if not self._send_robot_command(230, cell_num=current_loge):
                                     raise TableOperationFailed(f"Ошибка забора с ложемента {current_loge} (23X/230)")
-
+                                with shared_data_lock:
+                                    shared_data[self.number]['loge_right' if next_loge == 1 else 'loge_left'] = "-"
                                 logging.info(f"[MAIN] СТОЛ {self.number} сняли плату с ложемента {current_loge}")
                                 self.pause_mode()
                                 # 2) Получить итог прошивки АТОМАРНО для этого ложемента
                                 tr = self._consume_loge_outcome(current_loge)
+                                
                                 if tr is None:
                                     # страховка: если по какой-то причине исхода нет — считаем брак
                                     tr = 3
@@ -1743,6 +1782,8 @@ class Table:
                                     if not self._send_robot_command(241):
                                         raise TableOperationFailed("Ошибка укладки в тару успеха (241)")
                                     logging.info(f"[MAIN] СТОЛ {self.number} уложили плату в тару успеха (с ложе {current_loge})")
+                                    with shared_data_lock:
+                                        shared_data[self.number]['loge_right' if next_loge == 1 else 'loge_left'] = "-"
                                 elif tr == 3:
                                     Cell3 += 1
                                     Cell = Cell3
@@ -1750,9 +1791,11 @@ class Table:
                                     if not self._send_robot_command(242):
                                         raise TableOperationFailed("Ошибка укладки в тару брака (242)")
                                     logging.info(f"[MAIN] СТОЛ {self.number} уложили плату в тару брака (с ложе {current_loge})")
+                                    with shared_data_lock:
+                                        shared_data[self.number]['loge_right' if next_loge == 1 else 'loge_left'] = "-"
                                 else:
                                     raise RuntimeError(f"Неожиданный номер трея для укладки: {tr}")
-
+                                
                                 # очистка отображаемых ячеек после укладки
                                 Tray_robot = 0
                                 Cell = 0
@@ -1766,6 +1809,8 @@ class Table:
                                     max_new_board_tries=5   # предохранитель от бесконечного цикла брака
                                 )
                                 logging.info(f"[MAIN] СТОЛ {self.number} новая плата уложена на ложе {current_loge}, DM={dm_loaded}")
+                                with shared_data_lock:
+                                    shared_data[self.number]['loge_right' if next_loge == 1 else 'loge_left'] = "непрошитая плата"
                                 self.pause_mode()
                                 # 5) Передаём DM в общий держатель для следующей итерации
                                 dm_holder["dm"] = dm_loaded

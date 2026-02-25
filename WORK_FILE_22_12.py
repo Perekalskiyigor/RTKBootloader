@@ -1,14 +1,13 @@
-# python -m PyInstaller --onefile 3table_Worfiletray2810.py
+# python -m PyInstaller --onefile WORK_FILE_22_12.py
 import logging
 import time
-from pymodbus.server import StartTcpServer
+from pymodbus.server.sync import StartTcpServer
 from pymodbus.datastore import ModbusSequentialDataBlock, ModbusSlaveContext, ModbusServerContext
 import threading
 import socket
 from opcua import Client
 from opcua import ua
 import yaml
-import subprocess
 import sys
 import os
 import SQLite
@@ -18,6 +17,12 @@ import Mertech_scanner
 EMERGENCY_STOP = threading.Event()
 SETUP_TABLE = 0
 SUB_SETUP_TABLE = 0
+
+# вспомогательная функция отправки лога в OPC
+def opc_set(shared, key, value):
+     # безопасно пишем в OPC-DB под одним локом
+    with shared_data_lock:
+        shared['OPC-DB'][key] = value
 
 def trigger_emergency(reason: str):
     """
@@ -1947,10 +1952,6 @@ if __name__ == "__main__":
         print("Test stopped")
     """
 
-    # Стартуем вспосогательный сервер перепарвки данных от прошивальщика в основной скрпит. 
-    # делаем его как дочерний подпроцесс
-    proc = subprocess.Popen([sys.executable, "ServerRTK.py"])
-
 
 
     # Создаём столы
@@ -1995,6 +1996,8 @@ if __name__ == "__main__":
             SETUP_TABLE = 0
             logging.info(f"получен ответ от регула, что столы приведены в нулевое положении")
             print (f'получен ответ от регула, что столы приведены в нулевое положении ')
+            opc_set (shared_data, f'OPC_log', f"Система подготовлена к работе") # # 2-успех 1-брак
+
             break
 
 
@@ -2058,5 +2061,3 @@ if __name__ == "__main__":
 
 
         print("Все потоки завершены.")
-
-    proc.terminate()  # По выходу из main завершить сервер

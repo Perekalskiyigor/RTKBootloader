@@ -26,6 +26,7 @@ app = Flask(__name__)
 def set_test_results():
     try:
         data = request.get_json()
+        print(data)
 
         if not data:
             logging.warning("No JSON data received.")
@@ -51,16 +52,14 @@ def set_test_results():
 @app.route('/get_test_results/1', methods=['GET'])
 def get_test_results1():
     try:
-        stand_id = f"table_1"
+        stand_id = "nt_cmpp_rtk_1"  # Изменено с table_1
         data = latest_data_by_stand.get(stand_id)
 
         if not data:
             logging.info(f"No data available for stand_id: {stand_id}")
             return jsonify({"error description": "No data available", "result": "FAIL"}), 404
 
-        # Удаляем после получения
         del latest_data_by_stand[stand_id]
-
         logging.info(f"Data for {stand_id} retrieved and cleared.")
         return jsonify({"result": "OK", "data": data})
 
@@ -71,43 +70,38 @@ def get_test_results1():
 @app.route('/get_test_results/2', methods=['GET'])
 def get_test_results2():
     try:
-        stand_id = f"table_2"
+        stand_id = "nt_cmpp_rtk_2"  # Изменено с table_2
         data = latest_data_by_stand.get(stand_id)
 
         if not data:
             logging.info(f"No data available for stand_id: {stand_id}")
             return jsonify({"error description": "No data available", "result": "FAIL"}), 404
 
-        # Удаляем после получения
         del latest_data_by_stand[stand_id]
-
         logging.info(f"Data for {stand_id} retrieved and cleared.")
         return jsonify({"result": "OK", "data": data})
 
     except Exception as e:
-        logging.error(f"Error retrieving data for stand 1: {str(e)}")
+        logging.error(f"Error retrieving data for stand 2: {str(e)}")
         return jsonify({"error description": "FAIL", "result": str(e)}), 500
     
 @app.route('/get_test_results/3', methods=['GET'])
 def get_test_results3():
     try:
-        stand_id = f"table_3"
+        stand_id = "nt_cmpp_rtk_3"  # Изменено с table_3
         data = latest_data_by_stand.get(stand_id)
 
         if not data:
             logging.info(f"No data available for stand_id: {stand_id}")
             return jsonify({"error description": "No data available", "result": "FAIL"}), 404
 
-        # Удаляем после получения
         del latest_data_by_stand[stand_id]
-
         logging.info(f"Data for {stand_id} retrieved and cleared.")
         return jsonify({"result": "OK", "data": data})
 
     except Exception as e:
-        logging.error(f"Error retrieving data for stand 1: {str(e)}")
+        logging.error(f"Error retrieving data for stand 3: {str(e)}")
         return jsonify({"error description": "FAIL", "result": str(e)}), 500
-
 
 if __name__ == '__main__':
     # app.run(host="172.21.10.182", port=5003)

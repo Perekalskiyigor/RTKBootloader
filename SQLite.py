@@ -312,7 +312,19 @@ class DatabaseConnection:
             print(f"Запись {order_id} занята успешно.")
         
         
-    
+    def check_order (self, order_number):
+        # Делаем с блокировкой записи
+        self.cursor.execute('''
+                    SELECT 
+                        id
+                    FROM orders
+                    WHERE  order_number = ?
+        ''', (order_number,))
+        row = self.cursor.fetchone()
+        if row:
+            return True
+        else:
+            return False
 
     
 
@@ -321,7 +333,10 @@ class DatabaseConnection:
         logging.info(f"[RTK] Вызов метода set_BoardTest_Result для записи ID: {record_id}")
         print(f"[RTK] Установка результатов тестирования для записи ID: {record_id}")
         
-        try:    
+        try:
+            # текущее время
+            date_sent = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
             update_query = """
             UPDATE order_details
             SET stand_id = ?,
@@ -330,43 +345,42 @@ class DatabaseConnection:
                 test_result = ?,
                 log_path = ?,
                 report_path = ?,
-                error_description = ?
+                error_description = ?,
+                date_sent = ?
             WHERE id = ?
             """
-            # Отладочная информация
-            logging.debug(f"SQL: {update_query.strip()}")
-            logging.debug(f"SQL values: ({stand_id}, {serial_number_8}, {data_matrix}, {test_result}, {log_path}, {report_path}, {record_id},{error_description})")
-            print(f"[DB] Выполнение запроса с параметрами: ({stand_id}, {serial_number_8}, {data_matrix}, {test_result}, {log_path}, {report_path}, {record_id},{error_description})")
 
-            # Выполнение запроса
-            self.cursor.execute(update_query, (stand_id, serial_number_8, data_matrix, test_result, log_path, report_path, error_description, record_id))
+            # Отладка
+            logging.debug(f"SQL: {update_query.strip()}")
+            logging.debug(f"SQL values: ({stand_id}, {serial_number_8}, {data_matrix}, {test_result}, {log_path}, {report_path}, {error_description}, {date_sent}, {record_id})")
+
+            print(f"[DB] Выполнение запроса с параметрами: ({stand_id}, {serial_number_8}, {data_matrix}, {test_result}, {log_path}, {report_path}, {error_description}, {date_sent}, {record_id})")
+
+            # Выполнение
+            self.cursor.execute(update_query, (
+                stand_id,
+                serial_number_8,
+                data_matrix,
+                test_result,
+                log_path,
+                report_path,
+                error_description,
+                date_sent,
+                record_id
+            ))
             self.conn.commit()
 
-            
-            # Консольный вывод
-            print("[DB]  Данные успешно сохранены:")
-            print(f"   - stand_id: {stand_id}")
-            print(f"   - serial_number_8: {serial_number_8}")
-            print(f"   - data_matrix: {data_matrix}")
-            print(f"   - test_result: {test_result}")
-            print(f"   - log_path: {log_path}")
-            print(f"   - report_path: {report_path}")
+            print("[DB] Данные успешно сохранены:")
+            print(f"   - date_sent: {date_sent}")
 
-            # Логирование
-            logging.info(" Данные успешно сохранены в базу:")
-            logging.info(f"   - stand_id: {stand_id}")
-            logging.info(f"   - serial_number_8: {serial_number_8}")
-            logging.info(f"   - data_matrix: {data_matrix}")
-            logging.info(f"   - test_result: {test_result}")
-            logging.info(f"   - log_path: {log_path}")
-            logging.info(f"   - report_path: {report_path}")
+            logging.info("Данные успешно сохранены в базу")
+            logging.info(f"   - date_sent: {date_sent}")
 
         except Exception as e:
             error_msg = f"[DB] Ошибка при сохранении в базу: {e}"
             print(error_msg)
             logging.error(error_msg)
             raise
-
 
         
 
@@ -375,6 +389,7 @@ class DatabaseConnection:
 
     def get_order_insert_orders_frm1C(self, dictResult):
         """ Запрос информации по заказам и вставка данных в таблицы Orders и order_details """
+        
         order_id = dictResult.get('order_id')
         components = dictResult.get('components', {})
         products = dictResult.get('products', {})
@@ -388,11 +403,13 @@ class DatabaseConnection:
         logging.info("Метод get_order_insert_orders_frm1C вызван.")
         logging.info(f"Входные данные - order_id: '{order_id}', board_name: '{board_name}', firmware: '{firmware}' count {count} version {version} components {components}")
 
+
+        # ЖДЕМ 1С
         # Валидация входных данных
-        if not order_id or not board_name or not firmware:
-            logging.warning("Отсутствуют обязательные данные: order_id, board_name или firmware.")
-            print("Ошибка: Отсутствуют обязательные данные.")
-            return 
+        # if not order_id or not board_name or not firmware:
+        #     logging.warning("Отсутствуют обязательные данные: order_id, board_name или firmware.")
+        #     print("Ошибка: Отсутствуют обязательные данные.")
+        #     return 
 
         if not isinstance(batch, list) or not batch:
             logging.warning("Некорректные или пустые данные batch.")
@@ -436,7 +453,6 @@ class DatabaseConnection:
     def recievedata(self, id):
         """Запрос данных для прошивки по ID"""
         logging.info("Вызван метод recievedata: запрос данных для прошивки из базы данных")
-
         query = """
             SELECT 
                 S.id,
@@ -444,13 +460,17 @@ class DatabaseConnection:
                 O.module AS module_type,
                 S.data_matrix,
                 S.serial_number_8,
+                S.serial_number AS serial_number_9,
+                S.serial_number_15,
                 S.fw_type,
                 O.VersionLoadFile AS fw_path,
+                O.order_number AS order_name,
                 O.fw_version
             FROM order_details AS S
             JOIN Orders AS O ON O.id = S.order_id
             WHERE S.id = ?
         """
+
 
         try:
             cur = self.conn.cursor()
@@ -462,8 +482,8 @@ class DatabaseConnection:
                 logging.warning("Данные по ID %s не найдены", id)
                 return None
 
-            (order_id, stand_id, module_type, data_matrix, serial_number_8,
-            fw_type, fw_path, fw_version) = result
+            (order_id, stand_id, module_type, data_matrix, serial_number_8, serial_number_9, serial_number_15,
+            fw_type, fw_path, order_name, fw_version) = result
 
             logging.info("Данные успешно получены для ID: %s", id)
             logging.debug("Результаты: stand_id=%s, module_type=%s, fw_path=%s",
@@ -475,8 +495,11 @@ class DatabaseConnection:
                 'module_type': module_type,
                 'data_matrix': data_matrix,
                 'serial_number_8': serial_number_8,
+                'serial_number_9': serial_number_9,
+                'serial_number_15': serial_number_15,               
                 'fw_type': fw_type,
                 'fw_path': fw_path,
+                'order_name': order_name,
                 'fw_version': fw_version
             }
 
@@ -487,7 +510,6 @@ class DatabaseConnection:
     # Получение данных из базы для интерфейса ОПС
     def getDatafromOOPC(self, order_number):
         # logging.info("OPC Метод получения данных для ОПС запущен")
-
         try:
             self.cursor.execute('''
                 SELECT 
@@ -498,7 +520,6 @@ class DatabaseConnection:
             ''', (order_number,))
 
             row = self.cursor.fetchone()
-
             if row:
                 order_id = row[0]
                 # logging.info(f"OPC Данные по заказу '{order_number}' получены успешно.")
@@ -546,6 +567,7 @@ class DatabaseConnection:
         except Exception as e:
             logging.error(f"OPC Ошибка при получении данных по заказу '{order_number}': {e}", exc_info=True)
             return None
+        
     # Функция роверки платы в 1с
     def setCheckboardResult(self, record_id: int, check_result: bool):
         """
@@ -677,8 +699,39 @@ else:
 # }
 
 # record_id = 1  # id записи order_details
-# db_connection = DatabaseConnection()
+#db_connection = DatabaseConnection()
 # db_connection.setCheckboardResult(
 #     record_id=record_id,
 #     check_result=erp_response["result"]
+# )
+#print(db_connection.getDatafromOOPC("ЗНП-241.1.1"))
+
+
+# db_connection = DatabaseConnection()
+# result = db_connection.getDatafromOOPC('ЗНП-241.1.1')
+# print(result)
+
+
+# Пример тестовых данных
+# record_id = 8013
+
+# stand_id = "STAND_1"
+# serial_number_8 = "SN12345678"
+# data_matrix = "DM_TEST_123456"
+# test_result = 1  # например: 1 = OK, 0 = FAIL
+# log_path = "C:/logs/test.log"
+# report_path = "C:/reports/report.pdf"
+# error_description = ""
+
+# # Вызов метода
+# db = DatabaseConnection()
+# db.set_BoardTest_Result(
+#     record_id,
+#     stand_id,
+#     serial_number_8,
+#     data_matrix,
+#     test_result,
+#     log_path,
+#     report_path,
+#     error_description
 # )

@@ -14,25 +14,59 @@ username = config['server']['username']
 password = config['server']['password']
 url_token = config['server']['url_token']
 
+import requests
+import json
+import logging
+import configparser
+import datetime
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+config = configparser.ConfigParser()
+config.read('config.ini', encoding='utf-8')
+
+url_send_data = config['server']['url']
+username = config['server']['username']
+password = config['server']['password']
+url_token = config['server']['url_token']
+
+
 def get_token():
-    payload = 'grant_type=CLIENT_CREDENTIALS'
-    headers = {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': 'Basic VnFuaHFPd1pGak16Y0czTFY5d3VSLXhtdlgxX29oWFBjbDRCWXc3cXJSND06N08zNFV6QXpuaVAxOE9RM0VQUGNqWFlya3BmUEFySkpfeHdMcmNDdXRsOD0='
+    data = {
+        'grant_type': 'CLIENT_CREDENTIALS'
     }
+
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded'
+    }
+
     try:
-        response = requests.post(url_token, data=payload, headers=headers, verify=False)
+        response = requests.post(
+            url_token,
+            data=data,
+            headers=headers,
+            auth=(username, password),
+            verify=False,
+            timeout=10
+        )
+
+        print("TOKEN STATUS:", response.status_code)
+        print("TOKEN RESPONSE:", response.text)
 
         if response.status_code == 200:
             token_data = response.json()
-            access_token = token_data.get('id_token', token_data.get('access_token'))
-            logging.info("API1C - Recieve new Token")
-            return access_token
+            token = token_data.get('id_token') or token_data.get('access_token')
+            logging.info("API1C - Receive new token")
+            return token
         else:
-            logging.error(f"API1C - Token request failed with status {response.status_code}: {response.text}")
+            logging.error(
+                f"API1C - Token request failed with status {response.status_code}: {response.text}"
+            )
             return None
+
     except Exception as e:
-        logging.error(f"API1C - Error Recieve new Token: {str(e)}")
+        logging.error(f"API1C - Error receive new token: {str(e)}")
         return None
 
 
@@ -214,7 +248,12 @@ def send_unsuccess_log(board_dict):
         logging.info("Response: %s", response.text)
         print(f"\nУспешно отправлено: {response.status_code}")
 
-        return response.json()
+        try:
+            return response.json()
+        except ValueError:
+            logging.warning("Response is not JSON or empty")
+            return response.text
+
     except requests.exceptions.RequestException as e:
         logging.error("Error sending request: %s", str(e))
         print(f"\nОшибка отправки: {e}")
@@ -223,21 +262,21 @@ def send_unsuccess_log(board_dict):
 
 board_dict_success = {
     "rtk_id": "RTK_R050_BoardsIO_1",
-    "order": "ЗНП-25466.1.1",
+    "order": "ЗНП-37025.1.1",
     "version": "",
     "message_type": "firmware_log",
     "good": [
         {
             "board": {
-                "number": "Z01777327",
+                "number": "Z01745814T",
                 "tray_number": "123455"
             },
             "operator": "A.Eliseeva",
             "error": 0,
             "timestamps": {
-                "dm_code_time": "2025-11-28 10:51:35.798732",
-                "firmware_finished_time": "2025-11-28 10:52:12.725689",
-                "board_output_time": "2025-11-28 10:52:15.725689"
+                "dm_code_time": "2026-04-20 10:51:35.798732",
+                "firmware_finished_time": "2026-04-20 10:52:12.725689",
+                "board_output_time": "2026-04-20 10:52:15.725689"
             }
         }
     ],
@@ -251,27 +290,28 @@ board_dict_success = {
 
 board_dict_fail = {
     "rtk_id": "RTK_R050_BoardsIO_1",
-    "order": "ЗНП-25466.1.1",
+    "order": "ЗНП-37025.1.1",
     "version": "",
     "message_type": "firmware_log",
     "good": [],
     "bad": [
         {
             "board": {
-                "number": "Z01777339",
+                "number": "Z01746283B",
                 "tray_number": "123455"
             },
             "operator": "A.Eliseeva",
-            "error": 6,
+            "error": 2,
             "timestamps": {
-                "dm_code_time": "2025-11-28 08:21:02.653260",
-                "firmware_finished_time": "2025-11-28 08:21:33.371907",
-                "board_output_time": "2025-11-28 15:00:33.587027"
+                "dm_code_time": "2026-04-20 09:21:02.653260",
+                "firmware_finished_time": "2026-04-20 09:21:33.371907",
+                "board_output_time": "2026-04-20 09:00:33.587027"
             }
         }
     ]
 }
 
 # Вызов
-response = send_unsuccess_log(board_dict_fail)
-print("Ответ сервера:", response)
+#response = send_unsuccess_log(board_dict_fail)
+#response = send_success_log(board_dict_success)
+#print("Ответ сервера:", response)

@@ -1,3 +1,5 @@
+import pprint
+
 import requests
 import json
 import logging
@@ -53,16 +55,18 @@ def getOrders():
 
 def fetch_data(order):
     logging.info("Вызвана функция получения данных по заказу в бд def fetch_data(order) и провайдера SQL")
-
+      
+    order = order[4:]   # срезаем "ЗНП-"
     try:
         url = f"{fetch_data_url}{order}"
         payload = {}
         headers = {
         'Authorization': 'Basic bWFya19EUEE6MTIzNDU2elo='
         }
-        response = requests.request("GET", url, headers=headers, data=payload, verify=False)
+        response = requests.get(url, headers=headers, verify=True, timeout=15)
         #print(response.text)
         data = response.json()
+
 
         order_id = data.get('order')
         components = data.get('components', {})
@@ -136,15 +140,19 @@ def fetch_data(order):
 
 
 """
-dict = fetch_data("ЗНП-5972.1.1")
-db_connection = SQLite.DatabaseConnection()
-db_connection.get_order_insert_orders_frm1C(dict)
+# dict = fetch_data("ЗНП-5972.1.1")
+# db_connection = SQLite.DatabaseConnection()
+# db_connection.get_order_insert_orders_frm1C(dict)
 
-""" 
-#getOrders()
-
+# """ 
+# # getOrders()
+# # db_connection = SQLite.DatabaseConnection()
 
 # getOrders()
-fetch_data("ЗНП-24576.1.1")
+# dict = fetch_data("ЗНП-37025.1.1")
+# print(dict)
+
+# db_connection = SQLite.DatabaseConnection()
+# db_connection.get_order_insert_orders_frm1C(dict)
 
 

@@ -12,6 +12,7 @@ import sys
 import os
 import SQLite
 import Mertech_scanner
+import BoardAprove
 
 # --- Глобальная аварийная остановка всего комплекса ---
 EMERGENCY_STOP = threading.Event()
@@ -92,7 +93,7 @@ Cell1 = 0  # ячейка тары с новыми платами
 Cell2 = 0  # ячейка тары УСПЕХА (241)
 Cell3 = 0  # ячейка тары БРАКА (242)
 
-Order = "ЗНП-2160.1.1"
+Order = "ЗНП-37025.1.1"
 # данные с платы для цикла main и сетапа
 photodata = None
 
@@ -198,7 +199,7 @@ shared_data = {
 
         'OPC_ButtonLoadOrders': False,
         'OPC_ButtonSelectOrder': False,
-        'OPC_Order': "ЗНП-2160.1.1", # № Заказа (строка)
+        'OPC_Order': "ЗНП-241.1.1", # № Заказа (строка)
         'OPC_Orders': "",
         'OPC_search_result':"", # Узел для хранения списка с заказами
         'OPC_dataOrder': [], # Узел для хранения списка плат в заказе
@@ -309,7 +310,6 @@ igle_table2 = Igable.IgleTable(
 igle_table3 = Igable.IgleTable(
         urlIgleTabeControl=f"http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
         urlStatusFromIgleTabe=f"http://192.168.1.100:5003/get_test_results/3")
-
 ################################################# IgleTable Communication Class ###################################
 
 
@@ -334,7 +334,7 @@ class DatabaseSynchronizer:
                 # Попытка получения данных по заказу из базы данных
                 db_connection = SQL.DatabaseConnection()
                 result = db_connection.getDatafromOOPC(self.order)
-                
+
                 if result:
                     order_number, module, fw_version, last_count, common_count, success_count, nonsuccess_count = result
 
@@ -656,18 +656,18 @@ class OPCClient:
                         print(f"[OPC] write vitrina (basic+extra) failed: {e}")
 
                     # ---------- 3) ButtonLoadOrders: получить список заказов и показать ----------
-                    if btn_load:
-                        try:
-                            orders = Provider1C.getOrders() or []
-                            # в словарь (если хотите хранить локально)
-                            with shared_data_lock:
-                                shared_data['OPC-DB']['OPC_Orders'] = orders
-                            # в OPC как массив строк
-                            node = self._get_node(SEARCH_RESULT)
-                            if node:
-                                node.set_value(ua.DataValue(ua.Variant(orders, ua.VariantType.String)))
-                        except Exception as e:
-                            print(f"[OPC] handle ButtonLoadOrders failed: {e}")
+                    # if btn_load:
+                    #     try:
+                    #         orders = Provider1C.getOrders() or []
+                    #         # в словарь (если хотите хранить локально)
+                    #         with shared_data_lock:
+                    #             shared_data['OPC-DB']['OPC_Orders'] = orders
+                    #         # в OPC как массив строк
+                    #         node = self._get_node(SEARCH_RESULT)
+                    #         if node:
+                    #             node.set_value(ua.DataValue(ua.Variant(orders, ua.VariantType.String)))
+                    #     except Exception as e:
+                    #         print(f"[OPC] handle ButtonLoadOrders failed: {e}")
 
                     # ---------- Выбор заказа по факту текста в OPC_Order ----------
                     try:
@@ -688,12 +688,16 @@ class OPCClient:
                     except Exception as e:
                         print(f"[OPC] read OPC_Order failed: {e}")
                     ######### сделал макс
-                    if SQLite.db_connection.check_order(shared_data['OPC-DB']['OPC_Order']):
-                        dict_result = Provider1C.fetch_data(shared_data['OPC-DB']['OPC_Order'])
-                        db_connection = SQLite.DatabaseConnection()
-                        db_connection.get_order_insert_orders_frm1C(dict_result)
-                        Provider1C.db_connection.get_order_insert_orders_frm1C
-                    
+                    # db_connection = SQL.DatabaseConnection()
+                    # if db_connection.check_order(shared_data['OPC-DB']['OPC_Order']):
+                    #     order_crop = str(shared_data['OPC-DB']['OPC_Order'])[4:]
+                    #     with shared_data_lock:
+                    #         dict_result = Provider1C.fetch_data(order_crop)
+                    #         db_connection.get_order_insert_orders_frm1C(dict_result)
+                    #         print("заказ добавлен")
+                    # else:
+                    #         print("заказ уже есть в БД")
+
 
                     # ---------- 5) Пушим статусы столов (1..3) ----------
                     # try:
@@ -1095,16 +1099,19 @@ class Table:
     def _place_new_board_with_photo(self, target_loge: int, max_photo_attempts: int = 3,
                                     max_new_board_tries: int = 5) -> str:
         """
-        При захваченном роботе:
-        - взять плату из тары (210);
-        - попытаться прочитать DM до max_photo_attempts раз;
-        - если DM прочитан — уложить в target_loge (220) и вернуть DM;
-        - иначе — увести в брак (242), +Cell3, и повторить с новой платой.
-        Если подряд не удалось max_new_board_tries раз — авария.
+                При захваченном роботе:
+            - взять плату из тары (210);
+            - попытаться прочитать DM до max_photo_attempts раз;
+            - если DM прочитан:
+                - выполнить верификацию в 1С;
+                - если верификация успешна — уложить в target_loge (220) и вернуть DM;
+                - если верификация неуспешна — увести в брак (242), +Cell3, и повторить с новой платой;
+            - если DM не прочитан — увести в брак (242), +Cell3, и повторить с новой платой.
+            Если подряд не удалось max_new_board_tries раз — авария.
 
-        Возвращает DM уложенной платы.
+            Возвращает DM уложенной платы.
         """
-        global Tray_robot, Cell, Cell1, Cell3
+        global Tray_robot, Cell, Cell1, Cell3, Order
 
         for _ in range(max_new_board_tries):
             # 1) взять новую плату из тары
@@ -1125,13 +1132,20 @@ class Table:
             ok, dm = self._try_take_photo_limited(max_attempts=max_photo_attempts, retry_delay=1.0)
 
             if ok:
-                # 3a) кладём на целевой ложемент
-                if not self._send_robot_command(220, cell_num=target_loge):
-                    raise TableOperationFailed(f"Ошибка укладки в ложемент {target_loge} (22X)")
-                logging.info(f"Стол {self.number}: уложили плату с DM={dm} на ложе {target_loge}")
-                Tray_robot = 0
-                Cell = 0
-                return dm
+                logging.info(f"Стол {self.number}: считан DM={dm}, начинаем верификацию в 1С")
+                # 3) проверка в 1С
+                verified = BoardAprove.check_board(board_id=dm, order=Order).get("result")
+                print(f"Стол {self.number}: считан DM={dm}, произведена верификация в 1С результат {verified}")
+                # verified = True # ВАЖНО это заглушка отключения проверки плат, ее вкллючать не надо
+                if verified:
+                    # 4a) кладём на целевой ложемент
+                
+                    if not self._send_robot_command(220, cell_num=target_loge):
+                        raise TableOperationFailed(f"Ошибка укладки в ложемент {target_loge} (22X)")
+                    logging.info(f"Стол {self.number}: плата с DM={dm} успешно верифицирована и уложена на ложе {target_loge}")
+                    Tray_robot = 0
+                    Cell = 0
+                    return dm
             else:
                 # 3b) отправляем в брак и пробуем ещё одну плату
                 logging.warning(f"Стол {self.number}: DM не прочитан за {max_photo_attempts} попыток — уводим в брак")
@@ -1200,6 +1214,8 @@ class Table:
                 logging.error(f"Стол {self.number} Ошибка при запросе фото: {str(e)}")
                 
             time.sleep(retry_delay)
+
+
         # метод прошивки
     def start_sewing(self, photodata, loge, max_attempts=120, retry_delay=1):
         global Tray1, Tray2, Tray3
@@ -1287,14 +1303,23 @@ class Table:
                 self.opc_set(shared_data, f'OPC_load_t{self.number}', 0) # 1-старт прошивки 0-конец прошивки
                 
                 
-                if result == 200:
-                    print(f"Прошивка успешно начата для ложемента {loge}")
-                    logging.info(f"Прошивка успешно начата для стола {self.number}, ложемент {loge}")
+                if result == 200 and error_description is True:
+                    print(f"Прошивка успешно завершена для ложемента {loge}")
+                    logging.info(f"Прошивка успешно завершена для стола {self.number}, ложемент {loge}")
                     return True
+                elif result == 500 and error_description is False:
+                    print(f"Плата на ложементе {loge} не прошла прошивку. Повторно не шьем.")
+                    logging.warning(f"Стол {self.number}, ложемент {loge}: прошивка неуспешна, повтор запрещен")
+                    return False
                 elif result == 404:
-                    logging.warning(f"Ошибка 404 от регула (попытка {attempt})")
+                    logging.warning(f"Ошибка 404 от прошивальщика/БД (попытка {attempt})")
                     if attempt == max_attempts:
                         raise TableOperationFailed(f"Ошибка прошивки: получен код 404 для ложемента {loge}")
+
+                else:
+                    logging.warning(f"Неожиданный ответ прошивальщика: result={result}, error_description={error_description}, попытка={attempt}")
+                    if attempt == max_attempts:
+                        raise TableOperationFailed(f"Неожиданный ответ прошивальщика для ложемента {loge}: result={result}, error_description={error_description}")
             except Exception as e:
                 print(f"Ошибка при запуске прошивки для ложемента {loge}: {e}")
                 logging.error(f"Ошибка при запуске прошивки (попытка {attempt}): {str(e)}")
@@ -1903,7 +1928,6 @@ def start_threads_if_needed(targets: dict, do_defence=False, do_setup=False):
             )
             t.start()
             running_threads[tid] = t
-            print(f"__________________{tid} стол")
             time.sleep(15)  # <-- пауза между столами
 
     # with shared_data_lock:
@@ -1980,6 +2004,8 @@ if __name__ == "__main__":
     # thread1 = threading.Thread(target=table1.test_botloader)
     # thread2 = threading.Thread(target=table2.test_botloader)
     # thread3 = threading.Thread(target=table3.test_botloader)
+
+    
 
     while True:
         print (f'Сканирование штрих кода тары')
@@ -2067,3 +2093,4 @@ if __name__ == "__main__":
 
 
         print("Все потоки завершены.")
+

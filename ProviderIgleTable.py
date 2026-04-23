@@ -14,6 +14,16 @@ from datetime import datetime
 1. Метод `control_igle_table`:
    Выполняет выборку данных из заказа, формирует необходимую команду управления, и передаёт её загрузчику для выполнения прошивки устройства. 
    В состав передаваемых параметров входят: тип модуля, серийный номер, путь к прошивке, версия прошивки, а также информация о стенде и посадочном месте.
+    
+    ПРИМЕР
+    "stand_id" : "nt_cmpp_rtk_3",
+    "module_type": "R050 DI 16 012-000-AAA",
+    "data_matrix": ["Z01177337B"],
+    "order_name": "ЗНП-123",
+    "serial_number_8": "1",
+    "serial_number_9": "2",
+    "serial_number_15": "3",
+    "lodgment_number": 2,
 
 2. Метод `recentData`:
    Осуществляет опрос состояния иглостола. После завершения тестирования, иглостол отправляет результат на сервер, где данные временно сохраняются.
@@ -45,29 +55,45 @@ class IgleTable:
         if data:
             try:
                 # Извлекаем параметры из данных
-                stand_id = data.get('stand_id')
+                # Изменен формат для апи Моржова
+                stand_id = str(data.get('stand_id'))
+                stand_id = f"nt_cmpp_rtk_{stand_id.split('_')[-1]}"
+                
                 module_type = data.get('module_type')
                 data_matrix = photodata
-                serial_number_8 = data.get('serial_number_8')
+                Order_number = data.get('order_name')
+                # заглушка, т.к с 1с ничего не получаем
+                #serial_number_8 = data.get('serial_number_8')
+                serial_number_8 = "1"
+                serial_number_9 = data.get('serial_number_9')
+                # заглушка, т.к с 1с ничего не получаем
+                #serial_number_15 = data.get('serial_number_15')
+                serial_number_15 = "1"
                 fw_type = data.get('fw_type')
                 fw_path = data.get('fw_path')
                 fw_version = data.get('fw_version')
+                
                 loge = loge
 
                 print(f"ID: {data['id']}")
                 print(f"Stand ID: {data['stand_id']}")
                 print(f"Module Type: {data['module_type']}")
                 print(f"Data Matrix: {data['data_matrix']}")
-                print(f"Serial Number: {data['serial_number_8']}")
+                print(f"=====Serial Number: {serial_number_8}")
+                print(f"Serial Number_9: {data['serial_number_9']}")
+                print(f"=====Serial Number_15: {serial_number_15}")
                 print(f"Firmware Type: {data['fw_type']}")
                 print(f"Firmware Path: {data['fw_path']}")
                 print(f"Firmware Version: {data['fw_version']}")
+                print(f"Order_number: {data['order_name']}")
                 print(f"loge: {loge}")
 
                 # Логируем полученные параметры
-                logging.debug(f"Input parameters: stand_id={stand_id}, module_type={module_type}, "
+                logging.debug (f"Input parameters: stand_id={stand_id}, module_type={module_type}, "
                             f"data_matrix={data_matrix}, serial_number_8={serial_number_8}, "
-                            f"fw_type={fw_type}, fw_path={fw_path}, fw_version={fw_version}")
+                            f"fw_type={fw_type}, fw_path={fw_path}, fw_version={fw_version}, "
+                            f"Order_number = {Order_number}, serial_number_9 = {serial_number_9}, "
+                            f"serial_number_15 = {serial_number_15}")
             except KeyError as e:
                 # Логируем ошибку, если какой-то из параметров отсутствует
                 logging.error(f"Missing parameter: {e}")
@@ -79,8 +105,12 @@ class IgleTable:
             "stand_id": stand_id,
             "module_type": module_type,
             "data_matrix": [data_matrix],
+            "order_name": Order_number,
             "serial_number_8": serial_number_8,
+            "serial_number_9": serial_number_9,
+            "serial_number_15": serial_number_15,
             "lodgment_number": loge,
+            ""
 
             "firmwares": [
                 {
@@ -131,7 +161,8 @@ class IgleTable:
                     "report_path": data.get("report_file_path"),
                     "serial_number_8": data.get("serial_number_8") or data.get("serial"),
                     "stand_id": data.get("stand_id"),
-                    "error_description": test_result,
+                    "test_result": test_result, # По нему смотрю успех не успех
+                    "error_description": data.get("error_description"),  # если сервер это поле отдает
                     "status_code": result
                 }
             else:
@@ -144,14 +175,14 @@ class IgleTable:
     
 
 
-igle_table1 = IgleTable(
-    urlIgleTabeControl="http://172.21.10.182:5000/nails_table/start_test_board_with_rtk",
-    urlStatusFromIgleTabe="http://172.21.10.182:5003/get_test_results/1"
-)
+# igle_table1 = IgleTable(
+#     urlIgleTabeControl="http://172.21.10.182:5000/nails_table/start_test_board_with_rtk",
+#     urlStatusFromIgleTabe="http://172.21.10.182:5003/get_test_results/1"
+# )
 
-result1 = igle_table1.recentData()
-print("Received from RTK server (stand 1):")
-print(result1)
+# result1 = igle_table1.recentData()
+# print("Received from RTK server (stand 1):")
+# print(result1)
 """
 time.sleep(1.5)  # ⏱️ Пауза 1.5 секунды
 
@@ -178,38 +209,65 @@ print(result3)
 """
 
 
-"""
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-try:
-    # Подключаемся к "левому" адресу — не важно, доступен он или нет
-    s.connect(("8.8.8.8", 80))
-    ip = s.getsockname()[0]
-finally:
-    s.close()
-print(f"Локальный IP-адрес: {ip}")
+
+# s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+# try:
+#     # Подключаемся к "левому" адресу — не важно, доступен он или нет
+#     s.connect(("8.8.8.8", 80))
+#     ip = s.getsockname()[0]
+# finally:
+#     s.close()
+# print(f"Локальный IP-адрес: {ip}")
    
 
-igle_table = IgleTable(
-        urlIgleTabeControl=f"http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
-        urlStatusFromIgleTabe=f"http://192.168.1.100:5003/get_test_results",
+# igle_table = IgleTable(
+#         urlIgleTabeControl=f"http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
+#         urlStatusFromIgleTabe=f"http://192.168.1.100:5003/get_test_results",
 
-        module_type="R050 DI 16 011-000-AAA",
-        stand_id="nt_kto_rtk_1",
-        serial_number_8="1",
-        data_matrix=["11"],
-        firmwares = [
-            {
-            "fw_type": "MCU",
-            "fw_path": "C:\\nails_table_bridge\\plc050_di16012-full.hex",
-            "fw_version": "1.0.36.0"
-            }
-        ]
-    )
-resultTest = igle_table.recentData()
-print(f"Локальныйvvvv IP-адрес: {igle_table.urlStatusFromIgleTabe}")
+#         module_type="R050 DI 16 011-000-AAA",
+#         stand_id="nt_kto_rtk_3",
+#         serial_number_8="1",
+#         data_matrix=["11"],
+#         firmwares = [
+#             {
+#             "fw_type": "MCU",
+#             "fw_path": "C:\\nails_table_bridge\\plc050_di16012-full.hex",
+#             "fw_version": "1.0.36.0"
+#             }
+#         ]
 
-# Выводим все данные
-for key, value in resultTest.items():
-    print(f"{key}: {value}")
-# Проверяем, что ответ успешный
-"""
+        
+#     )
+# resultTest = igle_table.recentData()
+# print(f"Локальныйvvvv IP-адрес: {igle_table.urlStatusFromIgleTabe}")
+
+# # Выводим все данные
+# for key, value in resultTest.items():
+#     print(f"{key}: {value}")
+# # Проверяем, что ответ успешный
+
+
+# igle_table3 = IgleTable(
+#         urlIgleTabeControl=f"http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
+#         urlStatusFromIgleTabe=f"http://192.168.1.100:5003/get_test_results/3")
+
+# data4 = {
+#     "id" : "8137",
+#     "stand_id": "nt_cmpp_rtk_3",
+#     "module_type": "R050 DI 16 012-000-AAA",
+#     "data_matrix": ["111"],
+#     "order_name": "\u0417\u041d\u041f-37025.1.1",
+#     "serial_number_8": "1",
+#     "serial_number_9": "Z01745817",
+#     "serial_number_15": "1",
+#     "lodgment_number": 2,
+#     "firmwares":[
+#         {
+#             "fw_type": "MCU",
+#             "fw_path": "C:\\\\nails_table_bridge\\\\plc050_di16012-full.hex",
+#             "fw_version": "1.0.36.0"
+#         }
+#     ]
+#     }
+
+# igle_table3.control_igle_table(data4, "Z01177337B", 1)

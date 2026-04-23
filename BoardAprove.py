@@ -77,14 +77,16 @@ def check_board(
         }
 
 
-res = check_board(
-    board_id="V01240234",
-    order="ЗНП-24576.1.1"
-)
+# res = check_board(
+#     board_id="Z01745815T",
+#     order="ЗНП-37025.1.1"
+# )
 
-print("URL:", res["url"])
+# result = res["result"]
 
-if not res["ok"]:
-    print("Ошибка:", res["error"])
-else:
-    print("Ответ:", res["data"])
+# print(result)
+
+# if not result:
+#     print("Ошибка:", res["error"])
+# else:
+#     print("Ответ:", res["data"])

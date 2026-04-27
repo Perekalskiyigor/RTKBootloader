@@ -12,8 +12,8 @@ NODE_START   = "ns=2;s=Application.UserInterface.OPC_start_python"
 NODE_RUNNING = "ns=2;s=Application.UserInterface.OPC_log"
 POLL_SEC = 0.5
 
-EXE1 = r"C:\nails_table_bridge_v_0_2_0_for_rtk\nails_table_bridge\nails_table_bridge.exe"
-EXE2 = r"C:\Users\i.perekalskii\Desktop\DEV\RTKBootloader\dist\WORK_FILE_22_12.exe"
+EXE1 = r"C:\nails_table_v4\hub\temp\nails_table_hub\nails_table_hub.exe"
+EXE2 = r"C:\Users\i.perekalskii\Desktop\DEV\RTKBootloader\dist\WORK_FILE_27_04.exe"
 EXE3 = r"C:\Users\i.perekalskii\Desktop\DEV\RTKBootloader\dist\ServerRTK.exe"
 
 CONNECT_TIMEOUT_SEC = 8.0

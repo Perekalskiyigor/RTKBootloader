@@ -1,4 +1,4 @@
-# python -m PyInstaller --onefile WORK_FILE_22_12.py
+# python -m PyInstaller --onefile WORK_FILE_27_04.py
 import logging
 import time
 from pymodbus.server.sync import StartTcpServer
@@ -1513,7 +1513,7 @@ class Table:
             # 1. Забираем первую плату из тары
             print(f"1 Стол {self.number} Робот <- Забери плату из тары")
             logging.info(f"Стол {self.number} Робот <- Забери плату из тары")
-            Tray_robot = 2          # Ящик с новыми платами
+            Tray_robot = 1          # Ящик с новыми платами
             Cell1 += 1              # <-- счётчик тары новых
             Cell = Cell1            # <-- отдаём ячейку в Modbus
             time.sleep(1)           # чтобы Modbus успел прочитать
@@ -1907,7 +1907,7 @@ class Table:
 # держим ссылки на запущенные потоки
 running_threads = {}
 
-def start_threads_if_needed(targets: dict, do_defence=False, do_setup=False):
+def start_threads_if_needed(targets: dict, do_defence=False, do_setup=True):
     with shared_data_lock:
         opc_db = shared_data.get('OPC-DB', {})
         if not opc_db.get('OPC_START_RTK', False):
@@ -1992,7 +1992,7 @@ if __name__ == "__main__":
 
     # Выполняем однократные методы для каждого стола
     # for table in (table1, table2, table3):
-    #     table.defence_robo_cycle()
+    #     # table.defence_robo_cycle()
     #     table.setup_robo_cycle()
 
     # Создаем потоки для основного цикла
@@ -2049,7 +2049,7 @@ if __name__ == "__main__":
     start_threads_if_needed(
         {1: table1, 2: table2, 3: table3},
         do_defence=False,
-        do_setup=False
+        do_setup=True
     )
 
     # Ждём глобальной аварии или завершения потоков

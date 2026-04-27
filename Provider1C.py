@@ -149,8 +149,8 @@ def fetch_data(order):
 # # db_connection = SQLite.DatabaseConnection()
 
 # getOrders()
-# dict = fetch_data("ЗНП-37025.1.1")
-# print(dict)
+# dict = fetch_data("ЗНП-32223.1.1")
+
 
 # db_connection = SQLite.DatabaseConnection()
 # db_connection.get_order_insert_orders_frm1C(dict)

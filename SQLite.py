@@ -3,12 +3,18 @@ import datetime
 import sqlite3
 import logging
 from datetime import datetime
+import logging
+
+logger4 = logging.getLogger('LoggerMAIN')
+logger4.info('[SQLite] Запущен модуль провайдера')
 
 class DatabaseConnection:
     def __init__(self):
+        logger4.info('[SQLite] Инициализация подключения к БД | db=orders.db')
         # Initialize the connection
         self.conn = sqlite3.connect('orders.db')
         self.cursor = self.conn.cursor()
+        logger4.info('[SQLite] Подключение к БД успешно создано')
         
         # Set up basic logging configuration
         logging.basicConfig(
@@ -20,7 +26,7 @@ class DatabaseConnection:
 
     def db_connect(self):
         """ Connect to the database and create tables """
-        logging.info("Attempting to create tables in the database.")
+        logger4.info('[SQLite] db_connect вызван | создание/проверка таблиц')
         try:
             self.cursor.execute(''' 
                 CREATE TABLE IF NOT EXISTS orders (
@@ -49,73 +55,82 @@ class DatabaseConnection:
                     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
                 );
             ''')
-            logging.info("Order details table checked/created.")
 
-            self.conn.commit()
-            logging.info("Database connected and tables created successfully.")
+            self.conn.commit()            
+            logger4.info('[SQLite] Таблицы orders/order_details проверены или созданы')
         except Exception as e:
-            logging.error(f"Error occurred while creating tables: {e}")
+            logger4.exception('[SQLite] Ошибка db_connect при создании таблиц')
             raise
 
     
     def camera_photo(self, QRresult, serial_id):
         """Добавление данных по штрих коду с камеры в базу"""
-    
-        logging.info("Method camera_photo called.")
-        print("Method 1")
-        # Update the record
-        self.cursor.execute('''
-            UPDATE order_details 
-            SET data_matrix = ? 
-            WHERE serial_number_8 = ?
-        ''', (QRresult, serial_id))
+        logger4.info(f'[SQLite] camera_photo вызван | serial_id={serial_id}')
 
-        # Check if any row was updated
-        if self.cursor.rowcount == 0:
-            print(f"Error: No record found with Serial = {serial_id}")
-        else:
-            # Commit changes if the update was successful
-            self.conn.commit()
-            print(f"Successfully updated record with Serial = {serial_id}")
+        try:
+            # Update the record
+            self.cursor.execute('''
+                UPDATE order_details 
+                SET data_matrix = ? 
+                WHERE serial_number_8 = ?
+            ''', (QRresult, serial_id))
+
+            # Check if any row was updated
+            if self.cursor.rowcount == 0:
+                print(f"Error: No record found with Serial = {serial_id}")
+                logger4.warning(f'[SQLite] camera_photo запись не найдена | serial_id={serial_id}')
+                return 404
+            else:
+                # Commit changes if the update was successful
+                self.conn.commit()
+                logger4.info(f'[SQLite] camera_photo обновлено | serial_id={serial_id}')
+                print(f"Successfully updated record with Serial = {serial_id}")
+                return 200
+        except Exception:
+            logger4.exception(f'[SQLite] Ошибка camera_photo | serial_id={serial_id}')
+            return 500
 
     
     def setOrder(self, order_number, Module, Nomeclature, Value, Version_Loader, QRresult, serial_number_8):
         """ Запрос заказов всех """
-        logging.info("Sent Order in DB")
-        print("Method 1")
-        current_time = datetime.now()
-        # Update the record
-        self.cursor.execute('''
-            INSERT INTO order_details (
-                time_added,
+        logger4.info(f'[SQLite] setOrder вызван | order_number={order_number}, module={Module}, serial={serial_number_8}')
+        try:
+            current_time = datetime.now()
+            # Update the record
+            self.cursor.execute('''
+                INSERT INTO order_details (
+                    time_added,
+                    order_number, 
+                    module, 
+                    nomenclature, 
+                    value, 
+                    version_loader, 
+                    data_matrix, 
+                    serial_number_8
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                current_time,
                 order_number, 
-                module, 
-                nomenclature, 
-                value, 
-                version_loader, 
-                data_matrix, 
+                Module, 
+                Nomeclature, 
+                Value, 
+                Version_Loader, 
+                QRresult, 
                 serial_number_8
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            current_time,
-            order_number, 
-            Module, 
-            Nomeclature, 
-            Value, 
-            Version_Loader, 
-            QRresult, 
-            serial_number_8
-        ))
+            ))
 
-        # Check if any row was updated
-        if self.cursor.rowcount == 0:
-            print(f"Error: No record found with Serial = {serial_number_8}")
-        else:
-            # Commit changes if the update was successful
-            self.conn.commit()
-            print(f"Successfully updated record with Serial = {serial_number_8}")
-
-        print("Method 2")
+            # Check if any row was updated
+            if self.cursor.rowcount == 0:
+                print(f"Error: No record found with Serial = {serial_number_8}")
+            else:
+                # Commit changes if the update was successful
+                self.conn.commit()
+                print(f"Successfully updated record with Serial = {serial_number_8}")
+                logger4.info(f'[SQLite] setOrder запись добавлена | order_number={order_number}, serial={serial_number_8}')
+                return True
+        except Exception:
+            logger4.exception(f'[SQLite] Ошибка setOrder | order_number={order_number}, serial={serial_number_8}')
+            return False
 
     def setBoard(self,
             date_added,
@@ -130,6 +145,7 @@ class DatabaseConnection:
             stand_status,
             logStend,
             hard_stopToStand):
+        logger4.info(f'[SQLite] setBoard вызван | order_id={order_id}, stand_id={stand_id}, serial={serial_number_8}')
 
         try:
             self.cursor.execute('''
@@ -163,59 +179,61 @@ class DatabaseConnection:
             ))
 
             self.conn.commit()
+            logger4.info(f'[SQLite] setBoard запись добавлена | order_id={order_id}, serial={serial_number_8}')
+            return True
 
         except Exception as e:
-            logging.error(f"Error inserting board: {e}")
-            print(f"Error inserting record: {e}")
-
-            print("Method 2")
+            logger4.exception(f'[SQLite] Ошибка setBoard | order_id={order_id}, serial={serial_number_8}')
+            print(f'[SQLite] Ошибка setBoard | order_id={order_id}, serial={serial_number_8}')
+            return False
     
     
     
     def setTable(self, order_number, stand_id):
         """Поиск заказа и обновление одной записи в order_details."""
-        logging.info("Метод setTable вызван с order_number = %s", order_number)
+        logger4.info(f'[SQLite] setTable вызван | order_number={order_number}, stand_id={stand_id}')
         print(f"Метод setTable вызван с order_number = {order_number}")
 
-        # Получаем ID заказа
-        self.cursor.execute('''
-            SELECT id
-            FROM orders
-            WHERE order_number = ?
-            ORDER BY id DESC
-            LIMIT 1
-        ''', (order_number,))
-        row = self.cursor.fetchone()
-
-        if not row:
-            logging.warning("Заказ с номером %s не найден.", order_number)
-            print(f"Заказ с номером {order_number} не найден.")
-            return None
-
-        order_id = row[0]
-        logging.info("Найден ID заказа: %s", order_id)
-        print(f"Найден ID заказа: {order_id}")
-
-        # Ищем свободную строку в order_details
-        self.cursor.execute('''
-            SELECT id
-            FROM order_details
-            WHERE order_id = ? AND (stand_id IS NULL OR stand_id = 0)
-            ORDER BY id ASC
-            LIMIT 1
-        ''', (order_id,))
-        row = self.cursor.fetchone()
-
-        if not row:
-            logging.warning("Нет свободных записей в order_details для order_id = %s", order_id)
-            print(f"Нет свободных записей в order_details для order_id = {order_id}")
-            return None
-
-        serial_id = row[0]
-        logging.info("Найдена свободная запись в order_details: id = %s", serial_id)
-        print(f"Найдена свободная запись в order_details: id = {serial_id}")
-
         try:
+            # Получаем ID заказа
+            self.cursor.execute('''
+                SELECT id
+                FROM orders
+                WHERE order_number = ?
+                ORDER BY id DESC
+                LIMIT 1
+            ''', (order_number,))
+            row = self.cursor.fetchone()
+
+            if not row:
+                logger4.warning(f'[SQLite] setTable заказ не найден | order_number={order_number}')
+                print(f'[SQLite] setTable заказ не найден | order_number={order_number}')
+                return None
+
+            order_id = row[0]
+            logger4.info(f'[SQLite] setTable заказ найден | order_id={order_id}, order_number={order_number}')
+            print(f'[SQLite] setTable заказ найден | order_id={order_id}, order_number={order_number}')
+
+            # Ищем свободную строку в order_details
+            self.cursor.execute('''
+                SELECT id
+                FROM order_details
+                WHERE order_id = ? AND (stand_id IS NULL OR stand_id = 0)
+                ORDER BY id ASC
+                LIMIT 1
+            ''', (order_id,))
+            row = self.cursor.fetchone()
+
+            if not row:
+                logger4.warning(f'[SQLite] setTable Нет свободных записей в order_details для order_id = {order_id}')
+                print(f'[SQLite] setTable Нет свободных записей в order_details для order_id = {order_id}')
+                return None
+
+            serial_id = row[0]
+            logging.info("Найдена свободная запись в order_details: id = %s", serial_id)
+            print(f"Найдена свободная запись в order_details: id = {serial_id}")
+
+        
             self.conn.execute('BEGIN IMMEDIATE')  # Начинаем транзакцию с блокировкой
             self.cursor.execute('''
                 UPDATE order_details
@@ -225,31 +243,27 @@ class DatabaseConnection:
 
             if self.cursor.rowcount > 0:
                 self.conn.commit()
-                logging.info("Запись успешно обновлена: order_details.id = %s", serial_id)
-                print(f"Заблокирована и обновлена запись order_details.id = {serial_id}")
+                logger4.info(f'[SQLite] setTable Заблокирована и обновлена запись order_details.id={serial_id}, stand_id={stand_id}')
+                print(f'[SQLite] setTable Заблокирована и обновлена запись order_details.id={serial_id}, stand_id={stand_id}')
                 return serial_id
             else:
                 self.conn.rollback()
-                logging.warning("Обновление не затронуло ни одной строки.")
-                print("Свободных записей не найдено.")
+                logger4.warning(f'[SQLite] setTable Метод блокировки записей из order_details не смог заблокировать не одну из строк для order_details.id={serial_id}')
+                print(f'[SQLite] setTable Метод блокировки записей из order_details не смог заблокировать не одну из строк для order_details.id={serial_id}')
                 return None
 
         except Exception as e:
             self.conn.rollback()
-            logging.exception("Ошибка при обновлении записи order_details: %s", e)
-            print(f"Ошибка при обновлении записи order_details: {e}")
+            print(f'[SQLite] Ошибка setTable Ошибка при обновлении записи в order_details для записи ={order_number}, stand_id={stand_id} ошибка {e}')
+            logger4.exception(f'[SQLite] Ошибка setTable Ошибка при обновлении записи в order_details для записи ={order_number}, stand_id={stand_id} ошибка {e}')
             return None
         
     
     
     def ConnectPhotoSerial(self, record_id, photodata, loadresult):
         """ Связываем серийный номер и штрихкод на плате с результатом теста и фото """
+        logger4.debug(f'[SQLite] Вызов ConnectPhotoSerial(record_id = {record_id}, photodata = {photodata}, loadresult = {loadresult}) Связываем серийный номер и штрихкод на плате с результатом теста и фото')
         try:
-            logging.info("Method ConnectPhotoSerial called.")
-            #print("Method ConnectPhotoSerial called.")
-            
-            logging.debug(f"Input parameters: record_id={record_id}, loadresult={loadresult}, photodata=[{len(photodata)} bytes]")
-            #print(f"Input parameters: record_id={record_id}, loadresult={loadresult}, photodata={photodata}")
 
             update_query = """
             UPDATE order_details
@@ -257,23 +271,24 @@ class DatabaseConnection:
                 data_matrix = ?
             WHERE id = ?
             """
-            logging.debug(f"Executing SQL with values: ({loadresult}, [photodata], {record_id})")
+            
             #print(f"Executing SQL with values: ({loadresult}, [photodata], {record_id})")
             
             self.cursor.execute(update_query, (loadresult, photodata, record_id))
             self.conn.commit()
 
             if self.cursor.rowcount == 0:
-                logging.warning(f"No record found with id={record_id}.")
-                print(f"No record found with id={record_id}.")
+                
+                logger4.warning(f"[SQLite] ConnectPhotoSerial Не найдено не одной записи с указанным={record_id} в таблице order_details.")
+                print(f"[SQLite] ConnectPhotoSerial Не найдено не одной записи с указанным={record_id} в таблице order_details.")
                 return 404  # Запись не найдена
 
-            logging.info(f"Record {record_id} successfully updated.")
+            logger4.info(f"[SQLite] ConnectPhotoSerial Запись с {record_id} successfully updated.")
             #print(f"Record {record_id} successfully updated.")
             return 200  # Успех
 
         except Exception as e:
-            logging.error(f"Failed to update record {record_id}: {e}", exc_info=True)
+            logger4.error(f"[SQLite] ConnectPhotoSerial ошибка обновления записи {record_id}: {e}", exc_info=True)
             print(f"Failed to update record {record_id}: {e}")
             return 404  # Ошибка выполнения
 
@@ -283,47 +298,63 @@ class DatabaseConnection:
     
     def getBoard_id(self, order_number):
         """ Запрос заказов всех """
-        logging.info("Method 2 called.")
-        # Делаем с блокировкой записи
-        self.cursor.execute('''
-                    SELECT 
-                        O.order_number, 
-                        D.id, 
-                        D.stand_id,
-                        D.serial_number_8,
-                        D.data_matrix, 
-                        D.ERPMatrix, 
-                        D.fw_type,
-                        D.fw_path,
-                        D.date_sent,
-                        D.test_result
-                    FROM orders AS O
-                    JOIN order_details AS D ON O.id = D.order_id
-                    WHERE D.test_result <> 200 OR D.test_result IS NULL AND O.order_number = ?
-                    ORDER BY id DESC
-                    LIMIT 1
-                    FOR UPDATE SKIP LOCKED
-        ''', (order_number,))
+        logger4.info(f'[SQLite] getBoard_id вызван | order_number={order_number}')
+        try:
+            # Делаем с блокировкой записи
+            self.cursor.execute('''
+                        SELECT 
+                            O.order_number, 
+                            D.id, 
+                            D.stand_id,
+                            D.serial_number_8,
+                            D.data_matrix, 
+                            D.ERPMatrix, 
+                            D.fw_type,
+                            D.fw_path,
+                            D.date_sent,
+                            D.test_result
+                        FROM orders AS O
+                        JOIN order_details AS D ON O.id = D.order_id
+                        WHERE D.test_result <> 200 OR D.test_result IS NULL AND O.order_number = ?
+                        ORDER BY id DESC
+                        LIMIT 1
+                        FOR UPDATE SKIP LOCKED
+            ''', (order_number,))
 
-        row = self.cursor.fetchone()
+            row = self.cursor.fetchone()
 
-        if row:
-            order_id = row[1]  # D.id
-            print(f"Запись {order_id} занята успешно.")
+            if row:
+                record_id = row[1]
+                logger4.info(f'[SQLite] getBoard_id запись найдена | order_number={order_number}, record_id={record_id}')
+                return row
+
+            logger4.warning(f'[SQLite] getBoard_id запись не найдена | order_number={order_number}')
+            return None
+
+        except Exception:
+            logger4.exception(f'[SQLite] Ошибка getBoard_id | order_number={order_number}')
+            return None
         
         
     def check_order (self, order_number):
         # Делаем с блокировкой записи
-        self.cursor.execute('''
-                    SELECT 
-                        id
-                    FROM orders
-                    WHERE  order_number = ?
-        ''', (order_number,))
-        row = self.cursor.fetchone()
-        if row:
-            return True
-        else:
+        logger4.info(f'[SQLite] check_order вызван | order_number={order_number}')
+
+        try:
+            self.cursor.execute('''
+                SELECT id
+                FROM orders
+                WHERE order_number = ?
+            ''', (order_number,))
+
+            row = self.cursor.fetchone()
+            result = bool(row)
+
+            logger4.info(f'[SQLite] check_order результат | order_number={order_number}, exists={result}')
+            return result
+
+        except Exception:
+            logger4.exception(f'[SQLite] Ошибка check_order | order_number={order_number}')
             return False
 
     

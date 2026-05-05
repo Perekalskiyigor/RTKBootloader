@@ -31,7 +31,7 @@ def trigger_emergency(reason: str):
     После срабатывания ВСЕ циклы должны завершаться/ничего не делать.
     """
     if not EMERGENCY_STOP.is_set():
-        logging.critical(f"[EMERGENCY STOP] {reason}")
+        logger4.info(f"[MAIN]Глобальная аварийная остановка работа EMERGENCY STOP {reason}")
         print(f"[EMERGENCY STOP] {reason}")
         EMERGENCY_STOP.set()
 
@@ -51,17 +51,21 @@ class RobActionManager:
 
     def acquire(self, table_id):
         """Попытаться захватить Rob_Action для указанного стола."""
+        logger4.info(f"[MAIN] Работа функции захвата робота acquire(self, table_id)")
         with self.lock:
             if self.current_table is None:
                 self.current_table = table_id
+                logger4.info(f"[MAIN] Робот успешно захвачен для стола | table={table_id}")
                 return True
             return False
 
     def release(self, table_id):
         """Освободить Rob_Action."""
+        logger4.info(f"[MAIN] Вызван метод release(self, table_id) робот отпущен для стола table={table_id}")
         with self.lock:
             if self.current_table == table_id:
                 self.current_table = None
+                logger4.info(f"[MAIN] Успешное освобождение робота столом table={table_id}")
                 return True
             return False    
 
@@ -234,12 +238,13 @@ shared_data_lock = threading.Lock()
 logging.basicConfig(
     filename='RTK.log',
     level=logging.INFO,
-    format=' %(asctime)s - MAIN - %(levelname)s - %(message)s'
+    format=' %(asctime)s - MAIN - %(levelname)s - %(message)s',
+    encoding='utf-8'
 )
 
 # Логгер 1
 logger1 = logging.getLogger('LoggerTable1')
-fh1 = logging.FileHandler('LoggerTable1.txt')
+fh1 = logging.FileHandler('LoggerTable1.txt', encoding='utf-8')
 formatter1 = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 fh1.setFormatter(formatter1)
 logger1.addHandler(fh1)
@@ -247,7 +252,7 @@ logger1.setLevel(logging.INFO)
 
 # Логгер 2
 logger2 = logging.getLogger('LoggerTable2')
-fh2 = logging.FileHandler('LoggerTable2.txt')
+fh2 = logging.FileHandler('LoggerTable2.txt', encoding='utf-8')
 formatter2 = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 fh2.setFormatter(formatter2)
 logger2.addHandler(fh2)
@@ -255,7 +260,7 @@ logger2.setLevel(logging.DEBUG)
 
 # Логгер 3
 logger3 = logging.getLogger('LoggerTable3')
-fh3 = logging.FileHandler('LoggerTable3.txt')
+fh3 = logging.FileHandler('LoggerTable3.txt', encoding='utf-8')
 formatter3 = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 fh3.setFormatter(formatter3)
 logger3.addHandler(fh3)
@@ -263,7 +268,7 @@ logger3.setLevel(logging.DEBUG)
 
 # Логгер 4
 logger4 = logging.getLogger('LoggerMAIN')
-fh4 = logging.FileHandler('LoggerMAIN.txt')
+fh4 = logging.FileHandler('LoggerMAIN.txt', encoding='utf-8')
 formatter4 = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 fh4.setFormatter(formatter4)
 logger4.addHandler(fh4)
@@ -293,12 +298,15 @@ def log_message(logger_num, log_type, message):
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 try:
     # Берем адрес текущего хоста
+    logger4.info(f"[MAIN] Получение локального IP адреса")
     s.connect(("8.8.8.8", 80))
     ip = s.getsockname()[0]
 finally:
     s.close()
 print(f"Локальный IP-адрес: {ip}")
-   
+logger4.info(f"[MAIN] Получен локальный IP адрес {ip}")
+
+logger4.info(f"[MAIN] Создаются объекты иглостолов igle_table 1,2,3") 
 igle_table = Igable.IgleTable(
         urlIgleTabeControl=f"http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
         urlStatusFromIgleTabe=f"http://192.168.1.100:5003/get_test_results/1")
@@ -316,60 +324,81 @@ igle_table3 = Igable.IgleTable(
 ################################################# START SQL Communication class ###################################
 # Класс для синхронизации с базой данных и обновления глобального словаря
 class DatabaseSynchronizer:
-    def __init__(self, order, number, shared_dict) :
-        self.order = order
+    def __init__(self, number, shared_dict) :
         self.stop_event = threading.Event()  # Событие для остановки потока
         self.update_thread = threading.Thread(target=self.update_data, daemon=True)
         self.update_thread.start()
         self.lock = threading.Lock()
         self.number = number
+        self.current_order = None 
         self.my_data = shared_dict.get('OPC-DB', {})  # Только своя часть словаря
+        logger4.info(f"[MAIN][DBSync] Вызван класс работы с SQL  SQL Communication class с параметрами номер стола number = {number}") 
         self.lock = threading.Lock()
 
     def update_data(self):
         """Метод для обновления данных в глобальном словаре с базы данных"""
         global shared_data
+        logger4.info(f"[MAIN][DBSync] Вызван метод update_data класса SQL Communication class. Старт цикла обновления данных в бд") 
         while not self.stop_event.is_set():  # Проверка на остановку потока
             try:
-                # Попытка получения данных по заказу из базы данных
-                db_connection = SQL.DatabaseConnection()
-                result = db_connection.getDatafromOOPC(self.order)
-                print(f"++++++++++++++++++++++{order_number}")
-                print(module)
-                print(fw_version)
-                if result:
-                    order_number, module, fw_version, last_count, common_count, success_count, nonsuccess_count = result
+                # Динамически получаем текущий заказ из shared_data
+                with shared_data_lock:
+                    current_order = shared_data['OPC-DB'].get('OPC_Order', "").strip()
+                
+                # Если заказ изменился или ещё не обработан
+                if current_order and current_order != self.current_order:
+                    self.current_order = current_order
+                    logger4.info(f"[MAIN][DBSync] Новый заказ обнаружен: {self.current_order}")
+                
+                    # Попытка получения данных по заказу из базы данных
+                    db_connection = SQL.DatabaseConnection()
+                    logger4.debug(f"[MAIN] Делаем запрос к базе данных на получение заказа {self.order}")
+                    result = db_connection.getDatafromOOPC(self.order)
+                    print(f"[MAIN][DBSync] Из базы полчены даные на заказ {self.order} данные о заказу {result}")
+                
+                    if result:
+                        order_number, module, fw_version, last_count, common_count, success_count, nonsuccess_count = result
 
-                    # print(f"Номер заказа: {order_number}")
-                    # print(f"Модуль: {module}")
-                    # print(f"Версия ПО: {fw_version}")
-                    # print(f"Количество оставшихся: {last_count}")
-                    # print(f"Общее количество записей: {common_count}")
-                    # print(f"С успешным report_path: {success_count}")
-                    # print(f"С успешным log_path: {nonsuccess_count}")
+                        # print(f"Номер заказа: {order_number}")
+                        # print(f"Модуль: {module}")
+                        # print(f"Версия ПО: {fw_version}")
+                        # print(f"Количество оставшихся: {last_count}")
+                        # print(f"Общее количество записей: {common_count}")
+                        # print(f"С успешным report_path: {success_count}")
+                        # print(f"С успешным log_path: {nonsuccess_count}")
 
-                    # Обновление глобального словаря с данными из базы
-                    with self.lock:
-                        with shared_data_lock:
-                            self.my_data["OPC_Order"] = order_number          # номер заказа
-                            self.my_data["OPC_nameboard"] = module                      # имя платы
-                            self.my_data["OPC_firmware"] = fw_version              # версия прошивки
-                            self.my_data["DB_last_count"] = last_count              # колво непрошитых
-                            self.my_data["DB_common_count"] = common_count          # общее колво плат
-                            self.my_data["DB_success_count"] = success_count        # прошито ок
-                            self.my_data["DB_nonsuccess_count"] = last_count  # не прошито
-                else:
-                    print(f"[DBSync] Данные по заказу не найдены.")
+                        # Обновление глобального словаря с данными из базы
+                        logger4.info(f"[MAIN][DBSync] Обновление глобального словаря отправка данных с SQL Communication class для заказа {self.order}")
+                        logger4.info(
+                            f"[MAIN][DBSync] заказ{self.number}"
+                            f"order={order_number} | module={module} | fw={fw_version} | "
+                            f"left={last_count} | ok={success_count} | fail={nonsuccess_count}"
+                        )
+                        with self.lock:
+                            with shared_data_lock:
+                                self.my_data["OPC_Order"] = order_number          # номер заказа
+                                self.my_data["OPC_nameboard"] = module                      # имя платы
+                                self.my_data["OPC_firmware"] = fw_version              # версия прошивки
+                                self.my_data["DB_last_count"] = last_count              # колво непрошитых
+                                self.my_data["DB_common_count"] = common_count          # общее колво плат
+                                self.my_data["DB_success_count"] = success_count        # прошито ок
+                                self.my_data["DB_nonsuccess_count"] = last_count  # не прошито
+                    else:
+                        print(f"[MAIN][DBSync] Данные по заказу не найдены. Проверьте БД")
+                        logger4.warning(f"[MAIN][DBSYNC-{self.number}] Не возможно получить данные для заказа={self.order} при запросе к бд данные не найдены. Проверьте бд")
 
             except Exception as e:
                 logging.error(f"Ошибка при синхронизации с базой данных: {e}")
+                logger4.exception(f"[MAIN][DBSYNC-{self.number}] Ошибка подключения к бд DB ERROR: {e}")
             
             # Пауза 1 секунда перед следующей попыткой
             time.sleep(1)
+        logger4.info(f"[MAIN][DBSYNC-{self.number}] Цикл обовления данных БД остановлен")
 
     def stop(self):
         """Метод для остановки потока"""
         self.stop_event.set()  # Устанавливаем событие, чтобы остановить поток
+        logger4.info(f"[MAIN][DBSYNC-{self.number}] STOP потока обовления данных SQL Communication class")
 
 try:
         # Create an instance of DatabaseConnection
@@ -381,7 +410,6 @@ except Exception as e:
 
 
 
-################################################# START OPC Communication class ###################################
 
 ################################################# START OPC Communication class ###################################
 
@@ -405,16 +433,21 @@ class OPCClient:
         self.connected = False
         self.stop_event = threading.Event()
 
+        logger4.info(f"[OPC] инициализация  OPC Communication class | url={self.url}")
+
         # Start threads
         self.server_thread = threading.Thread(target=self.connection_manager, daemon=True)
         self.update_thread = threading.Thread(target=self.update_registers, daemon=True)
         self.server_thread.start()
         self.update_thread.start()
 
+        logger4.info("[OPC] Потоки OPC Communication class успешно запущены")
+
     # -------------------- внутренние утилиты OPC --------------------
     def _get_node(self, nodeid):
         """Ленивое получение и кэширование OPC-узла."""
         if nodeid is None:
+            logger4.warning("[OPC] _get_node вызван с nodeid=None")
             return None
         node = self.nodes.get(nodeid)
         if node is None and self.client:
@@ -430,30 +463,40 @@ class OPCClient:
         """Безопасная запись значения в OPC-узел (с кэшем)."""
         node = self._get_node(nodeid)
         if not node:
+            logger4.warning(f"[OPC] Ошибка записи, node not found | nodeid={nodeid}")
             return
         try:
             node.set_value(ua.DataValue(ua.Variant(value, vtype)))
+            # logger4.debug(f"[OPC] Запись удалась OK | nodeid={nodeid} | value={value} | type={vtype}")
         except Exception as e:
+            logger4.exception(
+            f"[OPC] Запись в опс завершилась ошибкой | nodeid={nodeid} | value={value} | type={vtype} | error={e}")
             print(f"[OPC] write fail {nodeid}: {e}")
 
     def _read_bool(self, nodeid, default=0):
         node = self._get_node(nodeid)
         if not node:
+            logger4.warning(f"[OPC] Не найден узел | nodeid={nodeid}")
             return default
         try:
             v = node.get_value()
+            # logger4.debug(f"[OPC] Узел прочитан успешно | nodeid={nodeid} | value={v}")
             return int(v)
         except Exception as e:
+            logger4.exception(f"[OPC] Проблема со считыванием данных узла | nodeid={nodeid} | error={e}")
             print(f"[OPC] read bool fail {nodeid}: {e}")
             return default
 
     def _read_str(self, nodeid, default=""):
         node = self._get_node(nodeid)
         if not node:
+            logger4.warning(f"[OPC] READ Попытка чтения STR не удалась, node not found | nodeid={nodeid}")
             return default
         try:
             v = node.get_value()
-            return str(v) if v is not None else default
+            result = str(v) if v is not None else default
+            logger4.debug(f"[OPC] Успешно считали STR OK | nodeid={nodeid} | value={result}")
+            return result
         except Exception as e:
             print(f"[OPC] read str fail {nodeid}: {e}")
             return default
@@ -461,13 +504,17 @@ class OPCClient:
     # -------------------- соединение --------------------
     def connection_manager(self):
         """Управление соединением по ОПС"""
+        logger4.info(f"[OPC] Connection manager запущен на адресе | url={self.url}")
+
         while not self.stop_event.is_set():
             try:
                 if not self.connected:
+                    logger4.info(f"[OPC] Попытка подключения к | url={self.url}")
                     self.client = Client(self.url)
                     self.client.connect()
                     self.connected = True
-                    print(f"Connected to {self.url}")
+                    logger4.info(f"[OPC] успешно подключен к | url={self.url}")
+                    print(f"[OPC] успешно подключен к | url={self.url}")
 
                     # при коннекте можно заранее прогреть часто используемые узлы
                     warm_ids = [
@@ -501,20 +548,31 @@ class OPCClient:
 
                         
                     ]
+                    ok_count = 0
                     for nid in warm_ids:
-                        self._get_node(nid)
+                        if self._get_node(nid):
+                            ok_count += 1
+
+                    logger4.info(
+                    f"[OPC] Прогрев узлов заврешен | ok={ok_count}/{len(warm_ids)}"
+                )
 
                 time.sleep(1)
             except Exception as e:
-                print(f"Connection error: {e}")
+                logger4.exception(f"[OPC] Ошибка подключения | url={self.url} | error={e}")
+                print(f"[OPC] Ошибка подключения | url={self.url} | error={e}")
                 self.connected = False
                 if self.client:
                     try:
                         self.client.disconnect()
-                    except:
-                        pass
+                        logger4.info("[OPC] Клиент ОПС был отключен после ошибки")
+                    except Exception as disconnect_error:
+                        logger4.exception(
+                        f"[OPC] ОПС выключен ошибка: {disconnect_error}"
+                        )
                 self.client = None
                 time.sleep(5)  # Wait before reconnection attempt
+        logger4.info("[OPC] Connection manager остановлен")
 
     def is_connected(self):
         """Check if client is properly connected"""
@@ -628,6 +686,7 @@ class OPCClient:
                         self._write(LOG,  opcdb.get('OPC_log', ""), ua.VariantType.String)
 
 
+                        st5 = False
                         # --- читаем флаги запуска из OPC и зеркалим в shared_data ---
                         try:
                             st1 = bool(self._read_bool(START_T1, False))
@@ -646,14 +705,20 @@ class OPCClient:
                                 shared_data['OPC-DB']['OPC_res_brak'] = st5
                                 shared_data['OPC-DB']['OPC_pause_RTK'] = st6
                                 shared_data['OPC-DB']['OPC_restart_RTK'] = st7
+                        
+                            logger4.debug(
+                                f"[OPC] читаем флаги запуска из OPC и зеркалим в shared_data FLAGS | RTK={st4} | T1={st1} | T2={st2} | T3={st3} | "
+                                f"BRAK={st5} | PAUSE={st6} | RESTART={st7}"
+                            )
 
 
                         except Exception as e:
                             print(f"[OPC] read START_T* failed: {e}")
+                            logger4.exception(f"[OPC] read START flags failed: {e}")
 
-                            # Обнуляем ячейку брака есл иполучили истину в OPC_res_brak
-                            if st5 is True:
-                                Cell2 = 0
+                        # Обнуляем ячейку брака есл иполучили истину в OPC_res_brak
+                        if st5 is True:
+                            Cell2 = 0
                             print(f"Cell2 = {Cell2}")
                         # ВАЖНО: OPC_Order обратно НЕ пишем, только читаем в отдельном блоке-детекторе выбора
                     except Exception as e:
@@ -727,12 +792,14 @@ class OPCClient:
 
     def stop(self):
         """Clean shutdown"""
+        logger4.info("[OPC] STOP requested")
         self.stop_event.set()
         if self.client:
             try:
                 self.client.disconnect()
-            except:
-                pass
+                logger4.info("[OPC] Client disconnected")
+            except Exception as e:
+                logger4.exception(f"[OPC] Client disconnect failed: {e}")
 
 
 
@@ -1138,7 +1205,7 @@ class Table:
                 # 3) проверка в 1С
                 verified = BoardAprove.check_board(board_id=dm, order=Order).get("result")
                 print(f"Стол {self.number}: считан DM={dm}, произведена верификация в 1С результат {verified}")
-                verified = True # ВАЖНО это заглушка отключения проверки плат, ее вкллючать не надо
+                # verified = True # ВАЖНО это заглушка отключения проверки плат, ее вкллючать не надо
                 if verified:
                     # 4a) кладём на целевой ложемент
                 
@@ -1908,17 +1975,22 @@ class Table:
 running_threads = {}
 
 def start_threads_if_needed(targets: dict, do_defence=False, do_setup=True):
+    logger4.info("[MAIN] ▶ Вызов start_threads_if_needed")
     with shared_data_lock:
         opc_db = shared_data.get('OPC-DB', {})
+        logger4.debug(f"[MAIN] получили из глобалльного словаря команды на запуск столов: {opc_db}")
         if not opc_db.get('OPC_START_RTK', False):
+            logger4.warning("[MAIN] запуск потоков отменён")
             return
         flags = {
             1: opc_db.get('OPC_strat_t1', False),
             2: opc_db.get('OPC_strat_t2', False),
             3: opc_db.get('OPC_strat_t3', False),
         }
+    logger4.info(f"[MAIN] Флаги запуска столов: {flags}")
 
     for tid, need_start in flags.items():
+        logger4.debug(f"[MAIN] Проверка стола {tid}: need_start={need_start}")
         if need_start and tid not in running_threads:
             table = targets[tid]
             t = threading.Thread(
@@ -1929,6 +2001,7 @@ def start_threads_if_needed(targets: dict, do_defence=False, do_setup=True):
             )
             t.start()
             running_threads[tid] = t
+            logger4.info(f"[MAIN] ✅ Поток Table{tid} успешно запущен")
             time.sleep(15)  # <-- пауза между столами
 
     # with shared_data_lock:
@@ -1936,30 +2009,40 @@ def start_threads_if_needed(targets: dict, do_defence=False, do_setup=True):
 
 
 def run_table_pipeline(table: Table, do_defence=True, do_setup=True):
+    logger4.info(f"[MAIN] Запуск run_table_pipeline")
     try:
         if do_defence:
             table.defence_robo_cycle()
         if do_setup:
+            logger4.info(f"[MAIN] Запуск цикла SETUP для столов {table.number}")
             table.setup_robo_cycle()
+            logger4.info(f"[MAIN] Цикл SETUP завершен для столов {table.number}")
     except Exception:
-        logging.exception(f"[PIPELINE] prep failed for table {table.number}")
+        logging.exception(f"[MAIN] run_table_pipeline завершился неудачно {table.number}")
         # по ситуации можно вызвать trigger_emergency(...)
     # после подготовки уходим в основной бесконечный цикл
+    logger4.info(f"[MAIN] START основного цикла для столов robo_main_cycle() (table {table.number}")
     table.robo_main_cycle()
 
     
 
 
 if __name__ == "__main__":
+    logger4.info("[MAIN]старт основного скрипта")
 
     modbus_provider = ModbusProvider()
+    logger4.info("[MAIN]старт ModbusProvider()")
     rob_manager = RobActionManager()
+    logger4.info("[MAIN]старт RobActionManager()")
     
 
     # Создаем и запускаем процесс синхронизации с БД
-    db_sync = DatabaseSynchronizer(Order, 1, shared_data)
+    logger4.info(f"[MAIN]Создаем и запускаем процесс синхронизации с БД Парметры переданные бд заказ {Order}")
+    print(f"_______________________________{Order}")
+    db_sync = DatabaseSynchronizer(1, shared_data)
 
     url = "opc.tcp://192.168.1.3:48010"
+    logger4.info(f"[MAIN]Запускаем обен с OPCClient сервером по адресу {url}")
     opc_client = OPCClient(url, 2, shared_data)
 
 
@@ -1986,6 +2069,7 @@ if __name__ == "__main__":
 
 
     # Создаём столы
+    logger4.info(f"[MAIN]Создаем объекты столов")
     table1 = Table("Table1", shared_data, shared_data_lock, 1, rob_manager)
     table2 = Table("Table2", shared_data, shared_data_lock, 2, rob_manager)
     table3 = Table("Table3", shared_data, shared_data_lock, 3, rob_manager)
@@ -1997,6 +2081,7 @@ if __name__ == "__main__":
 
     # Создаем потоки для основного цикла
     
+    logger4.info(f"[MAIN]Создаем потоки для столов")
     thread1 = threading.Thread(target=table1.robo_main_cycle)
     thread2 = threading.Thread(target=table2.robo_main_cycle)
     thread3 = threading.Thread(target=table3.robo_main_cycle)
@@ -2007,28 +2092,29 @@ if __name__ == "__main__":
     # thread3 = threading.Thread(target=table3.test_botloader)
 
     
-
+    # Блок санирования тары
     while True:
-        print (f'Сканирование штрих кода тары')
-        logging.info(f"Сканирование штрих кода тары")
+        logger4.info(f'[MAIN]Сканирование штрих кода тары')
+        print (f'[MAIN]Сканирование штрих кода тары')
         barcode = Mertech_scanner.scan_barcode()
         print(barcode)
         time.sleep(5)
         if barcode:
             SETUP_TABLE = 0
-            logging.info(f"Штрих кода тары успешно получен {barcode}")
-            print (f"Штрих кода тары успешно получен {barcode}")
+            logger4.info(f'[MAIN]Штрих кода тары успешно получен {barcode}')
+            print (f"[MAIN]Штрих кода тары успешно получен {barcode}")
             break
     
+    # Блок подготовки столов
     while True:
+        logger4.info(f'[MAIN]Ожидание от регула, что столы в начальной позиции')
         print (f'Ожидание от регула, что столы в начальной позиции')
-        logging.info(f"Ожидание от регула, что столы в начальной позиции")
         time.sleep(1)
         SETUP_TABLE = 1
         if SUB_SETUP_TABLE == 1:
             SETUP_TABLE = 0
-            logging.info(f"получен ответ от регула, что столы приведены в нулевое положении")
-            print (f'получен ответ от регула, что столы приведены в нулевое положении ')
+            logger4.info(f"[MAIN]получен ответ от регула, что столы приведены в нулевое положении")
+            print (f'[MAIN]получен ответ от регула, что столы приведены в нулевое положении ')
             opc_set (shared_data, f'OPC_log', f"Система подготовлена к работе") # # 2-успех 1-брак
 
             break
@@ -2056,7 +2142,7 @@ if __name__ == "__main__":
     try:
         while True:
             if EMERGENCY_STOP.is_set():
-                logging.critical("[MAIN] Поймали EMERGENCY_STOP. Останавливаемся.")
+                logger4.critical("[MAIN] Поймали EMERGENCY_STOP. Останавливаемся.")
                 break
 
             # Если хочешь поддержать «поздний старт по OPC», можно периодически вызывать:
@@ -2077,12 +2163,12 @@ if __name__ == "__main__":
         try:
             opc_client.stop()
         except Exception:
-            logging.exception("Ошибка при остановке OPC клиента")
+            logger4.exception("[MAIN]Ошибка при остановке OPC клиента")
 
         try:
             db_sync.stop()
         except Exception:
-            logging.exception("Ошибка при остановке потока синхронизации БД")
+            logger4.exception("[MAIN]Ошибка при остановке потока синхронизации БД")
 
         # Дожимаем потоки столов
         for t in (thread1, thread2, thread3):
@@ -2094,4 +2180,5 @@ if __name__ == "__main__":
 
 
         print("Все потоки завершены.")
+        logger4.info("[MAIN]Все потоки завершены.")
 

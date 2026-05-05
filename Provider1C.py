@@ -7,7 +7,9 @@ import sqlite3
 from datetime import datetime
 import SQLite
 import configparser
+import logging
 
+logger4 = logging.getLogger('LoggerMAIN')
 
 # Загрузка конфигурации
 config = configparser.ConfigParser(interpolation=None)
@@ -17,13 +19,7 @@ getOrders_url = config['serverOrder']['getOrders_url']
 username = config['serverOrder']['password']
 fetch_data_url = config['serverOrder']['fetch_data_url']
 
-
-# Настройка логирования
-logging.basicConfig(
-    filename='RTK.log',  # Файл для логирования
-    level=logging.INFO,           # Уровень логирования
-    format='SQLITE - %(asctime)s - %(levelname)s - %(message)s',  # Формат логов
-)
+logger4.info('[Provider1C] Запущен модуль провайдера')
 
 def getOrders():
     headers = {
@@ -39,31 +35,40 @@ def getOrders():
         keys = list(data.keys())  # получаем только ключи
 
         if keys:
-            print("Найденные ключи:", keys)
+            logger4.info(f"[Provider1C] Найденные ключи: {keys}")
+            print(f"[Provider1C] Найденные ключи: {keys}")
             return keys
         else:
-            print("Ответ получен, но он пуст.")
+            logger4.warning("[Provider1C] Ответ получен, но он пуст.")
+            print("[Provider1C] Ответ получен, но он пуст.")
+
 
     except requests.exceptions.RequestException as e:
-        print("Ошибка при запросе:", e)
+        logger4.error(f"[Provider1C] Ошибка при запросе: {e}")
+        print(f"[Provider1C] Ошибка при запросе: {e}")
     except ValueError:
         print("Ошибка разбора JSON. Ответ не является допустимым JSON.")
+        logger4.error("[Provider1C] Ошибка разбора JSON")
     except Exception as e:
         print("Произошла неизвестная ошибка:", e)
+        logger4.exception(f"[Provider1C] Неизвестная ошибка: {e}")
 
 
 
 def fetch_data(order):
-    logging.info("Вызвана функция получения данных по заказу в бд def fetch_data(order) и провайдера SQL")
+    logger4.info(f"[Provider1C] Вызвана fetch_data(order={order})")
       
-    order = order[4:]   # срезаем "ЗНП-"
+    
     try:
+        order = order[4:]   # срезаем "ЗНП-"
         url = f"{fetch_data_url}{order}"
         payload = {}
         headers = {
         'Authorization': 'Basic bWFya19EUEE6MTIzNDU2elo='
         }
+        logger4.info(f"[Provider1C] Запрос данных по заказу: {order}")
         response = requests.get(url, headers=headers, verify=True, timeout=15)
+        response.raise_for_status()
         #print(response.text)
         data = response.json()
 
@@ -99,7 +104,12 @@ def fetch_data(order):
             template_type = first_template.get('type')
             template_type_ru = first_template.get('type_RU')
             template_path = first_template.get('path')
+            logger4.info(
+                f"[Provider1C] Найден шаблон маркировки: "
+                f"type={template_type}, type_RU={template_type_ru}, path={template_path}"
+            )
         else:
+            logger4.warning(f"[Provider1C] Для заказа {order} шаблоны маркировки не найдены")
             template_type = None
             template_type_ru = None
             template_path = None
@@ -132,10 +142,25 @@ def fetch_data(order):
         
         
 
-        logging.info("Data successfully fetched.")
+        logger4.info(
+            f"[Provider1C] Данные успешно получены: "
+            f"order_id={order_id}, board_name={board_name}, version={version}, count={count}"
+        )
         return result
+    except requests.exceptions.Timeout:
+        logger4.exception(f"[Provider1C] Таймаут при получении данных по заказу: {order}")
+        raise
+    except requests.exceptions.HTTPError as e:
+        logger4.exception(f"[Provider1C] HTTP ошибка при получении данных по заказу {order}: {e}")
+        raise
+    except requests.exceptions.RequestException as e:
+        logger4.exception(f"[Provider1C] Ошибка запроса к 1С по заказу {order}: {e}")
+        raise
+    except ValueError as e:
+        logger4.exception(f"[Provider1C] Ошибка разбора JSON по заказу {order}: {e}")
+        raise
     except Exception as e:
-        logging.error(f"Error fetching data: {e}")
+        logger4.exception(f"[Provider1C] Неизвестная ошибка в fetch_data по заказу {order}: {e}")
         raise
 
 

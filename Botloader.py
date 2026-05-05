@@ -1,4 +1,3 @@
-import logging
 import time
 from datetime import datetime
 
@@ -13,13 +12,9 @@ import SentLog1C
 
 
 
- # Set up basic logging configuration
-logging.basicConfig(
-    filename='RTK.log',
-    level=logging.INFO,
-    format=' %(asctime)s - Botloader - %(levelname)s - %(message)s'
-)
+import logging
 
+logger4 = logging.getLogger('LoggerMAIN')
 
 
 
@@ -28,20 +23,24 @@ logging.basicConfig(
 ################################################# Botloader class ###################################
 class FirmwareLoader:
     def __init__(self,db_connection,igle_table,stand_id, Order, photodata, loge):
+        logger4.info(
+            f"[Botloader] Инициализация | stand_id={stand_id}, Order={Order}, photodata={photodata}, loge={loge}"
+        )
+
         try:
             # Создаем экземпляр подключения к базе данных
             self.db_connection = db_connection
-            logging.info("Соединение с базой данных установлено")
+            logger4.info("[Botloader] Соединение с базой данных установлено")
         except Exception as e:
-            logging.error(f"Ошибка при создании подключения с базой данных: {e}")
+            logger4.exception(f"[Botloader] Ошибка при создании подключения с базой данных: {e}")
             raise
 
         try:
             # Создаем экземпляр провайдера
             self.igle_table = igle_table
-            logging.info("Соединение с провайдером Иглостола установлено")
+            logger4.info("[Botloader] Соединение с провайдером Иглостола установлено")
         except Exception as e:
-            logging.error(f"Ошибка при создании подключения с провайдером: {e}")
+            logger4.exception(f"[Botloader] Ошибка при создании подключения с провайдером: {e}")
             raise
         self.stand_id = stand_id
         self.Order = Order
@@ -49,21 +48,29 @@ class FirmwareLoader:
         self.loge = loge
 
     def loader(self, photodata, loge):
-        print("3 Прошивальщик <- Команда на прошивку")
+        logger4.info(f"[Botloader] Вызов функции loader Команда на прошивку праметры  photodata = {photodata}, loge={loge}")
+        print(f"[Botloader] Вызов функции loader Команда на прошивку праметры  photodata = {photodata}, loge={loge}")
         
         # Блок начала работы с БД: получаем свободный id для заказа
         try:
             self.db_connection.db_connect()
+            logger4.info("[Botloader] Подключение к БД")
             # Берем свовобоный заказ
+            logger4.info(
+                f"[Botloader] Поиск свободного заказа | Order={self.Order}, stand_id={self.stand_id}"
+            )
             record_id = self.db_connection.setTable(self.Order, self.stand_id)
-            print(f"БД - получили свободный заказ {record_id}")
+            logger4.info(f"[Botloader] БД вернула свободный заказ record_id={record_id}")
+            print(f"[Botloader] БД вернула свободный заказ record_id={record_id}")
             if record_id is None:
-                print("Свободная запись не найдена")
+                logger4.warning(f"[Botloader] Свободная запись не найдена")
+                print(f"[Botloader] Свободная запись не найдена")
                 return 404, None
             #  получаем для него данные из бд для прошивки
             data = self.db_connection.recievedata(record_id)
             # Если данные были получены, напечатаем их
             if data:
+                 logger4.warning(f"[Botloader] Получены и успешно извлечены данные по прошивке для записи {record_id} data = {data}")
                  print(f"ID: {data['id']}")
                  print(f"Stand ID: {data['stand_id']}")
                  print(f"Module Type: {data['module_type']}")
@@ -76,20 +83,25 @@ class FirmwareLoader:
                  print(f"Firmware Version: {data['fw_version']}")
                  print(f"Order_number: {data['order_name']}")
             else:
-                 print(f"Не удалось получить данные для прошивки")
+                 logger4.error(f"[Botloader] Не удалось получить данные для прошивки | record_id={record_id}")
+                 print(f"[Botloader] Не удалось получить данные для прошивки | record_id={record_id}")
         except Exception as e:
-            logging.error(f"Ошибка при работе с базой данных: {e}")
-            print("Ошибка при подключении или получении записи из БД")
+            logger4.exception(f"[Botloader] Ошибка при работе с базой данных: {e}")
+            print(f"[Botloader] Ошибка при работе с базой данных: {e}")
             return
         
         # Блок прошивки
         time.sleep(2)
         try:
-            print (data, photodata, loge)
+            logger4.info(
+                f"[Botloader] Отправляем команду на Иглостол | record_id={record_id}, photodata={photodata}, loge={loge}"
+            )
+            # print (data, photodata, loge)
             self.igle_table.control_igle_table(data, photodata, loge)
+            logger4.info(f"[Botloader] Команда на Иглостол успешно отправлена | record_id={record_id}")
         except Exception as e:
-            logging.error(f"Ошибка при контроле через Иглостол: {e}")
-            print("Ошибка при контроле через Иглостол")
+            logger4.exception(f"[Botloader] Ошибка при отправке команды на прошивку Иглостолу: {e}")
+            print(f"[Botloader] Ошибка при отправке команды на прошивку Иглостолу: {e}")
             return
 
 
@@ -102,27 +114,30 @@ class FirmwareLoader:
                 resultTest = self.igle_table.recentData()
                 
                 if not isinstance(resultTest, dict):
-                    logging.error(f"Некорректный ответ recentData: {resultTest}")
-                    print("Некорректный ответ от Иглостола, ждем дальше")
+                    print("[Botloader] Некорректный ответ от Иглостола, ждем дальше")
                     continue
-                print("Результат запроса:")
+                print("[Botloader] Результат запроса:")
 
                 loadresult = resultTest.get('test_result', None)
-                print(f"Результат от IgleTable: {loadresult}")
+                print(f"[Botloader] Результат от IgleTable: {loadresult}")
                 
                 if loadresult is None:
-                    print("Ждем ответ от прошивальщика")
+                    print("[Botloader] Ждем ответ от прошивальщика")
                     time.sleep(2)
                     continue
                 
                 # Как только получили любой итоговый ответ (True/False) — сразу шлем в 1С
+                logger4.info(
+                    f"[Botloader] Ответ от Иглостола | record_id={record_id}, test_result={loadresult}"
+                )
                 self.send_log_to_1c_safe(data, resultTest)
+                logger4.info(f"[Botloader] Лог в 1С отправлен/обработан | record_id={record_id}")
                 break
 
 
             except Exception as e:
-                logging.error(f"Ошибка при получении данных от Иглостола: {e}")
-                print("Ошибка при получении данных от Иглостола")
+                logger4.exception(f"[Botloader] Ошибка при получении данных от Иглостола: {e}")
+                print("[Botloader] Ошибка при получении данных от Иглостола")
                 break
 
 
@@ -138,28 +153,39 @@ class FirmwareLoader:
             error_description = resultTest.get("error_description")
 
             try:
+                logger4.info(
+                    f"[Botloader] Запись успешного результата в БД | "
+                    f"record_id={record_id}, stand_id={stand_id}, serial_8={serial_number_8}, "
+                    f"test_result={test_result}, log_path={log_path}, report_path={report_path}"
+                )
                 # Записываем результаты прошивки в БД
                 self.db_connection.set_BoardTest_Result(record_id, stand_id, serial_number_8, data_matrix, test_result, log_path, report_path, error_description)
-                print(f"Результаты прошивки успешно записаны в БД для заказа {record_id}")
+                logger4.info(f"[Botloader] Результаты прошивки записаны в БД | record_id={record_id}")
+                print(f"[Botloader] Результаты прошивки успешно записаны в БД для заказа {record_id}")
                 
                 # Привязываем Data matrix к серийнику
+                logger4.info(f"[Botloader] Привязка DataMatrix к серийному номеру | record_id={record_id}, photodata={self.photodata}")
                 self.db_connection.ConnectPhotoSerial(record_id, self.photodata, loadresult)
-                print("Привязали Data matrix к серийному номеру")
+                print("[Botloader]Привязали Data matrix к серийному номеру")
 
                 
                 # Очищаем переменные
                 self.cleanup()
+                logger4.info(f"[Botloader] Цикл прошивки завершен успешно | record_id={record_id}")
                 # Если с ошибкой прошивка возращаем статус error_description
                 return 200, test_result
             except Exception as e:
-                logging.error(f"Ошибка при записи в БД: {e}")
-                print("Ошибка при записи в БД")
+                logger4.exception(f"[Botloader] Ошибка при записи успешного результата в БД: {e}")
+                print(f"[Botloader] Ошибка при записи успешного результата в БД: {e}")
                 # Очищаем переменные
                 self.cleanup()
                 return 404, test_result
         else:
-            print("Ошибка: не удалось получить данные, запись в БД не выполнена.")
-            logging.error(f"Ошибка прошивки: {resultTest.get('test_result', 'Неизвестная ошибка')}")
+            print("[Botloader] Ошибка: не удалось получить данные, запись в БД не выполнена.")
+            logger4.error(
+                f"[Botloader] Ошибка прошивки | "
+                f"record_id={record_id}, resultTest={resultTest}"
+            )
 
             # Если не удалось, сообщаем роботу переместить в брак
             try:
@@ -168,24 +194,41 @@ class FirmwareLoader:
                 serial_number_8 = resultTest.get("serial_number_8")
                 error_description = resultTest.get("error_description") or "Ошибка прошивки"
 
+                logger4.info(
+                    f"[Botloader] Запись брака в БД | "
+                    f"record_id={record_id}, stand_id={self.stand_id}, "
+                    f"serial_8={serial_number_8}, log_path={log_path}, "
+                    f"report_path={report_path}, error_description={error_description}"
+                )
+
                 self.db_connection.set_BoardTest_Result(
                     record_id, self.stand_id, None, None, "404", log_path, report_path, error_description
                 )
-                print("Робот, перемести в брак.")
+                logger4.info(f"[Botloader] Брак записан в БД | record_id={record_id}")
+                print(f"[Botloader] Брак записан в БД | record_id={record_id}")
             except Exception as e:
-                logging.exception(f"Не удалось записать брак в БД: {e}")
-                print("Не удалось записать брак в БД")
+                logger4.exception(f"[Botloader] Не удалось записать брак в БД: {e}")
+                print("[Botloader] Не удалось записать брак в БД")
 
             self.cleanup()
+            logger4.info(f"[Botloader] Цикл прошивки завершен с ошибкой | record_id={record_id}")
             return 500, False
         
 
     def send_log_to_1c_safe(self, data, resultTest):
         """Отправка лога в 1С. Логи разные взависмоисти от успеха не успеха прошивки. Фомируеются 2 словаря"""
         try:
+            logger4.info("[Botloader][1С] Начало отправки лога в 1С send_log_to_1c_safe")
+
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
             test_result = resultTest.get("test_result", None)
-            serial_number = data.get("serial_number_9", "")
+            serial_number = resultTest.get("data_matrix", "")
+
+            logger4.info(
+            f"[Botloader][1С] Подготовка payload для 1С | "
+            f"test_result={test_result}, serial_number={serial_number}, "
+            f"order={data.get('order_name')}, fw_version={data.get('fw_version')}"
+            )
 
 
             board_info = {
@@ -219,6 +262,7 @@ class FirmwareLoader:
                     ],
                     "bad": []
                 }
+                logger4.info(f"[Botloader][1С] Отправка успешного firmware_log в 1С | payload={payload}")
                 response = SentLog1C.send_success_log(payload)
             else:
                 payload = {
@@ -231,15 +275,16 @@ class FirmwareLoader:
                         }
                     ]
                 }
+                logger4.info(f"[Botloader][1С] Отправка не успешного firmware_log в 1С | payload={payload}")
                 response = SentLog1C.send_unsuccess_log(payload)
 
-            print("Ответ сервера 1С:", response)
-            logging.info("Лог в 1С успешно отправлен")
+            logger4.info(f"[Botloader][1С] Ответ сервера 1С: {response} Лог успешно отправлен в 1С")
+            print(f"[Botloader][1С] Ответ сервера 1С: {response}")
             return True
 
         except Exception as e:
-            logging.exception(f"1С недоступна или ошибка отправки лога: {e}")
-            print("1С недоступна, продолжаем без отправки лога")
+            logger4.exception(f"[Botloader][1С] 1С недоступна или ошибка отправки лога: {e}")
+            print(f"[Botloader][1С] 1С недоступна или ошибка отправки лога: {e}")
             return False
         
 
@@ -250,6 +295,7 @@ class FirmwareLoader:
         # self.db_connection = None
         # self.igle_table = None
         print("Переменные очищены.")
+        logger4.info("[Botloader] cleanup: переменные очищены")
 
 
 if __name__ == "__main__":

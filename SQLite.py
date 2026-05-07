@@ -10,11 +10,11 @@ logger4.info('[SQLite] Запущен модуль провайдера')
 
 class DatabaseConnection:
     def __init__(self):
-        logger4.info('[SQLite] Инициализация подключения к БД | db=orders.db')
+        # logger4.info('[SQLite] Инициализация подключения к БД | db=orders.db')
         # Initialize the connection
         self.conn = sqlite3.connect('orders.db')
         self.cursor = self.conn.cursor()
-        logger4.info('[SQLite] Подключение к БД успешно создано')
+        # logger4.info('[SQLite] Подключение к БД успешно создано')
         
         # Set up basic logging configuration
         logging.basicConfig(
@@ -188,7 +188,7 @@ class DatabaseConnection:
             return False
     
     
-    
+    # Этот метод удалить он не используется используется метод ниже
     def setTable(self, order_number, stand_id):
         """Поиск заказа и обновление одной записи в order_details."""
         logger4.info(f'[SQLite] setTable вызван | order_number={order_number}, stand_id={stand_id}')
@@ -256,6 +256,108 @@ class DatabaseConnection:
             self.conn.rollback()
             print(f'[SQLite] Ошибка setTable Ошибка при обновлении записи в order_details для записи ={order_number}, stand_id={stand_id} ошибка {e}')
             logger4.exception(f'[SQLite] Ошибка setTable Ошибка при обновлении записи в order_details для записи ={order_number}, stand_id={stand_id} ошибка {e}')
+            return None
+        
+    
+    def setTableByPhoto(self, order_number, stand_id, photodata):
+        """Метод блокирует запись в базе для кажой платы исходя из полученного датаматрикса с платы. Используется  в Botloader.py"""
+        serial_for_search = photodata[:-1] if photodata.endswith("B") else photodata # С камеры читаются серийники с B на конце в базе онит  без B
+        print(f"ПОИСК serial_for_search = '{serial_for_search}'")
+        logger4.info(
+        f'[SQLite] setTableByPhoto вызван | '
+        f'order_number={order_number}, stand_id={stand_id}, '
+        f'photodata={photodata}, нормализованный датаматрикс для поиска={serial_for_search}'
+    )
+
+        try:
+            self.conn.execute('BEGIN IMMEDIATE')
+
+            # Получаем ID заказа
+            self.cursor.execute('''
+                SELECT id
+                FROM orders
+                WHERE order_number = ?
+                ORDER BY id DESC
+                LIMIT 1
+            ''', (order_number,))
+            row = self.cursor.fetchone()
+
+            if not row:
+                self.conn.rollback()
+                logger4.warning(f'[SQLite] Заказ не найден | order_number={order_number}')
+                return None
+
+            order_id = row[0]
+
+            # Ищем конкретную плату по photodata в serial_number
+            self.cursor.execute('''
+                SELECT id, stand_id
+                FROM order_details
+                WHERE order_id = ?
+                AND serial_number = ?
+                LIMIT 1
+            ''', (order_id, serial_for_search))
+            row = self.cursor.fetchone()
+
+            if not row:
+                self.conn.rollback()
+                logger4.warning(
+                    f'[SQLite] Плата с номером {serial_for_search} не найдена в базе | order_id={order_id}. Проверьте что такая плата существует в заказе'
+                )
+                return None
+
+            serial_id, current_stand_id = row
+
+            logger4.info(
+            f"[SQLite] Плата найдена | id={serial_id}, "
+            f"старый stand_id={current_stand_id}, новый stand_id={stand_id}"
+            )
+
+            # # Проверяем, не занята ли уже запись
+            # if current_stand_id not in (None, 0, "0", ""):
+            #     self.conn.rollback()
+            #     logger4.warning(
+            #         f'[SQLite] Запись уже занята | id={serial_id}, current_stand_id={current_stand_id}'
+            #     )
+            #     return None
+
+            # Блокируем конкретную запись
+            # Закоментил здесь блокировку по столу 
+            # self.cursor.execute('''
+            #     UPDATE order_details
+            #     SET stand_id = ?
+            #     WHERE id = ?
+            #     AND (stand_id IS NULL OR stand_id = 0 OR stand_id = '' OR stand_id = '0')
+            # ''', (stand_id, serial_id))
+
+            # AND (stand_id IS NULL OR stand_id = 0 OR stand_id = '' OR stand_id = '0')
+            self.cursor.execute('''
+                UPDATE order_details
+                SET stand_id = ?
+                WHERE id = ?
+            ''', (stand_id, serial_id))
+
+            if self.cursor.rowcount == 0:
+                self.conn.rollback()
+                logger4.warning(
+                    f'[SQLite] Не удалось заблокировать запись | id={serial_id}, photodata={photodata}'
+                )
+                return None
+
+            self.conn.commit()
+            logger4.info(
+                f'[SQLite] Запись обновлена по photodata | '
+                f'id={serial_id}, serial_number={serial_for_search}, '
+                f'photodata={photodata}, stand_id={stand_id}'
+            )
+            return serial_id
+
+        except Exception as e:
+            self.conn.rollback()
+            logger4.exception(
+                f'[SQLite] Ошибка setTableByPhoto | '
+                f'order_number={order_number}, stand_id={stand_id}, photodata={photodata}, error={e}'
+            )
             return None
         
     
@@ -338,7 +440,7 @@ class DatabaseConnection:
         
     def check_order (self, order_number):
         # Делаем с блокировкой записи
-        logger4.info(f'[SQLite] check_order вызван | order_number={order_number}')
+        #logger4.info(f'[SQLite] check_order вызван | order_number={order_number}')
 
         try:
             self.cursor.execute('''
@@ -350,7 +452,7 @@ class DatabaseConnection:
             row = self.cursor.fetchone()
             result = bool(row)
 
-            logger4.info(f'[SQLite] check_order результат | order_number={order_number}, exists={result}')
+            #logger4.info(f'[SQLite] check_order результат | order_number={order_number}, exists={result}')
             return result
 
         except Exception:
@@ -766,3 +868,16 @@ else:
 #     report_path,
 #     error_description
 # )
+
+
+
+# db = DatabaseConnection()
+# db.db_connect()
+
+# result = db.setTableByPhoto(
+#     order_number="ЗНП-29973.1.1",
+#     stand_id="ТЕСТ",
+#     photodata="U00075196B"
+# )
+
+# print(f"RESULT = {result}")

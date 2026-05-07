@@ -495,7 +495,7 @@ class OPCClient:
         try:
             v = node.get_value()
             result = str(v) if v is not None else default
-            logger4.debug(f"[OPC] Успешно считали STR OK | nodeid={nodeid} | value={result}")
+            #logger4.debug(f"[OPC] Успешно считали STR OK | nodeid={nodeid} | value={result}")
             return result
         except Exception as e:
             print(f"[OPC] read str fail {nodeid}: {e}")
@@ -706,10 +706,10 @@ class OPCClient:
                                 shared_data['OPC-DB']['OPC_pause_RTK'] = st6
                                 shared_data['OPC-DB']['OPC_restart_RTK'] = st7
                         
-                            logger4.debug(
-                                f"[OPC] читаем флаги запуска из OPC и зеркалим в shared_data FLAGS | RTK={st4} | T1={st1} | T2={st2} | T3={st3} | "
-                                f"BRAK={st5} | PAUSE={st6} | RESTART={st7}"
-                            )
+                            # logger4.debug(
+                            #     f"[OPC] читаем флаги запуска из OPC и зеркалим в shared_data FLAGS | RTK={st4} | T1={st1} | T2={st2} | T3={st3} | "
+                            #     f"BRAK={st5} | PAUSE={st6} | RESTART={st7}"
+                            # )
 
 
                         except Exception as e:
@@ -957,6 +957,8 @@ class Table:
         # Переменные хранения состояний прошивки на ложе
         self._loge_outcome = {1: None, 2: None}  # 2=успех(норм), 3=брак
         self._loge_dm      = {1: None, 2: None}  # опционально: DM последней прошивки на ложе
+        self.photodata1 = None
+        self.next_photodata = None
     # остановка скрпита по кнопке от регула (Max)
     def pause_mode(self):
         while True:
@@ -1006,7 +1008,7 @@ class Table:
 
     # The first cycle Protect Table in the start work
 
-    def _send_robot_command(self, base_command, cell_num=None, timeout_s: int = 600):
+    def _send_robot_command(self, base_command, cell_num=None, timeout_s: int = 900):
         """
         Отправляет команду роботу с разделением 220 (укладка) / 230 (забор).
         Если в течение timeout_s (по умолчанию 300 сек = 5 минут) нет подтверждения — 
@@ -1286,7 +1288,7 @@ class Table:
 
 
         # метод прошивки
-    def start_sewing(self, photodata, loge, max_attempts=120, retry_delay=1):
+    def start_sewing(self, photodata, loge, max_attempts=3, retry_delay=1):
         global Tray1, Tray2, Tray3
         """
         Метод для инициализации процесса прошивки с обработкой ошибок
@@ -1362,13 +1364,13 @@ class Table:
 
                 ####OPC####
                 if error_description is True:
-                    self.opc_set(shared_data, f'OPC_res_load_t{self.number}', 1) # # 2-успех 1-брак
-                    self.opc_set(shared_data, f'OPC_log', f"Стол {self.number} ложе {loge} плата не прошла прошивку или тестирование") # # 2-успех 1-брак
-                     
+                    self.opc_set(shared_data, f'OPC_res_load_t{self.number}', 2)  # 2 = успех
+                    self.opc_set(shared_data, 'OPC_log',
+                                f"Стол {self.number} ложе {loge} плата прошла прошивку и тестирование успешно")
                 else:
-                    self.opc_set(shared_data, f'OPC_res_load_t{self.number}', 2) # # 2-успех 1-брак
-                    self.opc_set(shared_data, f'OPC_log', f"Стол {self.number} ложе {loge} плата прошла прошивку и тестирование успешно") # # 2-успех 1-брак
-                self.opc_set(shared_data, f'OPC_load_t{self.number}', 0) # 1-старт прошивки 0-конец прошивки
+                    self.opc_set(shared_data, f'OPC_res_load_t{self.number}', 1)  # 1 = брак
+                    self.opc_set(shared_data, 'OPC_log',
+                                f"Стол {self.number} ложе {loge} плата не прошла прошивку или тестирование")
                 
                 
                 if result == 200 and error_description is True:
@@ -1379,10 +1381,41 @@ class Table:
                     print(f"Плата на ложементе {loge} не прошла прошивку. Повторно не шьем.")
                     logging.warning(f"Стол {self.number}, ложемент {loge}: прошивка неуспешна, повтор запрещен")
                     return False
+                # Если плата не найдена в базе данных заказа
                 elif result == 404:
-                    logging.warning(f"Ошибка 404 от прошивальщика/БД (попытка {attempt})")
-                    if attempt == max_attempts:
-                        raise TableOperationFailed(f"Ошибка прошивки: получен код 404 для ложемента {loge}")
+                    print(
+                        f"\n"
+                        f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
+                        f"СТОЛ {self.number} ЛОЖЕ {loge}\n"
+                        f"ПЛАТА НЕ НАЙДЕНА В БАЗЕ\n"
+                        f"DATAMATRIX: {photodata}\n"
+                        f"ЗАКАЗ: {Order}\n"
+                        f"УВОДИМ В БРАК\n"
+                        f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                    )
+
+                    logger4.error(
+                        f"Плата {photodata} не найдена в базе заказа {Order}"
+                    )
+
+                    SQLite.insert_log(
+                        f"Плата {photodata} не найдена в базе заказа {Order}",
+                        0
+                    )
+
+                    # 3 = брак
+                    self._set_loge_outcome(loge, 3, photodata)
+
+                    # OPC
+                    self.opc_set(shared_data, f'OPC_res_load_t{self.number}', 1)
+                    self.opc_set(
+                        shared_data,
+                        'OPC_log',
+                        f"Стол {self.number} ложе {loge}: плата {photodata} не найдена в базе"
+                    )
+                    self.opc_set(shared_data, f'OPC_load_t{self.number}', 0)
+
+                    return False
 
                 else:
                     logging.warning(f"Неожиданный ответ прошивальщика: result={result}, error_description={error_description}, попытка={attempt}")
@@ -1556,7 +1589,7 @@ class Table:
 
     def setup_robo_cycle(self):
         global photodata
-        global photodata1
+        # global photodata1
         global Tray1, Tray_robot
         global Cell1,Cell2, Cell3,Cell
         global Order
@@ -1589,7 +1622,9 @@ class Table:
             time.sleep(1)
             
             # 2. Фотографируем первую плату
-            _, photodata1 = self._take_photo()
+            _, self.photodata1 = self._take_photo()
+            logger4.info(f"[MAIN][SETUP] Для стола {self.number}: первая плата DM={self.photodata1}")
+            print(f"[MAIN][SETUP] Для стола {self.number}: первая плата DM={self.photodata1}")
             
             # 3. Укладываем первую плату на ложемент 2
             print(f"3 Стол {self.number} Робот <- Уложи плату в ложемент тетситрования 2")
@@ -1611,7 +1646,7 @@ class Table:
     def robo_main_cycle(self):
         import threading, time, logging
         from dataclasses import dataclass
-        global Tray1, Cell1,Cell2, Cell3, Cell, photodata, photodata1, Tray_robot
+        global Tray1, Cell1,Cell2, Cell3, Cell, photodata, Tray_robot
 
         SEW_WAIT_TIMEOUT = 900000  # сек
         ROBOT_WAIT_TIMEOUT = 900000 # сек
@@ -1621,8 +1656,15 @@ class Table:
 
         # Стартуем: на ложе 2 уже есть плата — начнём шить с него
         current_loge = 2
-        photodata1 = '111'                     # DM для первой прошивки (если требуется)
-        next_photodata = photodata1            # DM, который будет прошиваться на current_loge
+        # Закоментировал эту строку так как сетап получит значение photodata1
+        # self.photodata1 = '111'                     # DM для первой прошивки (если требуется)
+        
+        if not self.photodata1:
+            logger4.warning(f"[MAIN] Для стола {self.number}: отсутствует первый датаматрикс пременная self.photodata1 пришла пустая из сетапа")
+            raise RuntimeError(f"СТОЛ {self.number}: нет DM первой платы после SETUP")
+        next_photodata = self.photodata1            # DM, который будет прошиваться на current_loge
+        logger4.warning(f"[MAIN] Для стола {self.number}: для ложе 1 получен датаматрикс {next_photodata}")
+        
 
         # Поток «идущей» прошивки 1-й итерации (как было)
         in_flight_sewing_thread = None
@@ -1975,10 +2017,10 @@ class Table:
 running_threads = {}
 
 def start_threads_if_needed(targets: dict, do_defence=False, do_setup=True):
-    logger4.info("[MAIN] ▶ Вызов start_threads_if_needed")
+    # logger4.info("[MAIN] ▶ Вызов start_threads_if_needed")
     with shared_data_lock:
         opc_db = shared_data.get('OPC-DB', {})
-        logger4.debug(f"[MAIN] получили из глобалльного словаря команды на запуск столов: {opc_db}")
+        #logger4.debug(f"[MAIN] получили из глобалльного словаря команды на запуск столов: {opc_db}")
         if not opc_db.get('OPC_START_RTK', False):
             logger4.warning("[MAIN] запуск потоков отменён")
             return
@@ -2009,20 +2051,23 @@ def start_threads_if_needed(targets: dict, do_defence=False, do_setup=True):
 
 
 def run_table_pipeline(table: Table, do_defence=True, do_setup=True):
-    logger4.info(f"[MAIN] Запуск run_table_pipeline")
+    logger4.info(f"[MAIN] Запуск run_table_pipeline table={table.number}")
     try:
         if do_defence:
             table.defence_robo_cycle()
+
         if do_setup:
-            logger4.info(f"[MAIN] Запуск цикла SETUP для столов {table.number}")
+            logger4.info(f"[MAIN] Запуск цикла SETUP для стола {table.number}")
             table.setup_robo_cycle()
-            logger4.info(f"[MAIN] Цикл SETUP завершен для столов {table.number}")
+            logger4.info(f"[MAIN] Цикл SETUP завершен для стола {table.number}")
+
+        logger4.info(f"[MAIN] START robo_main_cycle() table={table.number}")
+        table.robo_main_cycle()
+
     except Exception:
-        logging.exception(f"[MAIN] run_table_pipeline завершился неудачно {table.number}")
-        # по ситуации можно вызвать trigger_emergency(...)
-    # после подготовки уходим в основной бесконечный цикл
-    logger4.info(f"[MAIN] START основного цикла для столов robo_main_cycle() (table {table.number}")
-    table.robo_main_cycle()
+        logger4.exception(f"[MAIN] run_table_pipeline завершился неудачно table={table.number}")
+        trigger_emergency(f"Ошибка запуска/работы стола {table.number}")
+        return
 
     
 

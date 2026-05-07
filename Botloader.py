@@ -59,7 +59,12 @@ class FirmwareLoader:
             logger4.info(
                 f"[Botloader] Поиск свободного заказа | Order={self.Order}, stand_id={self.stand_id}"
             )
-            record_id = self.db_connection.setTable(self.Order, self.stand_id)
+            
+            record_id = self.db_connection.setTableByPhoto(
+                self.Order,
+                self.stand_id,
+                photodata
+            )
             logger4.info(f"[Botloader] БД вернула свободный заказ record_id={record_id}")
             print(f"[Botloader] БД вернула свободный заказ record_id={record_id}")
             if record_id is None:
@@ -193,16 +198,26 @@ class FirmwareLoader:
                 report_path = resultTest.get("report_path")
                 serial_number_8 = resultTest.get("serial_number_8")
                 error_description = resultTest.get("error_description") or "Ошибка прошивки"
+                data_matrix = resultTest.get("data_matrix") or self.photodata
+                stand_id = resultTest.get("stand_id")
 
                 logger4.info(
                     f"[Botloader] Запись брака в БД | "
-                    f"record_id={record_id}, stand_id={self.stand_id}, "
-                    f"serial_8={serial_number_8}, log_path={log_path}, "
-                    f"report_path={report_path}, error_description={error_description}"
+                    f"record_id={record_id}, stand_id={stand_id}, "
+                    f"serial_8={serial_number_8}, data_matrix={data_matrix}, "
+                    f"log_path={log_path}, report_path={report_path}, "
+                    f"error_description={error_description}"
                 )
 
                 self.db_connection.set_BoardTest_Result(
-                    record_id, self.stand_id, None, None, "404", log_path, report_path, error_description
+                    record_id,
+                    stand_id,
+                    serial_number_8,
+                    data_matrix,
+                    "404",
+                    log_path,
+                    report_path,
+                    error_description
                 )
                 logger4.info(f"[Botloader] Брак записан в БД | record_id={record_id}")
                 print(f"[Botloader] Брак записан в БД | record_id={record_id}")
@@ -346,41 +361,75 @@ print (f"***************{res}")
 """
 
 
-# Тест отправки данных на прошивку
+# #Тест отправки данных на прошивку
 # igle_table3 = Igable.IgleTable(
 #         urlIgleTabeControl=f"http://192.168.1.100:5000/nails_table/start_test_board_with_rtk",
 #         urlStatusFromIgleTabe=f"http://192.168.1.100:5003/get_test_results/1")
 
 # db_connection = SQL.DatabaseConnection()
-# Order = "ЗНП-241.1.1"
-# photodata = "45654465"
+# Order = "ЗНП-29973.1.1"
+# photodata = "U00075415B"
 # stand_id = "table_3"
-# loge = 1
+# loge = 2
 # firmware_loader = FirmwareLoader(db_connection,igle_table3,stand_id, Order, photodata, loge)
 # res = firmware_loader.loader(photodata, loge)
 # print (f"***************{res}")
 
-####################################################
-# Тестирование лога 1С
+# ####################################################
+# # Тестирование лога 1С
 # firmware_loader = FirmwareLoader(
 #         db_connection=None,
 #         igle_table=None,
 #         stand_id="table_3",
-#         Order="ЗНП-37025.1.1",
-#         photodata="45654465",
+#         Order="ЗНП-29973.1.1",
+#         photodata="U00075415B",
 #         loge=1
 #     )
 
 # data = {
 #         "order_name": "ЗНП-37025.1.1",
-#         "fw_version": "1.0.0"
+#         "fw_version": "1.0.36.0"
 #     }
 
 # resultTest = {
 #         "status_code": "OK",
-#         "serial_number_8": "Z01745814T",
+#         "serial_number_8": "U00075415B",
 #         "error_description": 1
 #     }
 
 # res = firmware_loader.send_log_to_1c_safe(data, resultTest)
 # print("Результат вызова:", res)
+
+# now = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+
+# payload = {
+#     "rtk_id": "RTK_R050_BoardsIO_1",
+#     "order": "ЗНП-29973.1.1",
+#     "version": "R050_DI_16_012_000_AAA",
+#     "message_type": "firmware_log",
+
+#     "good": [
+#         {
+#             "board": {
+#                 "number": "U00075415B",
+#                 "tray_number": "123455"
+#             },
+
+#             "operator": "I.Perekalskii",
+
+#             "timestamps": {
+#                 "dm_code_time": now,
+#                 "firmware_finished_time": now,
+#                 "board_output_time": now
+#             },
+
+#             "error": 0
+#         }
+#     ],
+
+#     "bad": []
+# }
+
+# response = SentLog1C.send_success_log(payload)
+
+# print(response)

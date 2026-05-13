@@ -47,7 +47,7 @@ class FirmwareLoader:
         self.photodata = photodata
         self.loge = loge
 
-    def loader(self, photodata, loge):
+    def loader(self, photodata, loge, user):
         logger4.info(f"[Botloader] Вызов функции loader Команда на прошивку праметры  photodata = {photodata}, loge={loge}")
         print(f"[Botloader] Вызов функции loader Команда на прошивку праметры  photodata = {photodata}, loge={loge}")
         
@@ -135,7 +135,7 @@ class FirmwareLoader:
                 logger4.info(
                     f"[Botloader] Ответ от Иглостола | record_id={record_id}, test_result={loadresult}"
                 )
-                self.send_log_to_1c_safe(data, resultTest)
+                self.send_log_to_1c_safe(data, resultTest, user)
                 logger4.info(f"[Botloader] Лог в 1С отправлен/обработан | record_id={record_id}")
                 break
 
@@ -148,6 +148,10 @@ class FirmwareLoader:
 
         # Обработка данных и запись результатов в БД
         if resultTest.get("test_result") == True:
+
+            # user = 'i.perekalskii' # Убери это заглушка
+
+
             # Извлекаем необходимые данные
             data_matrix = resultTest.get("data_matrix")
             log_path = resultTest.get("log_path")
@@ -164,7 +168,7 @@ class FirmwareLoader:
                     f"test_result={test_result}, log_path={log_path}, report_path={report_path}"
                 )
                 # Записываем результаты прошивки в БД
-                self.db_connection.set_BoardTest_Result(record_id, stand_id, serial_number_8, data_matrix, test_result, log_path, report_path, error_description)
+                self.db_connection.set_BoardTest_Result(record_id, stand_id, serial_number_8, data_matrix, test_result, log_path, report_path, error_description, user)
                 logger4.info(f"[Botloader] Результаты прошивки записаны в БД | record_id={record_id}")
                 print(f"[Botloader] Результаты прошивки успешно записаны в БД для заказа {record_id}")
                 
@@ -217,7 +221,8 @@ class FirmwareLoader:
                     "404",
                     log_path,
                     report_path,
-                    error_description
+                    error_description,
+                    user
                 )
                 logger4.info(f"[Botloader] Брак записан в БД | record_id={record_id}")
                 print(f"[Botloader] Брак записан в БД | record_id={record_id}")
@@ -230,7 +235,7 @@ class FirmwareLoader:
             return 500, False
         
 
-    def send_log_to_1c_safe(self, data, resultTest):
+    def send_log_to_1c_safe(self, data, resultTest, user):
         """Отправка лога в 1С. Логи разные взависмоисти от успеха не успеха прошивки. Фомируеются 2 словаря"""
         try:
             logger4.info("[Botloader][1С] Начало отправки лога в 1С send_log_to_1c_safe")
@@ -251,7 +256,7 @@ class FirmwareLoader:
                     "number": serial_number,
                     "tray_number": "123455"
                 },
-                "operator": "I.Perekalskii",
+                "operator": user,
                 "timestamps": {
                     "dm_code_time": now,
                     "firmware_finished_time": now,

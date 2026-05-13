@@ -417,7 +417,8 @@ class DatabaseConnection:
                             D.test_result
                         FROM orders AS O
                         JOIN order_details AS D ON O.id = D.order_id
-                        WHERE D.test_result <> 200 OR D.test_result IS NULL AND O.order_number = ?
+                        WHERE O.order_number = ?
+                            AND (D.test_result <> 200 OR D.test_result IS NULL)
                         ORDER BY id DESC
                         LIMIT 1
                         FOR UPDATE SKIP LOCKED
@@ -461,9 +462,17 @@ class DatabaseConnection:
 
     
 
-    def set_BoardTest_Result(self, record_id, stand_id, serial_number_8, data_matrix, test_result, log_path, report_path, error_description):
+    def set_BoardTest_Result(self, record_id, stand_id, serial_number_8, data_matrix, test_result, log_path, report_path, error_description, user):
         """ Установка результатов тестирования вызывается от Сервер РТК """
-        logging.info(f"[RTK] Вызов метода set_BoardTest_Result для записи ID: {record_id}")
+        logger4.info(
+            f'[SQLite] set_BoardTest_Result вызван | '
+            f'record_id={record_id}, '
+            f'stand_id={stand_id}, '
+            f'serial_number_8={serial_number_8}, '
+            f'data_matrix={data_matrix}, '
+            f'user={user}, '
+            f'test_result={test_result}'
+        )
         print(f"[RTK] Установка результатов тестирования для записи ID: {record_id}")
         
         try:
@@ -479,15 +488,22 @@ class DatabaseConnection:
                 log_path = ?,
                 report_path = ?,
                 error_description = ?,
-                date_sent = ?
+                date_sent = ?,
+                user = ?
             WHERE id = ?
             """
 
-            # Отладка
-            logging.debug(f"SQL: {update_query.strip()}")
-            logging.debug(f"SQL values: ({stand_id}, {serial_number_8}, {data_matrix}, {test_result}, {log_path}, {report_path}, {error_description}, {date_sent}, {record_id})")
+            logger4.info(
+                f'[SQLite] Выполнение UPDATE order_details | '
+                f'record_id={record_id}'
+            )
 
-            print(f"[DB] Выполнение запроса с параметрами: ({stand_id}, {serial_number_8}, {data_matrix}, {test_result}, {log_path}, {report_path}, {error_description}, {date_sent}, {record_id})")
+            print(
+                f"[DB] Выполнение запроса с параметрами: "
+                f"({stand_id}, {serial_number_8}, {data_matrix}, "
+                f"{test_result}, {log_path}, {report_path}, "
+                f"{error_description}, {date_sent}, {user}, {record_id})"
+            )
 
             # Выполнение
             self.cursor.execute(update_query, (
@@ -499,20 +515,27 @@ class DatabaseConnection:
                 report_path,
                 error_description,
                 date_sent,
+                user,
                 record_id
             ))
             self.conn.commit()
 
             print("[DB] Данные успешно сохранены:")
-            print(f"   - date_sent: {date_sent}")
 
-            logging.info("Данные успешно сохранены в базу")
-            logging.info(f"   - date_sent: {date_sent}")
-
+            logger4.info(
+                f'[SQLite] set_BoardTest_Result успешно завершен | '
+                f'record_id={record_id}, '
+                f'test_result={test_result}, '
+                f'user={user}, '
+                f'date_sent={date_sent}'
+            )
+           
         except Exception as e:
-            error_msg = f"[DB] Ошибка при сохранении в базу: {e}"
-            print(error_msg)
-            logging.error(error_msg)
+            logger4.exception(
+                f'[SQLite] Ошибка set_BoardTest_Result | '
+                f'record_id={record_id}, '
+                f'error={e}'
+            )
             raise
 
         
@@ -522,6 +545,7 @@ class DatabaseConnection:
 
     def get_order_insert_orders_frm1C(self, dictResult):
         """ Запрос информации по заказам и вставка данных в таблицы Orders и order_details """
+        logger4.info('[SQLite] get_order_insert_orders_frm1C вызван')
         
         order_id = dictResult.get('order_id')
         components = dictResult.get('components', {})
@@ -533,25 +557,30 @@ class DatabaseConnection:
         version = products.get('version', None)
         marking_templates = products.get('marking_templates', [])
 
-        logging.info("Метод get_order_insert_orders_frm1C вызван.")
-        logging.info(f"Входные данные - order_id: '{order_id}', board_name: '{board_name}', firmware: '{firmware}' count {count} version {version} components {components}")
-
-
-        # ЖДЕМ 1С
-        # Валидация входных данных
-        # if not order_id or not board_name or not firmware:
-        #     logging.warning("Отсутствуют обязательные данные: order_id, board_name или firmware.")
-        #     print("Ошибка: Отсутствуют обязательные данные.")
-        #     return 
+        logger4.info(
+            f'[SQLite] get_order_insert_orders_frm1C входные данные | '
+            f'order_id={order_id}, '
+            f'board_name={board_name}, '
+            f'firmware={firmware}, '
+            f'count={count}, '
+            f'version={version}, '
+            f'batch_count={len(batch) if isinstance(batch, list) else "invalid"}, '
+            f'components={components}'
+        )
 
         if not isinstance(batch, list) or not batch:
-            logging.warning("Некорректные или пустые данные batch.")
-            print("Ошибка: Некорректные или пустые данные batch.")
+            logger4.warning(
+                f'[SQLite] get_order_insert_orders_frm1C некорректный batch | '
+                f'order_id={order_id}, batch_type={type(batch)}, batch={batch}'
+            )
             return
 
         try:
             # Шаг 1: Вставка данных заказа в таблицу Orders
-            logging.info("Вставка данных заказа в таблицу Orders.")
+            logger4.info(
+                f'[SQLite] Вставка заказа в Orders | '
+                f'order_id={order_id}, module={board_name}'
+            )
             self.cursor.execute('''
                 INSERT INTO Orders (order_number, module, Nomenclature, Value, VersionLoadFile, fw_version, marking_templates)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -561,8 +590,16 @@ class DatabaseConnection:
             # Получение ID вставленного заказа
             self.cursor.execute('SELECT last_insert_rowid()')
             inserted_order_id = self.cursor.fetchone()[0]
-            logging.info(f"Заказ вставлен с ID: {inserted_order_id}")
+            
+            logger4.info(
+                f'[SQLite] Заказ успешно вставлен в Orders | '
+                f'order_id={order_id}, inserted_order_id={inserted_order_id}'
+            )
 
+            logger4.info(
+                f'[SQLite] Начало вставки плат в order_details | '
+                f'inserted_order_id={inserted_order_id}'
+            )
 
             for item in batch:
                 serial = item["number"]
@@ -574,18 +611,27 @@ class DatabaseConnection:
                 ''', (inserted_order_id, serial, serial_8, serial_15))
                 self.conn.commit()
 
-            logging.info("Заказ и его детали успешно вставлены.")
+            logger4.info(
+                f'[SQLite] get_order_insert_orders_frm1C успешно завершен | '
+                f'order_id={order_id}, '
+                f'inserted_order_id={inserted_order_id}'
+            )
             print("Заказ и его детали успешно вставлены.")
 
         except sqlite3.Error as e:
-            logging.error(f"Ошибка SQLite при вставке данных: {e}")
-            print(f"Ошибка SQLite: {e}")
+            logger4.exception(
+                f'[SQLite] Ошибка SQLite get_order_insert_orders_frm1C | '
+                f'order_id={order_id}, error={e}'
+            )
+            print(f"[SQLite] Ошибка вставки заказа или его данных в базу данных SQLite: {e}")
             self.conn.rollback()
 
     
     def recievedata(self, id):
         """Запрос данных для прошивки по ID"""
-        logging.info("Вызван метод recievedata: запрос данных для прошивки из базы данных")
+        logger4.info(
+            f'[SQLite] recievedata вызван | record_id={id}'
+        )
         query = """
             SELECT 
                 S.id,
@@ -607,20 +653,32 @@ class DatabaseConnection:
 
         try:
             cur = self.conn.cursor()
+            logger4.info(
+                f'[SQLite] Выполнение SELECT recievedata | record_id={id}'
+            )
             logging.debug("Выполняется SQL-запрос получения данных для ID: %s", id)
             cur.execute(query, (id,))
             result = cur.fetchone()
 
             if result is None:
-                logging.warning("Данные по ID %s не найдены", id)
+                logger4.warning(
+                    f'[SQLite] recievedata данные не найдены  по ID record_id={id}'
+                )
                 return None
 
             (order_id, stand_id, module_type, data_matrix, serial_number_8, serial_number_9, serial_number_15,
             fw_type, fw_path, order_name, fw_version) = result
 
-            logging.info("Данные успешно получены для ID: %s", id)
-            logging.debug("Результаты: stand_id=%s, module_type=%s, fw_path=%s",
-                        stand_id, module_type, fw_path)
+            logger4.info(
+                f'[SQLite] Данные успешно получены recievedata запись найдена | '
+                f'record_id={id}, '
+                f'order_id={order_id}, '
+                f'stand_id={stand_id}, '
+                f'module_type={module_type}, '
+                f'order_name={order_name}, '
+                f'fw_version={fw_version}'
+            )
+
 
             return {
                 'id': order_id,
@@ -637,12 +695,14 @@ class DatabaseConnection:
             }
 
         except sqlite3.Error as e:
-            logging.error("SQLite ошибка в recievedata: %s", str(e))
+            logger4.exception(
+                f'[SQLite] SQLite ошибка recievedata | '
+                f'record_id={id}, error={e}'
+            )
             return None
         
     # Получение данных из базы для интерфейса ОПС
     def getDatafromOOPC(self, order_number):
-        # logging.info("OPC Метод получения данных для ОПС запущен")
         try:
             self.cursor.execute('''
                 SELECT 
@@ -657,10 +717,16 @@ class DatabaseConnection:
                 order_id = row[0]
                 # logging.info(f"OPC Данные по заказу '{order_number}' получены успешно.")
             else:
-                logging.warning(f"OPC Заказ с номером '{order_number}' не найден в базе данных.")
-
+                logger4.warning(
+                    f'[SQLite] Заказ для OPC интерфейса не найден | '
+                    f'order_number={order_number}'
+                )
+                return None
         except Exception as e:
-            logging.error(f"OPC Ошибка при получении данных по заказу '{order_number}': {e}", exc_info=True)
+            logger4.exception(
+                f'[SQLite] Ошибка поиска заказа getDatafromOOPC | '
+                f'order_number={order_number}, error={e}'
+            )
             return None
 
         try:
@@ -669,10 +735,22 @@ class DatabaseConnection:
                     O.order_number,
                     O.module,
                     O.fw_version, 
-                    COUNT(*) FILTER (WHERE D.stand_id IS NULL) AS Lastcount,
+
+                    COUNT(*) FILTER (
+                        WHERE D.stand_id IS NULL
+                    ) AS Lastcount,
+
                     COUNT(D.id) AS CommonCount,
-                    COUNT(*) FILTER (WHERE D.report_path IS NOT NULL) AS Sucesscount,
-                    COUNT(*) FILTER (WHERE D.log_path IS NOT NULL) AS NonSucesscount
+
+                    COUNT(*) FILTER (
+                        WHERE D.test_result = 1
+                    ) AS Sucesscount,
+
+                    COUNT(*) FILTER (
+                        WHERE D.test_result IS NOT NULL
+                        AND D.test_result <> 1
+                    ) AS NonSucesscount
+
                 FROM orders AS O
                 JOIN order_details AS D ON O.id = D.order_id
                 WHERE D.order_id = ?
@@ -694,11 +772,17 @@ class DatabaseConnection:
                 # logging.info(f"OPC Данные по заказу '{order_number}' получены успешно.")
                 return order_number, module, fw_version, last_count, common_count, success_count, nonsuccess_count
             else:
-                logging.warning(f"OPC Заказ с номером '{order_number}' не найден в базе данных.")
+                logger4.warning(
+                    f'[SQLite] Статистика заказа не найдена не могу прокинуть данные на OPC ипнтерфейс | '
+                    f'order_id={order_id}'
+                )
                 return None
 
         except Exception as e:
-            logging.error(f"OPC Ошибка при получении данных по заказу '{order_number}': {e}", exc_info=True)
+            logger4.exception(
+                f'[SQLite] Ошибка получения статистики getDatafromOOPC | '
+                f'order_id={order_id}, error={e}'
+            )
             return None
         
     # Функция роверки платы в 1с
@@ -805,8 +889,9 @@ print(res)
 
 """
 # Проверка функции OPC
+# Проверка функции OPC
 db_connection = DatabaseConnection()
-result = db_connection.getDatafromOOPC('ЗНП-2160.1.1')
+result = db_connection.getDatafromOOPC('ЗНП-29961.1.1')
 
 if result:
     order_number, module, fw_version, last_count, common_count, success_count, nonsuccess_count = result
@@ -816,8 +901,8 @@ if result:
     print(f"Версия ПО: {fw_version}")
     print(f"Количество оставшихся: {last_count}")
     print(f"Общее количество записей: {common_count}")
-    print(f"С успешным report_path: {success_count}")
-    print(f"С успешным log_path: {nonsuccess_count}")
+    print(f"Успешно прошитые: {success_count}")
+    print(f"Неуспешно прошитые: {nonsuccess_count}")
 else:
     print("Данные по заказу не найдены или произошла ошибка.")
 """
@@ -856,18 +941,21 @@ else:
 # report_path = "C:/reports/report.pdf"
 # error_description = ""
 
-# # Вызов метода
 # db = DatabaseConnection()
+
 # db.set_BoardTest_Result(
-#     record_id,
-#     stand_id,
-#     serial_number_8,
-#     data_matrix,
-#     test_result,
-#     log_path,
-#     report_path,
-#     error_description
+#     record_id=9267,
+#     stand_id="TEST_STAND",
+#     serial_number_8="TEST9254",
+#     data_matrix="DM_TEST_9254",
+#     test_result=1,
+#     log_path="C:/RTK/logs/test9254.log",
+#     report_path="C:/RTK/reports/test9254.pdf",
+#     error_description="",
+#     user="OPC_USER_TEST"
 # )
+
+# print("Тест записи 9267 завершен")
 
 
 

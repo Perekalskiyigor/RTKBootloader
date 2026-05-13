@@ -324,16 +324,23 @@ igle_table3 = Igable.IgleTable(
 ################################################# START SQL Communication class ###################################
 # Класс для синхронизации с базой данных и обновления глобального словаря
 class DatabaseSynchronizer:
-    def __init__(self, number, shared_dict) :
-        self.stop_event = threading.Event()  # Событие для остановки потока
+    def __init__(self, number, shared_dict):
+        self.number = number
+        self.shared_dict = shared_dict
+        self.stop_event = threading.Event()
+        self.lock = threading.Lock()
+        self.current_order = None
+
+        with shared_data_lock:
+            self.shared_dict.setdefault('OPC-DB', {})
+            self.my_data = self.shared_dict['OPC-DB']
+
+        logger4.info(
+            f"[MAIN][DBSync] Вызван класс работы с SQL | number={number}"
+        )
+
         self.update_thread = threading.Thread(target=self.update_data, daemon=True)
         self.update_thread.start()
-        self.lock = threading.Lock()
-        self.number = number
-        self.current_order = None 
-        self.my_data = shared_dict.get('OPC-DB', {})  # Только своя часть словаря
-        logger4.info(f"[MAIN][DBSync] Вызван класс работы с SQL  SQL Communication class с параметрами номер стола number = {number}") 
-        self.lock = threading.Lock()
 
     def update_data(self):
         """Метод для обновления данных в глобальном словаре с базы данных"""
@@ -352,9 +359,9 @@ class DatabaseSynchronizer:
                 
                     # Попытка получения данных по заказу из базы данных
                     db_connection = SQL.DatabaseConnection()
-                    logger4.debug(f"[MAIN] Делаем запрос к базе данных на получение заказа {self.order}")
-                    result = db_connection.getDatafromOOPC(self.order)
-                    print(f"[MAIN][DBSync] Из базы полчены даные на заказ {self.order} данные о заказу {result}")
+                    logger4.debug(f"[MAIN] Делаем запрос к базе данных на получение заказа {self.current_order}")
+                    result = db_connection.getDatafromOOPC(self.current_order)
+                    print(f"[MAIN][DBSync] Из базы полчены даные на заказ {self.current_order} данные о заказу {result}")
                 
                     if result:
                         order_number, module, fw_version, last_count, common_count, success_count, nonsuccess_count = result
@@ -368,7 +375,7 @@ class DatabaseSynchronizer:
                         # print(f"С успешным log_path: {nonsuccess_count}")
 
                         # Обновление глобального словаря с данными из базы
-                        logger4.info(f"[MAIN][DBSync] Обновление глобального словаря отправка данных с SQL Communication class для заказа {self.order}")
+                        logger4.info(f"[MAIN][DBSync] Обновление глобального словаря отправка данных с SQL Communication class для заказа {self.current_order}")
                         logger4.info(
                             f"[MAIN][DBSync] заказ{self.number}"
                             f"order={order_number} | module={module} | fw={fw_version} | "
@@ -384,8 +391,8 @@ class DatabaseSynchronizer:
                                 self.my_data["DB_success_count"] = success_count        # прошито ок
                                 self.my_data["DB_nonsuccess_count"] = last_count  # не прошито
                     else:
-                        print(f"[MAIN][DBSync] Данные по заказу не найдены. Проверьте БД")
-                        logger4.warning(f"[MAIN][DBSYNC-{self.number}] Не возможно получить данные для заказа={self.order} при запросе к бд данные не найдены. Проверьте бд")
+                        print(f"[MAIN][DBSync] Данные для заказа={self.current_order} не найдены. Проверьте БД")
+                        logger4.warning(f"[MAIN][DBSYNC-{self.number}] Не возможно получить данные для заказа={self.current_order} при запросе к бд данные не найдены. Проверьте бд")
 
             except Exception as e:
                 logging.error(f"Ошибка при синхронизации с базой данных: {e}")
@@ -651,8 +658,7 @@ class OPCClient:
                         self._write(FW_VERSION, opcdb.get('OPC_firmware', 'пусто'), ua.VariantType.String)
 
                         # Кол-во непрошитых (берём OPC_cnt_newBoard, иначе DB_last_count как запасной источник)
-                        cnt_new = opcdb.get('DB_nonsuccess_count', "")
-                        cnt_new = cnt_new
+                        cnt_new = opcdb.get('DB_nonsuccess_count', 0)
                         self._write(CNT_NEW_BOARD, cnt_new, ua.VariantType.Int16)  # при необходимости замените тип
 
                         # Список заказов (строка/массив строк)
@@ -966,6 +972,23 @@ class Table:
             with shared_data_lock:
                 if shared_data['OPC-DB']["OPC_ButtonLoadOrders"] == False:
                     break
+
+    # Внутренний метод для счетчика ячеек тары с новыми платами.
+    # При достижении 60 сбрасывает Cell1 на 1.
+    def _next_cell1(self) -> int:
+        global Cell1, Cell
+
+        with shared_data_lock:
+            Cell1 += 1
+
+            if Cell1 > 60:
+                logger4.info(f"[CELL1] Достигнут лимит 60, сбрасываем Cell1 на 1")
+                print(f"[MAIN][CELL1] Достигнут лимит 60, сбрасываем Cell1 на 1")
+                Cell1 = 1
+
+            Cell = Cell1
+            return Cell1
+    
     # Утилиты для записи/чтения результатов прошивки на ложе
     def _set_loge_outcome(self, loge: int, tray_code: int, dm: str | None = None):
         # tray_code: 2 = норм, 3 = брак (как у вас)
@@ -1188,12 +1211,15 @@ class Table:
             # 1) взять новую плату из тары
             Tray_robot = 1
             with shared_data_lock:
-                if shared_data['OPC-DB']['OPC_res_brak'] == False:
-                    Cell1 += 1
-                    Cell = Cell1
-                else:
+                opc_res_brak = shared_data['OPC-DB']['OPC_res_brak']
+
+            if opc_res_brak == False:
+                self._next_cell1()
+            else:
+                with shared_data_lock:
                     Cell1 = 0
                     Cell = Cell1
+            
             time.sleep(1)  # дать Modbus прочитать
 
             if not self._send_robot_command(210):
@@ -1343,7 +1369,8 @@ class Table:
         while attempt < max_attempts:
             attempt += 1
             try:
-                result, error_description = firmware_loader.loader(photodata, loge)
+                user = 'i.perekalskii'
+                result, error_description = firmware_loader.loader(photodata, loge, user)
                 SQLite.insert_log(f"Завершена прошивка платы {photodata} на {loge} с результатом {error_description}", 0)
                 
                 # Если прошивка не успешная - в отбраковку, иначе в нормальный лоток
@@ -1366,11 +1393,11 @@ class Table:
                 if error_description is True:
                     self.opc_set(shared_data, f'OPC_res_load_t{self.number}', 2)  # 2 = успех
                     self.opc_set(shared_data, 'OPC_log',
-                                f"Стол {self.number} ложе {loge} плата прошла прошивку и тестирование успешно")
+                                f"Стол {self.number} ложе {loge} плата не прошла прошивку и тестирование успешно")
                 else:
                     self.opc_set(shared_data, f'OPC_res_load_t{self.number}', 1)  # 1 = брак
                     self.opc_set(shared_data, 'OPC_log',
-                                f"Стол {self.number} ложе {loge} плата не прошла прошивку или тестирование")
+                                f"Стол {self.number} ложе {loge} плата прошла прошивку или тестирование")
                 
                 
                 if result == 200 and error_description is True:
@@ -1614,8 +1641,7 @@ class Table:
             print(f"1 Стол {self.number} Робот <- Забери плату из тары")
             logging.info(f"Стол {self.number} Робот <- Забери плату из тары")
             Tray_robot = 1          # Ящик с новыми платами
-            Cell1 += 1              # <-- счётчик тары новых
-            Cell = Cell1            # <-- отдаём ячейку в Modbus
+            self._next_cell1() # Метод увеличивает значение ячеек в таре на 1 при достижении 60 сбрасывает
             time.sleep(1)           # чтобы Modbus успел прочитать
             if not self._send_robot_command(210):
                 raise TableOperationFailed("Ошибка забора первой платы из тары")
@@ -2149,6 +2175,10 @@ if __name__ == "__main__":
             logger4.info(f'[MAIN]Штрих кода тары успешно получен {barcode}')
             print (f"[MAIN]Штрих кода тары успешно получен {barcode}")
             break
+
+    # Блок обнуления ячейки при джостижении 60 плат
+    if Cell1 >= 60:
+        Cell1 = 1
     
     # Блок подготовки столов
     while True:

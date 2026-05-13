@@ -68,12 +68,12 @@ def photo():
     
 
 
-res,data = photo()
-print (f"Result={res}  Data = {data}")
+# res,data = photo()
+# print (f"Result={res}  Data = {data}")
 
 
 
-# for i in range(3):
+# for i in range(100):
 #     try:
 #         logging.debug(f"Попытка {i}: запрос фото с камеры")
 #         res,photodata = photo()

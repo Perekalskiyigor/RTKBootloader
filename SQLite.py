@@ -4,6 +4,7 @@ import sqlite3
 import logging
 from datetime import datetime
 import logging
+import time
 
 logger4 = logging.getLogger('LoggerMAIN')
 logger4.info('[SQLite] Запущен модуль провайдера')
@@ -260,13 +261,19 @@ class DatabaseConnection:
         
     
     def setTableByPhoto(self, order_number, stand_id, photodata):
-        """Метод блокирует запись в базе для кажой платы исходя из полученного датаматрикса с платы. Используется  в Botloader.py"""
-        serial_for_search = photodata[:-1] if photodata.endswith("B") else photodata # С камеры читаются серийники с B на конце в базе онит  без B
-        print(f"ПОИСК serial_for_search = '{serial_for_search}'")
+        """Метод блокирует запись в базе для кажой платы исходя из полученного датаматрикса с платы. Используется  в Botloader.py
+        найти плату по DataMatrix → заблокировать запись → вернуть record_id → поставить статус reserved.
+        """
+        dm = photodata.strip()
+        # если камера читает U00075414B, а в базе U00075414
+        if dm.endswith("B"):
+            dm = dm[:-1] # С камеры читаются серийники с B на конце в базе онит  без B
+        # serial_for_search = photodata[:-1] if photodata.endswith("B") else photodata # С камеры читаются серийники с B на конце в базе онит  без B
+        print(f"ПОИСК serial_for_search = '{dm}'")
         logger4.info(
         f'[SQLite] setTableByPhoto вызван | '
         f'order_number={order_number}, stand_id={stand_id}, '
-        f'photodata={photodata}, нормализованный датаматрикс для поиска={serial_for_search}'
+        f'photodata={photodata}, нормализованный датаматрикс для поиска={dm}'
     )
 
         try:
@@ -295,14 +302,18 @@ class DatabaseConnection:
                 FROM order_details
                 WHERE order_id = ?
                 AND serial_number = ?
+                AND (
+                        status IS NULL
+                        OR status = 'new'
+                    )
                 LIMIT 1
-            ''', (order_id, serial_for_search))
+            ''', (order_id, dm))
             row = self.cursor.fetchone()
 
             if not row:
                 self.conn.rollback()
                 logger4.warning(
-                    f'[SQLite] Плата с номером {serial_for_search} не найдена в базе | order_id={order_id}. Проверьте что такая плата существует в заказе'
+                    f'[SQLite] Плата с номером {dm} не найдена в базе | order_id={order_id}. Проверьте что такая плата существует в заказе'
                 )
                 return None
 
@@ -332,10 +343,22 @@ class DatabaseConnection:
 
             # AND (stand_id IS NULL OR stand_id = 0 OR stand_id = '' OR stand_id = '0')
             self.cursor.execute('''
-                UPDATE order_details
-                SET stand_id = ?
+            UPDATE order_details
+                SET
+                    stand_id = ?,
+                    data_matrix = ?,
+                    status = 'reserved',
+                    reserved_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-            ''', (stand_id, serial_id))
+                AND (
+                        status IS NULL
+                        OR status = 'new'
+                    )
+            ''', (
+                stand_id,
+                dm,
+                serial_id
+            ))
 
             if self.cursor.rowcount == 0:
                 self.conn.rollback()
@@ -346,9 +369,11 @@ class DatabaseConnection:
 
             self.conn.commit()
             logger4.info(
-                f'[SQLite] Запись обновлена по photodata | '
-                f'id={serial_id}, serial_number={serial_for_search}, '
-                f'photodata={photodata}, stand_id={stand_id}'
+                f'[SQLite] Запись зарезервирована | '
+                f'id={serial_id}, '
+                f'status=reserved, '
+                f'serial_number={dm}, '
+                f'stand_id={stand_id}'
             )
             return serial_id
 
@@ -359,8 +384,173 @@ class DatabaseConnection:
                 f'order_number={order_number}, stand_id={stand_id}, photodata={photodata}, error={e}'
             )
             return None
+    
+    def mark_firmware_sent(self, record_id):
+        """
+        Переводит запись из reserved в sent после успешной отправки команды на иглостол.
+        """
+
+        try:
+            self.cursor.execute('''
+                UPDATE order_details
+                SET
+                    status = 'sent',
+                    started_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                AND status = 'reserved'
+            ''', (record_id,))
+
+            if self.cursor.rowcount == 0:
+                self.conn.rollback()
+                logger4.warning(
+                    f'[SQLite] mark_firmware_sent: запись не обновлена | '
+                    f'id={record_id}'
+                )
+                return False
+
+            self.conn.commit()
+
+            logger4.info(
+                f'[SQLite] mark_firmware_sent: запись переведена в sent | '
+                f'id={record_id}'
+            )
+            return True
+
+        except Exception as e:
+            self.conn.rollback()
+            logger4.exception(
+                f'[SQLite] mark_firmware_sent: ошибка | '
+                f'id={record_id}, error={e}'
+            )
+            return False
         
     
+    def wait_firmware_result(self, record_id, timeout=300, poll_sec=2):
+        """
+        Ждет результат прошивки в БД.
+
+        Сервер РТК должен записать:
+            status = 'done' или 'failed'
+            test_result = 1 или 404
+
+        Если timeout — метод сам переводит запись в failed
+        и возвращает resultTest с test_result=404.
+        """
+
+        import time
+
+        start_time = time.time()
+
+        while True:
+            try:
+                self.cursor.execute('''
+                    SELECT
+                        id,
+                        stand_id,
+                        serial_number_8,
+                        data_matrix,
+                        test_result,
+                        log_path,
+                        report_path,
+                        error_description,
+                        status,
+                        finished_at
+                    FROM order_details
+                    WHERE id = ?
+                    AND status IN ('done', 'failed')
+                ''', (record_id,))
+
+                row = self.cursor.fetchone()
+
+                if row:
+                    result = {
+                        "id": row[0],
+                        "stand_id": row[1],
+                        "serial_number_8": row[2],
+                        "data_matrix": row[3],
+                        "test_result": row[4],
+                        "log_path": row[5],
+                        "report_path": row[6],
+                        "error_description": row[7],
+                        "status": row[8],
+                        "finished_at": row[9],
+                    }
+
+                    logger4.info(
+                        f"[SQLite] wait_firmware_result: результат получен | "
+                        f"id={record_id}, status={result['status']}, "
+                        f"test_result={result['test_result']}"
+                    )
+
+                    return result
+
+                if time.time() - start_time > timeout:
+                    error_text = "Timeout waiting firmware result"
+
+                    self.cursor.execute('''
+                        UPDATE order_details
+                        SET
+                            status = 'failed',
+                            finished_at = CURRENT_TIMESTAMP,
+                            test_result = 404,
+                            error_description = ?
+                        WHERE id = ?
+                        AND status = 'sent'
+                    ''', (error_text, record_id))
+
+                    if self.cursor.rowcount == 0:
+                        logger4.warning(
+                            f"[SQLite] wait_firmware_result: timeout, но запись не переведена в failed | "
+                            f"id={record_id}. Возможно статус уже изменился."
+                        )
+                    else:
+                        logger4.error(
+                            f"[SQLite] wait_firmware_result: timeout, запись переведена в failed | "
+                            f"id={record_id}, test_result=404"
+                        )
+
+                    self.conn.commit()
+
+                    return {
+                        "id": record_id,
+                        "stand_id": None,
+                        "serial_number_8": None,
+                        "data_matrix": None,
+                        "test_result": 404,
+                        "log_path": None,
+                        "report_path": None,
+                        "error_description": error_text,
+                        "status": "failed",
+                        "finished_at": None,
+                    }
+
+                logger4.info(
+                    f"[SQLite] wait_firmware_result: ждем результат | "
+                    f"id={record_id}"
+                )
+
+                time.sleep(poll_sec)
+
+            except Exception as e:
+                self.conn.rollback()
+
+                logger4.exception(
+                    f"[SQLite] wait_firmware_result: ошибка | "
+                    f"id={record_id}, error={e}"
+                )
+
+                return {
+                    "id": record_id,
+                    "stand_id": None,
+                    "serial_number_8": None,
+                    "data_matrix": None,
+                    "test_result": 404,
+                    "log_path": None,
+                    "report_path": None,
+                    "error_description": str(e),
+                    "status": "failed",
+                    "finished_at": None,
+                }
     
     def ConnectPhotoSerial(self, record_id, photodata, loadresult):
         """ Связываем серийный номер и штрихкод на плате с результатом теста и фото """
@@ -785,6 +975,8 @@ class DatabaseConnection:
             )
             return None
         
+    
+        
     # Функция роверки платы в 1с
     def setCheckboardResult(self, record_id: int, check_result: bool):
         """
@@ -866,8 +1058,85 @@ def insert_log(description: str, user: str, status: int = 0):
         if conn:
             conn.close()
 
-    
 
+# Функция которая дает завершение заказа в опс
+def end_order_toOPC(order_number):
+        """
+        True  = в заказе ещё есть непрошитые платы
+        False = заказ завершён, непрошитых плат нет
+        None  = ошибка / заказ не найден
+        """
+        try:
+            conn = sqlite3.connect("orders.db")
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT 
+                    O.ID
+                FROM orders AS O
+                WHERE O.order_number = ?
+                ORDER BY O.order_number DESC
+            ''', (order_number,))
+
+            row = cursor.fetchone()
+            if row:
+                order_id = row[0]
+                # logging.info(f"OPC Данные по заказу '{order_number}' получены успешно.")
+            else:
+                logger4.warning(
+                    f'[SQLite] Заказ для OPC интерфейса не найден | '
+                    f'order_number={order_number}'
+                )
+                return None
+        except Exception as e:
+            logger4.exception(
+                f'[SQLite] Ошибка поиска заказа getDatafromOOPC | '
+                f'order_number={order_number}, error={e}'
+            )
+            return None
+
+        try:
+            cursor.execute('''
+                SELECT id
+            FROM order_details
+            WHERE order_id = ? 
+            AND test_result IS NULL
+            ''', (order_id,))
+
+            row = cursor.fetchone()
+
+            if row:
+                order_id = row[0]
+                # logging.info(f"OPC Данные по заказу '{order_number}' получены успешно.")
+                return False
+            else:
+                logger4.warning(
+                    f'[SQLite] Не могу получить состояние заказа для функциии окончания заказа опс '
+                    f'order_id={order_id}'
+                )
+                return True
+
+        except Exception as e:
+            logger4.exception(
+                f'[SQLite] Ошибка получения статистики end_order_toOPC | '
+                f'order_id={order_id}, error={e}'
+            )
+            return None
+
+# res = record_id = end_order_toOPC(
+#     order_number='ЗНП-29961.1.1'
+# )
+
+# print(f"Взаказе есть гнепрошитые платы {record_id}")
+
+
+# db_connection = DatabaseConnection()
+# record_id = db_connection.setTableByPhoto(
+#     order_number='ЗНП-29961.1.1',
+#     stand_id=1,
+#     photodata='U00079882'
+# )
+
+# print(f"record_id = {record_id}")
 
 
 
@@ -925,9 +1194,9 @@ else:
 #print(db_connection.getDatafromOOPC("ЗНП-241.1.1"))
 
 
-# db_connection = DatabaseConnection()
-# result = db_connection.getDatafromOOPC('ЗНП-241.1.1')
-# print(result)
+db_connection = DatabaseConnection()
+result = db_connection.getDatafromOOPC('ЗНП-29961.1.1')
+print(result)
 
 
 # Пример тестовых данных

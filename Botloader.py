@@ -104,50 +104,55 @@ class FirmwareLoader:
             # print (data, photodata, loge)
             self.igle_table.control_igle_table(data, photodata, loge)
             logger4.info(f"[Botloader] Команда на Иглостол успешно отправлена | record_id={record_id}")
+            # После отправки команды поставить sent в бд
+            if not self.db_connection.mark_firmware_sent(record_id):
+                logger4.error(f"[Botloader] Не удалось перевести запись в sent | record_id={record_id}")
+                return 404, None
         except Exception as e:
             logger4.exception(f"[Botloader] Ошибка при отправке команды на прошивку Иглостолу: {e}")
             print(f"[Botloader] Ошибка при отправке команды на прошивку Иглостолу: {e}")
             return
 
+        # Ждем результат прошивки из БД
+        logger4.info(
+            f"[Botloader] Ожидание результата прошивки из БД | "
+            f"record_id={record_id}"
+        )
+        resultTest = self.db_connection.wait_firmware_result(record_id)
 
-        resultTest = {}
-        loadresult = None
+        if not isinstance(resultTest, dict):
+            logger4.error(
+                f"[Botloader] Некорректный результат wait_firmware_result | "
+                f"record_id={record_id}"
+            )
+            self.cleanup()
+            return 500, False
 
-        while True:
-            try:
-                # Получаем данные о результате от стола через сервер RTK
-                resultTest = self.igle_table.recentData()
-                
-                if not isinstance(resultTest, dict):
-                    print("[Botloader] Некорректный ответ от Иглостола, ждем дальше")
-                    continue
-                print("[Botloader] Результат запроса:")
+        loadresult = resultTest.get("test_result")
 
-                loadresult = resultTest.get('test_result', None)
-                print(f"[Botloader] Результат от IgleTable: {loadresult}")
-                
-                if loadresult is None:
-                    print("[Botloader] Ждем ответ от прошивальщика")
-                    time.sleep(2)
-                    continue
-                
-                # Как только получили любой итоговый ответ (True/False) — сразу шлем в 1С
-                logger4.info(
-                    f"[Botloader] Ответ от Иглостола | record_id={record_id}, test_result={loadresult}"
-                )
-                self.send_log_to_1c_safe(data, resultTest, user)
-                logger4.info(f"[Botloader] Лог в 1С отправлен/обработан | record_id={record_id}")
-                break
+        logger4.info(
+            f"[Botloader] Получен результат прошивки из БД | "
+            f"record_id={record_id}, test_result={loadresult}, "
+            f"status={resultTest.get('status')}"
+        )
 
+        # Отправляем лог в 1С
+        try:
+            self.send_log_to_1c_safe(data, resultTest, user)
 
-            except Exception as e:
-                logger4.exception(f"[Botloader] Ошибка при получении данных от Иглостола: {e}")
-                print("[Botloader] Ошибка при получении данных от Иглостола")
-                break
+            logger4.info(
+                f"[Botloader] Лог в 1С отправлен/обработан | "
+                f"record_id={record_id}"
+            )
 
-
+        except Exception as e:
+            logger4.exception(
+                f"[Botloader] Ошибка отправки лога в 1С | "
+                f"record_id={record_id}, error={e}"
+            )
+        
         # Обработка данных и запись результатов в БД
-        if resultTest.get("test_result") == True:
+        if resultTest.get("test_result") in (1, True, "1"):
 
             # user = 'i.perekalskii' # Убери это заглушка
 
@@ -168,13 +173,13 @@ class FirmwareLoader:
                     f"test_result={test_result}, log_path={log_path}, report_path={report_path}"
                 )
                 # Записываем результаты прошивки в БД
-                self.db_connection.set_BoardTest_Result(record_id, stand_id, serial_number_8, data_matrix, test_result, log_path, report_path, error_description, user)
-                logger4.info(f"[Botloader] Результаты прошивки записаны в БД | record_id={record_id}")
-                print(f"[Botloader] Результаты прошивки успешно записаны в БД для заказа {record_id}")
+                # self.db_connection.set_BoardTest_Result(record_id, stand_id, serial_number_8, data_matrix, test_result, log_path, report_path, error_description, user)
+                # logger4.info(f"[Botloader] Результаты прошивки записаны в БД | record_id={record_id}")
+                # print(f"[Botloader] Результаты прошивки успешно записаны в БД для заказа {record_id}")
                 
                 # Привязываем Data matrix к серийнику
-                logger4.info(f"[Botloader] Привязка DataMatrix к серийному номеру | record_id={record_id}, photodata={self.photodata}")
-                self.db_connection.ConnectPhotoSerial(record_id, self.photodata, loadresult)
+                logger4.info(f"[Botloader] Привязка DataMatrix к серийному номеру | record_id={record_id}, photodata={photodata}")
+                self.db_connection.ConnectPhotoSerial(record_id, photodata, loadresult)
                 print("[Botloader]Привязали Data matrix к серийному номеру")
 
                 
@@ -202,7 +207,7 @@ class FirmwareLoader:
                 report_path = resultTest.get("report_path")
                 serial_number_8 = resultTest.get("serial_number_8")
                 error_description = resultTest.get("error_description") or "Ошибка прошивки"
-                data_matrix = resultTest.get("data_matrix") or self.photodata
+                data_matrix = resultTest.get("data_matrix") or photodata
                 stand_id = resultTest.get("stand_id")
 
                 logger4.info(
@@ -213,19 +218,19 @@ class FirmwareLoader:
                     f"error_description={error_description}"
                 )
 
-                self.db_connection.set_BoardTest_Result(
-                    record_id,
-                    stand_id,
-                    serial_number_8,
-                    data_matrix,
-                    "404",
-                    log_path,
-                    report_path,
-                    error_description,
-                    user
-                )
-                logger4.info(f"[Botloader] Брак записан в БД | record_id={record_id}")
-                print(f"[Botloader] Брак записан в БД | record_id={record_id}")
+                # self.db_connection.set_BoardTest_Result(
+                #     record_id,
+                #     stand_id,
+                #     serial_number_8,
+                #     data_matrix,
+                #     "404",
+                #     log_path,
+                #     report_path,
+                #     error_description,
+                #     user
+                # )
+                # logger4.info(f"[Botloader] Брак записан в БД | record_id={record_id}")
+                # print(f"[Botloader] Брак записан в БД | record_id={record_id}")
             except Exception as e:
                 logger4.exception(f"[Botloader] Не удалось записать брак в БД: {e}")
                 print("[Botloader] Не удалось записать брак в БД")
@@ -242,12 +247,16 @@ class FirmwareLoader:
 
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
             test_result = resultTest.get("test_result", None)
+            test_result_raw = resultTest.get("test_result", None)
+            is_success = str(test_result_raw).strip() == "1" or test_result_raw is True
+
             serial_number = resultTest.get("data_matrix", "")
 
             logger4.info(
-            f"[Botloader][1С] Подготовка payload для 1С | "
-            f"test_result={test_result}, serial_number={serial_number}, "
-            f"order={data.get('order_name')}, fw_version={data.get('fw_version')}"
+                f"[Botloader][1С] Подготовка payload для 1С | "
+                f"test_result={test_result_raw}, is_success={is_success}, "
+                f"serial_number={serial_number}, "
+                f"order={data.get('order_name')}, fw_version={data.get('fw_version')}"
             )
 
 
@@ -271,7 +280,7 @@ class FirmwareLoader:
                 "message_type": "firmware_log",
             }
 
-            if test_result == True:
+            if is_success:
                 payload = {
                     **common_payload,
                     "good": [

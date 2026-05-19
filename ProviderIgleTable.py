@@ -110,7 +110,6 @@ class IgleTable:
             "serial_number_9": serial_number_9,
             "serial_number_15": serial_number_15,
             "lodgment_number": loge,
-            ""
 
             "firmwares": [
                 {

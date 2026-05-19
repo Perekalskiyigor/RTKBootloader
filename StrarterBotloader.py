@@ -6,6 +6,22 @@ import time
 import subprocess
 from pathlib import Path
 from opcua import Client, ua
+import sqlite3
+
+
+DB_PATH = r"orders.db"
+
+LOAD_NODES = {
+    1: "ns=2;s=Application.GVL.OPC_load_t1",
+    2: "ns=2;s=Application.GVL.OPC_load_t2",
+    3: "ns=2;s=Application.GVL.OPC_load_t3",
+}
+
+RES_NODES = {
+    1: "ns=2;s=Application.GVL.OPC_res_load_t1",
+    2: "ns=2;s=Application.GVL.OPC_res_load_t2",
+    3: "ns=2;s=Application.GVL.OPC_res_load_t3",
+}
 
 OPC_URL = "opc.tcp://192.168.1.3:48010"
 NODE_START   = "ns=2;s=Application.UserInterface.OPC_start_python"
@@ -13,7 +29,7 @@ NODE_RUNNING = "ns=2;s=Application.UserInterface.OPC_log"
 POLL_SEC = 0.5
 
 EXE1 = r"C:\nails_table_v4\hub\temp\nails_table_hub\nails_table_hub.exe"
-EXE2 = r"C:\Users\i.perekalskii\Desktop\DEV\RTKBootloader\dist\WORK_FILE_27_04.exe"
+EXE2 = r"C:\Users\i.perekalskii\Desktop\DEV\RTKBootloader\dist\WORK_FILE_08_05.exe"
 EXE3 = r"C:\Users\i.perekalskii\Desktop\DEV\RTKBootloader\dist\ServerRTK.exe"
 
 CONNECT_TIMEOUT_SEC = 8.0
@@ -23,6 +39,37 @@ proc1 = None
 proc2 = None
 proc3 = None
 
+
+def get_status_from_db(table_num):
+    conn = sqlite3.connect(DB_PATH, timeout=5)
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT status, test_result
+        FROM order_details
+        WHERE stand_id IN (?, ?)
+        ORDER BY COALESCE(finished_at, started_at, reserved_at) DESC
+        LIMIT 1
+    """, (f"table_{table_num}", f"nt_cmpp_rtk_{table_num}"))
+
+    row = cur.fetchone()
+    conn.close()
+
+    if not row:
+        return None
+
+    status, test_result = row
+
+    if status == "sent":
+        return 1, 0
+
+    if status == "done":
+        return 0, 2
+
+    if status == "failed":
+        return 0, 1
+
+    return None
 
 def _app_dir() -> Path:
     # для pyinstaller onefile: sys.executable = путь к exe
@@ -87,6 +134,13 @@ def _taskkill_name(name: str):
     subprocess.run(["taskkill", "/IM", name, "/T", "/F"],
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
 
+def is_process_running(exe_name):
+    result = subprocess.run(
+        ["tasklist"],
+        capture_output=True,
+        text=True
+    )
+    return exe_name.lower() in result.stdout.lower()
 
 def stop_procs_once():
     global proc1, proc2, proc3
@@ -95,22 +149,21 @@ def stop_procs_once():
         log("[APPS] stopping main.exe (launcher PID)")
         _taskkill_pid(proc2.pid)
 
-    if is_running(proc3):
-        log("[APPS] stopping ServerRTK (launcher PID)")
-        _taskkill_pid(proc3.pid)
+    # if is_running(proc3):
+    #     log("[APPS] stopping ServerRTK (launcher PID)")
+    #     _taskkill_pid(proc3.pid)
 
-    if is_running(proc1):
-        log("[APPS] stopping nails_table_bridge (launcher PID)")
-        _taskkill_pid(proc1.pid)
+    # if is_running(proc1):
+    #     log("[APPS] stopping nails_table_bridge (launcher PID)")
+    #     _taskkill_pid(proc1.pid)
 
     # добиваем по именам (на случай если PID уже другой/порожденные процессы)
     _taskkill_name(Path(EXE2).name)
-    _taskkill_name(Path(EXE3).name)
-    _taskkill_name(Path(EXE1).name)
+    # _taskkill_name(Path(EXE3).name)
+    # _taskkill_name(Path(EXE1).name)
 
     proc1 = None
     proc2 = None
-    proc3 = None
 
 
 def read_bool(node) -> int:
@@ -123,6 +176,9 @@ def read_bool(node) -> int:
 
 def write_string(node, text: str):
     node.set_value(ua.DataValue(ua.Variant(text, ua.VariantType.String)))
+
+def write_int(node, value: int):
+    node.set_value(ua.DataValue(ua.Variant(int(value), ua.VariantType.Int16)))
 
 
 def connect_with_timeout(url: str, timeout_sec: float) -> Client:
@@ -145,8 +201,10 @@ def connect_with_timeout(url: str, timeout_sec: float) -> Client:
 
 
 def main():
+    global proc1, proc2, proc3
     log(f"[BOOT] pid={os.getpid()} exe={sys.executable}")
 
+    
     last_log = None
 
     while True:
@@ -154,14 +212,29 @@ def main():
         try:
             client = connect_with_timeout(OPC_URL, CONNECT_TIMEOUT_SEC)
 
+            
+
             node_start = client.get_node(NODE_START)
             node_log = client.get_node(NODE_RUNNING)
+
+            load_nodes = {n: client.get_node(nodeid) for n, nodeid in LOAD_NODES.items()}
+            res_nodes = {n: client.get_node(nodeid) for n, nodeid in RES_NODES.items()}
 
             last_state = None
             t_heartbeat = 0.0
 
+            last_backup_states = {}
+
             while True:
+                main_alive = is_process_running(Path(EXE2).name)
+                server_alive = is_process_running(Path(EXE3).name)
+                bridge_alive = is_process_running(Path(EXE1).name)
+
                 state = read_bool(node_start)
+
+                if not server_alive:
+                    proc3 = _popen_new_console(EXE3)
+                    log(f"[APPS] ServerRTK restarted, pid={proc3.pid}")
 
                 if state != last_state:
                     log(f"[OPC] START changed: {last_state} -> {state}")
@@ -171,12 +244,35 @@ def main():
                         stop_procs_once()
                     last_state = state
 
-                running = is_running(proc1) and is_running(proc3) and is_running(proc2)
+                running = server_alive and main_alive
                 msg = "RUNNING" if running else "STOPPED"
                 if msg != last_log:
                     write_string(node_log, msg)
                     log(f"[OPC] wrote OPC_log='{msg}'")
                     last_log = msg
+                
+                # Резервное обновление статусов прошивки из БД,
+                # если основной main.exe не работает
+                main_alive = is_process_running(Path(EXE2).name)
+
+                if not main_alive:
+                    for table_num in (1, 2, 3):
+                        status = get_status_from_db(table_num)
+
+                        if status:
+                            load_value, res_value = status
+
+                            write_int(load_nodes[table_num], load_value)
+                            write_int(res_nodes[table_num], res_value)
+
+                            current_state = (load_value, res_value)
+
+                            if last_backup_states.get(table_num) != current_state:
+                                log(
+                                    f"[OPC-BACKUP] table={table_num} "
+                                    f"load={load_value}, res={res_value}"
+                                )
+                                last_backup_states[table_num] = current_state
 
                 # каждые 5 сек пишем что цикл жив
                 if time.time() - t_heartbeat > 5:
@@ -187,7 +283,6 @@ def main():
 
         except Exception as e:
             log(f"[OPC] error: {e}")
-            stop_procs_once()
             try:
                 if client:
                     client.disconnect()

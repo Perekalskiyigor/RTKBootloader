@@ -50,6 +50,7 @@ class FirmwareLoader:
     def loader(self, photodata, loge, user):
         logger4.info(f"[Botloader] Вызов функции loader Команда на прошивку праметры  photodata = {photodata}, loge={loge}")
         print(f"[Botloader] Вызов функции loader Команда на прошивку праметры  photodata = {photodata}, loge={loge}")
+        print(f"[Botloader] Значение user на входе: '{user}' (тип: {type(user)})")
         
         # Блок начала работы с БД: получаем свободный id для заказа
         try:
@@ -154,7 +155,6 @@ class FirmwareLoader:
         # Обработка данных и запись результатов в БД
         if resultTest.get("test_result") in (1, True, "1"):
 
-            # user = 'i.perekalskii' # Убери это заглушка
 
 
             # Извлекаем необходимые данные
@@ -179,7 +179,8 @@ class FirmwareLoader:
                 
                 # Привязываем Data matrix к серийнику
                 logger4.info(f"[Botloader] Привязка DataMatrix к серийному номеру | record_id={record_id}, photodata={photodata}")
-                self.db_connection.ConnectPhotoSerial(record_id, photodata, loadresult)
+                self.db_connection.ConnectPhotoSerial(record_id, photodata, loadresult, user)
+                print(f"------------------------------{user}")
                 print("[Botloader]Привязали Data matrix к серийному номеру")
 
                 

@@ -28,10 +28,9 @@ NODE_START   = "ns=2;s=Application.UserInterface.OPC_start_python"
 NODE_RUNNING = "ns=2;s=Application.UserInterface.OPC_log"
 POLL_SEC = 0.5
 
-EXE1 = r"C:\nails_table_v4\hub\temp\nails_table_hub\nails_table_hub.exe"
-EXE2 = r"C:\Users\i.perekalskii\Desktop\DEV\RTKBootloader\dist\WORK_FILE_08_05.exe"
+EXE1 = r"C:\nails_table_v4\hub\nails_table_hub\nails_table_hub.exe"
+EXE2 = r"C:\Users\i.perekalskii\Desktop\DEV\RTKBootloader\dist\WORK_FILE_25_05.exe"
 EXE3 = r"C:\Users\i.perekalskii\Desktop\DEV\RTKBootloader\dist\ServerRTK.exe"
-
 CONNECT_TIMEOUT_SEC = 8.0
 RECONNECT_DELAY_SEC = 2.0
 
@@ -145,22 +144,23 @@ def is_process_running(exe_name):
 def stop_procs_once():
     global proc1, proc2, proc3
 
+    # Останавливаем прошивальщик / main
     if is_running(proc2):
-        log("[APPS] stopping main.exe (launcher PID)")
+        log("[APPS] stopping WORK_FILE_25_05.exe")
         _taskkill_pid(proc2.pid)
 
-    # if is_running(proc3):
-    #     log("[APPS] stopping ServerRTK (launcher PID)")
-    #     _taskkill_pid(proc3.pid)
+    # Останавливаем hub / bridge / скрипт
+    if is_running(proc1):
+        log("[APPS] stopping nails_table_hub.exe")
+        _taskkill_pid(proc1.pid)
 
-    # if is_running(proc1):
-    #     log("[APPS] stopping nails_table_bridge (launcher PID)")
-    #     _taskkill_pid(proc1.pid)
-
-    # добиваем по именам (на случай если PID уже другой/порожденные процессы)
+    # Добиваем по именам на случай, если PID уже не тот
     _taskkill_name(Path(EXE2).name)
-    # _taskkill_name(Path(EXE3).name)
-    # _taskkill_name(Path(EXE1).name)
+    _taskkill_name(Path(EXE1).name)
+
+    # ServerRTK НЕ трогаем
+    proc1 = None
+    proc2 = None
 
     proc1 = None
     proc2 = None
@@ -244,7 +244,7 @@ def main():
                         stop_procs_once()
                     last_state = state
 
-                running = server_alive and main_alive
+                running = server_alive and main_alive and bridge_alive
                 msg = "RUNNING" if running else "STOPPED"
                 if msg != last_log:
                     write_string(node_log, msg)

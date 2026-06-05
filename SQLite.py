@@ -261,25 +261,19 @@ class DatabaseConnection:
         
     
     def setTableByPhoto(self, order_number, stand_id, photodata):
-        """Метод блокирует запись в базе для кажой платы исходя из полученного датаматрикса с платы. Используется  в Botloader.py
-        найти плату по DataMatrix → заблокировать запись → вернуть record_id → поставить статус reserved.
-        """
         dm = photodata.strip()
-        # если камера читает U00075414B, а в базе U00075414
         if dm.endswith("B"):
-            dm = dm[:-1] # С камеры читаются серийники с B на конце в базе онит  без B
-        # serial_for_search = photodata[:-1] if photodata.endswith("B") else photodata # С камеры читаются серийники с B на конце в базе онит  без B
-        print(f"ПОИСК serial_for_search = '{dm}'")
+            dm = dm[:-1]
+
         logger4.info(
-        f'[SQLite] setTableByPhoto вызван | '
-        f'order_number={order_number}, stand_id={stand_id}, '
-        f'photodata={photodata}, нормализованный датаматрикс для поиска={dm}'
-    )
+            f'[SQLite] setTableByPhoto вызван | '
+            f'order_number={order_number}, stand_id={stand_id}, '
+            f'photodata={photodata}, dm={dm}'
+        )
 
         try:
             self.conn.execute('BEGIN IMMEDIATE')
 
-            # Получаем ID заказа
             self.cursor.execute('''
                 SELECT id
                 FROM orders
@@ -291,90 +285,45 @@ class DatabaseConnection:
 
             if not row:
                 self.conn.rollback()
-                logger4.warning(f'[SQLite] Заказ не найден | order_number={order_number}')
                 return None
 
             order_id = row[0]
 
-            # Ищем конкретную плату по photodata в serial_number
             self.cursor.execute('''
-                SELECT id, stand_id
+                SELECT id, stand_id, status
                 FROM order_details
                 WHERE order_id = ?
-                AND serial_number = ?
                 AND (
-                        status IS NULL
-                        OR status = 'new'
-                    )
+                    serial_number = ?
+                    OR data_matrix = ?
+                )
+                AND (
+                    status LIKE 'reserved_%'
+                    OR status LIKE 'placed_%'
+                    OR status = 'reserved'
+                    OR status = 'sent'
+                )
                 LIMIT 1
-            ''', (order_id, dm))
+            ''', (order_id, dm, dm))
+
             row = self.cursor.fetchone()
 
             if not row:
                 self.conn.rollback()
                 logger4.warning(
-                    f'[SQLite] Плата с номером {dm} не найдена в базе | order_id={order_id}. Проверьте что такая плата существует в заказе'
+                    f'[SQLite] Плата {dm} не найдена среди reserved/placed/sent | order_id={order_id}'
                 )
                 return None
 
-            serial_id, current_stand_id = row
-
-            logger4.info(
-            f"[SQLite] Плата найдена | id={serial_id}, "
-            f"старый stand_id={current_stand_id}, новый stand_id={stand_id}"
-            )
-
-            # # Проверяем, не занята ли уже запись
-            # if current_stand_id not in (None, 0, "0", ""):
-            #     self.conn.rollback()
-            #     logger4.warning(
-            #         f'[SQLite] Запись уже занята | id={serial_id}, current_stand_id={current_stand_id}'
-            #     )
-            #     return None
-
-            # Блокируем конкретную запись
-            # Закоментил здесь блокировку по столу 
-            # self.cursor.execute('''
-            #     UPDATE order_details
-            #     SET stand_id = ?
-            #     WHERE id = ?
-            #     AND (stand_id IS NULL OR stand_id = 0 OR stand_id = '' OR stand_id = '0')
-            # ''', (stand_id, serial_id))
-
-            # AND (stand_id IS NULL OR stand_id = 0 OR stand_id = '' OR stand_id = '0')
-            self.cursor.execute('''
-            UPDATE order_details
-                SET
-                    stand_id = ?,
-                    data_matrix = ?,
-                    status = 'reserved',
-                    reserved_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-                AND (
-                        status IS NULL
-                        OR status = 'new'
-                    )
-            ''', (
-                stand_id,
-                dm,
-                serial_id
-            ))
-
-            if self.cursor.rowcount == 0:
-                self.conn.rollback()
-                logger4.warning(
-                    f'[SQLite] Не удалось заблокировать запись | id={serial_id}, photodata={photodata}'
-                )
-                return None
+            serial_id, current_stand_id, current_status = row
 
             self.conn.commit()
+
             logger4.info(
-                f'[SQLite] Запись зарезервирована | '
-                f'id={serial_id}, '
-                f'status=reserved, '
-                f'serial_number={dm}, '
-                f'stand_id={stand_id}'
+                f'[SQLite] Плата найдена для прошивки | '
+                f'id={serial_id}, stand_id={current_stand_id}, status={current_status}'
             )
+
             return serial_id
 
         except Exception as e:
@@ -386,42 +335,34 @@ class DatabaseConnection:
             return None
     
     def mark_firmware_sent(self, record_id):
-        """
-        Переводит запись из reserved в sent после успешной отправки команды на иглостол.
-        """
-
         try:
-            self.cursor.execute('''
+            self.cursor.execute("""
                 UPDATE order_details
                 SET
                     status = 'sent',
                     started_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-                AND status = 'reserved'
-            ''', (record_id,))
+                AND (
+                    status LIKE 'reserved_%'
+                    OR status LIKE 'placed_%'
+                    OR status = 'reserved'
+                )
+            """, (record_id,))
 
             if self.cursor.rowcount == 0:
                 self.conn.rollback()
                 logger4.warning(
-                    f'[SQLite] mark_firmware_sent: запись не обновлена | '
-                    f'id={record_id}'
+                    f"[SQLite] mark_firmware_sent: запись не обновлена | id={record_id}"
                 )
                 return False
 
             self.conn.commit()
-
-            logger4.info(
-                f'[SQLite] mark_firmware_sent: запись переведена в sent | '
-                f'id={record_id}'
-            )
+            logger4.info(f"[SQLite] mark_firmware_sent: запись переведена в sent | id={record_id}")
             return True
 
         except Exception as e:
             self.conn.rollback()
-            logger4.exception(
-                f'[SQLite] mark_firmware_sent: ошибка | '
-                f'id={record_id}, error={e}'
-            )
+            logger4.exception(f"[SQLite] mark_firmware_sent: ошибка | id={record_id}, error={e}")
             return False
         
     
@@ -552,37 +493,42 @@ class DatabaseConnection:
                     "finished_at": None,
                 }
     
-    def ConnectPhotoSerial(self, record_id, photodata, loadresult):
-        """ Связываем серийный номер и штрихкод на плате с результатом теста и фото """
-        logger4.debug(f'[SQLite] Вызов ConnectPhotoSerial(record_id = {record_id}, photodata = {photodata}, loadresult = {loadresult}) Связываем серийный номер и штрихкод на плате с результатом теста и фото')
-        try:
+    def ConnectPhotoSerial(self, record_id, photodata, loadresult, user= "-"):
+        logger4.debug(
+            f'[SQLite] Вызов ConnectPhotoSerial(record_id={record_id}, '
+            f'photodata={photodata}, loadresult={loadresult}, user={user})'
+        )
 
+        try:
             update_query = """
             UPDATE order_details
             SET test_result = ?,
-                data_matrix = ?
+                data_matrix = ?,
+                user = ?
             WHERE id = ?
             """
-            
-            #print(f"Executing SQL with values: ({loadresult}, [photodata], {record_id})")
-            
-            self.cursor.execute(update_query, (loadresult, photodata, record_id))
+
+            self.cursor.execute(update_query, (loadresult, photodata, user, record_id))
             self.conn.commit()
 
             if self.cursor.rowcount == 0:
-                
-                logger4.warning(f"[SQLite] ConnectPhotoSerial Не найдено не одной записи с указанным={record_id} в таблице order_details.")
-                print(f"[SQLite] ConnectPhotoSerial Не найдено не одной записи с указанным={record_id} в таблице order_details.")
-                return 404  # Запись не найдена
+                logger4.warning(
+                    f"[SQLite] ConnectPhotoSerial Не найдено записи id={record_id}"
+                )
+                return 404
 
-            logger4.info(f"[SQLite] ConnectPhotoSerial Запись с {record_id} successfully updated.")
-            #print(f"Record {record_id} successfully updated.")
-            return 200  # Успех
+            logger4.info(
+                f"[SQLite] ConnectPhotoSerial обновлено | "
+                f"id={record_id}, data_matrix={photodata}, user={user}"
+            )
+            return 200
 
         except Exception as e:
-            logger4.error(f"[SQLite] ConnectPhotoSerial ошибка обновления записи {record_id}: {e}", exc_info=True)
-            print(f"Failed to update record {record_id}: {e}")
-            return 404  # Ошибка выполнения
+            logger4.error(
+                f"[SQLite] ConnectPhotoSerial ошибка обновления записи {record_id}: {e}",
+                exc_info=True
+            )
+            return 404
 
 
 
@@ -927,7 +873,7 @@ class DatabaseConnection:
                     O.fw_version, 
 
                     COUNT(*) FILTER (
-                        WHERE D.stand_id IS NULL
+                        WHERE D.test_result IS NULL
                     ) AS Lastcount,
 
                     COUNT(D.id) AS CommonCount,
@@ -1122,6 +1068,127 @@ def end_order_toOPC(order_number):
             )
             return None
 
+def has_new_boards(order_number):
+    conn = sqlite3.connect("orders.db")
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT O.id
+        FROM orders O
+        WHERE O.order_number = ?
+        LIMIT 1
+    """, (order_number,))
+    row = cur.fetchone()
+
+    if not row:
+        return None
+
+    order_id = row[0]
+
+    cur.execute("""
+        SELECT COUNT(*)
+        FROM order_details
+        WHERE order_id = ?
+        AND (
+            status IS NULL
+            OR status = 'new'
+        )
+    """, (order_id,))
+
+    count_new = cur.fetchone()[0]
+    conn.close()
+
+    return count_new > 0
+
+
+def reserve_board_for_loge(order_number, dm, stand_id, table_no, loge):
+    """
+    Бронируем плату после фото/проверки 1С, но ДО укладки роботом.
+    """
+    conn = sqlite3.connect("orders.db")
+    cur = conn.cursor()
+
+    dm_norm = dm[:-1] if dm.endswith("B") else dm
+
+    cur.execute("""
+        UPDATE order_details
+        SET
+            status = ?,
+            stand_id = ?,
+            data_matrix = ?
+        WHERE id = (
+            SELECT D.id
+            FROM order_details D
+            JOIN orders O ON O.id = D.order_id
+            WHERE O.order_number = ?
+              AND (
+                    D.serial_number = ?
+                    OR D.serial_number_8 = ?
+                    OR D.data_matrix = ?
+                  )
+              AND (D.status IS NULL OR D.status = 'new')
+            LIMIT 1
+        )
+    """, (
+        f"reserved_t{table_no}_l{loge}",
+        stand_id,
+        dm_norm,
+        order_number,
+        dm_norm,
+        dm_norm,
+        dm_norm
+    ))
+
+    conn.commit()
+
+    if cur.rowcount == 0:
+        return None
+
+    cur.execute("""
+        SELECT id
+        FROM order_details
+        WHERE order_id = (SELECT id FROM orders WHERE order_number = ?)
+          AND data_matrix = ?
+          AND status = ?
+        LIMIT 1
+    """, (order_number, dm_norm, f"reserved_t{table_no}_l{loge}"))
+
+    row = cur.fetchone()
+    return row[0] if row else None
+
+
+def mark_board_placed(record_id, table_no, loge):
+    conn = sqlite3.connect("orders.db")
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE order_details
+        SET status = ?
+        WHERE id = ?
+    """, (f"placed_t{table_no}_l{loge}", record_id))
+
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def release_reserved_board(record_id):
+    conn = sqlite3.connect("orders.db")
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE order_details
+        SET status = 'new',
+            stand_id = NULL
+        WHERE id = ?
+          AND status LIKE 'reserved_%'
+    """, (record_id,))
+
+    conn.commit()
+    return cur.rowcount > 0
+
+
+# res = has_new_boards('ЗНП-29961.1.1')
+# print(res)
 # res = record_id = end_order_toOPC(
 #     order_number='ЗНП-29961.1.1'
 # )

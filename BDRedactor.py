@@ -1,3 +1,4 @@
+# python -m PyInstaller --onefile BDRedactor.py
 import sqlite3
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog 

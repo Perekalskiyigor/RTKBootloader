@@ -227,6 +227,7 @@ shared_data = {
         'OPC_pause_RTK':False, # Постановка на паузу
         'OPC_restart_RTK':False, # Перезапуск ртк
         'OPC_end_order':False, # Данные о завршен ли заказ или нет если завершен False если нет true
+        'OPC_finish_order': False,  # ручной запуск досушки если стопим заказ на середине
         'OPC_cnt_newBoard':0, # колво непрошитых плат
         'OPC_cnt_Board':0, # колво плат в заказе
         'OPC_success_count':0, #кол во успешно прощитых платё
@@ -625,7 +626,10 @@ class OPCClient:
                         'ns=2;s=Application.UserInterface.OPC_res_brak',
 
                         # Заказ завршен или нет
-                        'ns=2;s=Application.UserInterface.OPC_end_order'
+                        'ns=2;s=Application.UserInterface.OPC_end_order',
+
+                        # Узел флага ручного завершения заказа ручной режим досушки
+                        'ns=2;s=Application.UserInterface.OPC_finish_order'
 
                         
                     ]
@@ -701,6 +705,7 @@ class OPCClient:
         OPC_RESTART_RTK = 'ns=2;s=Application.UserInterface.OPC_restart_RTK'
 
         OPC_END_ORDER = 'ns=2;s=Application.UserInterface.OPC_end_order'
+        OPC_FINISH_ORDER = 'ns=2;s=Application.UserInterface.OPC_finish_order' # Узел ручного запуска досушки заказа
         OPC_NAME = 'ns=2;s=Application.UserInterface.OPC_name'
 
         # шаблон nodeId для столов
@@ -710,7 +715,7 @@ class OPCClient:
         while not self.stop_event.is_set():
             try:
                 if not self.is_connected():
-                    time.sleep(1)
+                    time.sleep(0.5)
                     continue
 
                 with self.lock:
@@ -811,6 +816,7 @@ class OPCClient:
 
 
                         st5 = False
+                        st9 = False
                         # --- читаем флаги запуска из OPC и зеркалим в shared_data ---
                         try:
                             st1 = bool(self._read_bool(START_T1, False))
@@ -821,6 +827,7 @@ class OPCClient:
                             st6 = bool(self._read_bool(OPC_PAUSE_RTK, False))
                             st7 = bool(self._read_bool(OPC_RESTART_RTK, False))
                             st8 = str(self._read_str(OPC_NAME, 'i.perekalskii'))
+                            st9 = bool(self._read_bool(OPC_FINISH_ORDER, False))
 
 
                             with shared_data_lock:
@@ -832,6 +839,7 @@ class OPCClient:
                                 shared_data['OPC-DB']['OPC_pause_RTK'] = st6
                                 shared_data['OPC-DB']['OPC_restart_RTK'] = st7
                                 shared_data['OPC-DB']['OPC_name'] = st8
+                                shared_data['OPC-DB']['OPC_finish_order'] = st9
                                 
                             # logger4.debug(
                             #     f"[OPC] читаем флаги запуска из OPC и зеркалим в shared_data FLAGS | RTK={st4} | T1={st1} | T2={st2} | T3={st3} | "
@@ -850,6 +858,12 @@ class OPCClient:
                         # ВАЖНО: OPC_Order обратно НЕ пишем, только читаем в отдельном блоке-детекторе выбора
                     except Exception as e:
                         print(f"[OPC] write vitrina (basic+extra) failed: {e}")
+
+                    # --------------------Если получили команду завершить заказ стартуем досушку------------------
+                    if st9 is True and not NO_MORE_NEW_BOARDS.is_set():
+                        NO_MORE_NEW_BOARDS.set()
+                        logger4.warning("[MAIN] Оператор включил ручной режим досушки. Новые платы больше не берём.")
+                        opc_set(shared_data, 'OPC_log', "Включён режим досушки. Новые платы больше не берём.")
 
                     #---------- 3) ButtonLoadOrders: получить список заказов и показать ----------
                     if btn_load:
@@ -915,7 +929,7 @@ class OPCClient:
             except Exception as e:
                 print(f"Critical error in update loop: {e}")
 
-            time.sleep(1)
+            time.sleep(0.5)
 
     def stop(self):
         """Clean shutdown"""

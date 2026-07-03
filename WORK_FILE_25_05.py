@@ -34,6 +34,9 @@ def trigger_emergency(reason: str):
     """
     if not EMERGENCY_STOP.is_set():
         logger4.info(f"[MAIN]Глобальная аварийная остановка работа EMERGENCY STOP {reason}")
+
+        SQLite.insert_log_for1C(description=f"Остановка РТК: Аварийный останов {reason}", user=user)
+
         print(f"[EMERGENCY STOP] {reason}")
         EMERGENCY_STOP.set()
 
@@ -868,6 +871,8 @@ class OPCClient:
                     #---------- 3) ButtonLoadOrders: получить список заказов и показать ----------
                     if btn_load:
                         try:
+                            SQLite.insert_log_for1C(description="Отправка запроса в 1С: Получение списка заказов", user=user)
+
                             print(f"btn load______________________{btn_load}")
                             orders = Provider1C.getOrders() or []
                             # в словарь (если хотите хранить локально)
@@ -891,6 +896,9 @@ class OPCClient:
                                 with shared_data_lock:
                                     shared_data['OPC-DB']['OPC_Order'] = selected_from_opc
                                 logging.info(f"[OPC] Selected order detected: {selected_from_opc}")
+
+                                SQLite.insert_log_for1C(description="Отправка запроса в 1С: Получение информации о заказе", user=user)
+
                                 Order = selected_from_opc
                                 print(f"выбрали от интерфейса{selected_from_opc}")
                                 # (опционально) почистить предыдущие витрины/данные
@@ -1690,6 +1698,8 @@ class Table:
                 print(f"Стол {self.number} С камеры получен ID {photodata}")
                 logger4.debug(f"Стол {self.number} Успех: получен ID фото {photodata}")
                 SQLite.insert_log(f"Для стола {self.number} получено фото datamatrix платы значение = {photodata}", 0)
+
+                SQLite.insert_log_for1C(description=f"Первое считывание DM на первой плате данного запуска = {photodata}", user=user)
                 
                 # Если фото получено успешно, возвращаем результат
                 if res == 200 and photodata != "NoRead":
@@ -2736,6 +2746,8 @@ def start_threads_if_needed(targets: dict, do_defence=False, do_setup=True):
             logger4.info(f"[MAIN] ✅ Поток Table{tid} успешно запущен")
             time.sleep(15)  # <-- пауза между столами
 
+            SQLite.insert_log_for1C(description="Запуск заказа", user=user)
+
     # with shared_data_lock:
     #     shared_data['OPC-DB']['OPC_START'] = False
 
@@ -2763,6 +2775,9 @@ def run_table_pipeline(table: Table, do_defence=True, do_setup=True):
 
 
 if __name__ == "__main__":
+    SQLite.insert_log_for1C(description="Включение РТК", user=user)
+    SQLite.insert_log_for1C(description="Авторизация оператора", user=user)
+
     logger4.info("[MAIN]старт основного скрипта")
 
     modbus_provider = ModbusProvider()
@@ -2930,4 +2945,6 @@ if __name__ == "__main__":
 
         print("Все потоки завершены.")
         logger4.info("[MAIN]Все потоки завершены.")
+        SQLite.insert_log_for1C(description="Выключение РТК", user=user)
+        SQLite.insert_log_for1C(description="Выход из системы оператора", user=user)
 

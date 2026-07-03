@@ -1187,6 +1187,40 @@ def release_reserved_board(record_id):
     return cur.rowcount > 0
 
 
+# Функция отправки логов в таблицу LogRTKto1C это для 1С зпускается и отправялети логи
+def insert_log_for1C(description: str, user: str, status: int = 0):
+    try:
+        conn = sqlite3.connect("orders.db")
+        cursor = conn.cursor()
+
+        # создаём таблицу, если её нет
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS LogRTKto1C (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                description TEXT,
+                data TEXT,
+                status INTEGER,
+                user TEXT
+            )
+        """)
+
+        # текущая дата/время
+        data = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # вставка записи
+        cursor.execute(
+            "INSERT INTO LogRTKto1C (description, data, status, user) VALUES (?, ?, ?, ?)",
+            (description, data, status, user)
+        )
+
+        conn.commit()
+    except sqlite3.Error as e:
+        print("Ошибка при работе с БД:", e)
+    finally:
+        if conn:
+            conn.close()
+
+
 # res = has_new_boards('ЗНП-29961.1.1')
 # print(res)
 # res = record_id = end_order_toOPC(
@@ -1261,9 +1295,9 @@ else:
 #print(db_connection.getDatafromOOPC("ЗНП-241.1.1"))
 
 
-db_connection = DatabaseConnection()
-result = db_connection.getDatafromOOPC('ЗНП-29961.1.1')
-print(result)
+# db_connection = DatabaseConnection()
+# result = db_connection.getDatafromOOPC('ЗНП-29961.1.1')
+# print(result)
 
 
 # Пример тестовых данных
@@ -1305,3 +1339,10 @@ print(result)
 # )
 
 # print(f"RESULT = {result}")
+
+db = DatabaseConnection()
+# db.db_connect()
+# insert_log_for1C(
+#     description="Включение РТК",
+#     user="V.Ovchinnikov"
+# )

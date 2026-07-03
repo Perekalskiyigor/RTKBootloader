@@ -7,7 +7,10 @@ import subprocess
 from pathlib import Path
 from opcua import Client, ua
 import sqlite3
-
+import threading
+import wmi
+import SQLite
+import pythoncom
 
 DB_PATH = r"orders.db"
 
@@ -37,6 +40,65 @@ RECONNECT_DELAY_SEC = 2.0
 proc1 = None
 proc2 = None
 proc3 = None
+
+
+"""Мониторинг ИБП"""
+def ups_monitor_thread():
+    """
+    Мониторинг питания ИБП через WMI.
+    BatteryStatus:
+    1 = питание от батареи
+    2 = питание от сети
+    """
+
+    pythoncom.CoInitialize()
+
+    last_status = 2  # при старте считаем, что питание нормальное
+
+    try:
+        c = wmi.WMI()
+        log("[UPS] monitor started")
+    except Exception as e:
+        log(f"[UPS] WMI init error: {e}")
+        pythoncom.CoUninitialize()
+        return
+
+    try:
+        while True:
+            try:
+                batteries = c.Win32_Battery()
+
+                if batteries:
+                    status = int(batteries[0].BatteryStatus)
+
+                    if status == 1 and last_status != 1:
+                        log("[UPS] 220В пропало. Питание от батареи.")
+                        SQLite.insert_log_for1C(
+                            description="220В пропало. Питание от батареи",
+                            user="UPS"
+                        )
+
+                    elif status == 2 and last_status != 2:
+                        log("[UPS] 220В восстановлено. Питание от сети.")
+                        SQLite.insert_log_for1C(
+                            description="220В восстановлено. Питание от сети",
+                            user="UPS"
+                        )
+
+                    last_status = status
+
+                else:
+                    if last_status != -1:
+                        log("[UPS] ИБП не найден через Win32_Battery")
+                        last_status = -1
+
+            except Exception as e:
+                log(f"[UPS] monitor error: {e}")
+
+            time.sleep(1)
+
+    finally:
+        pythoncom.CoUninitialize()
 
 
 def get_status_from_db(table_num):
@@ -203,6 +265,12 @@ def connect_with_timeout(url: str, timeout_sec: float) -> Client:
 def main():
     global proc1, proc2, proc3
     log(f"[BOOT] pid={os.getpid()} exe={sys.executable}")
+
+    # Мониторинг ибп
+    threading.Thread(
+        target=ups_monitor_thread,
+        daemon=True
+    ).start()
 
     
     last_log = None

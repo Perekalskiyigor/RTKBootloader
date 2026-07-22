@@ -1340,9 +1340,9 @@ else:
 
 # print(f"RESULT = {result}")
 
-#db = DatabaseConnection()
+# db = DatabaseConnection()
 # db.db_connect()
 # insert_log_for1C(
-#     description="Включение РТК",
-#     user="V.Ovchinnikov"
+# description="Test",
+# user="V.Ovchinnikov"
 # )

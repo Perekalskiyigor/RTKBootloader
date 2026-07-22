@@ -2,6 +2,7 @@
 import sqlite3
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog 
+from pathlib import Path
 
 # simpledialog — маленькое окно ввода при редактировании поля.
 

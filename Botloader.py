@@ -153,6 +153,7 @@ class FirmwareLoader:
             )
         
         # Обработка данных и запись результатов в БД
+        # При успешной прошивке извлекаем данные
         if resultTest.get("test_result") in (1, True, "1"):
 
 
@@ -235,6 +236,8 @@ class FirmwareLoader:
             except Exception as e:
                 logger4.exception(f"[Botloader] Не удалось записать брак в БД: {e}")
                 print("[Botloader] Не удалось записать брак в БД")
+
+                self.db_connection.set_user(record_id, user)
 
             self.cleanup()
             logger4.info(f"[Botloader] Цикл прошивки завершен с ошибкой | record_id={record_id}")

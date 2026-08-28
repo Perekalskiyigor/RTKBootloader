@@ -531,6 +531,45 @@ class DatabaseConnection:
             return 404
 
 
+    def set_user(self, record_id, user):
+        """Метод используется прошивальщиком для проставлени я пользователя при неуспешной прошивке"""
+        logger4.debug(
+            f"[SQLite] set_user вызван | record_id={record_id}, user={user}"
+        )
+
+        try:
+            self.cursor.execute(
+                """
+                UPDATE order_details
+                SET user = ?
+                WHERE id = ?
+                """,
+                (user, record_id)
+            )
+
+            self.conn.commit()
+
+            if self.cursor.rowcount == 0:
+                logger4.warning(
+                    f"[SQLite] set_user: запись не найдена | id={record_id}"
+                )
+                return False
+
+            logger4.info(
+                f"[SQLite] set_user: пользователь записан | "
+                f"id={record_id}, user={user}"
+            )
+            return True
+
+        except Exception as e:
+            self.conn.rollback()
+            logger4.exception(
+                f"[SQLite] set_user ошибка | "
+                f"id={record_id}, user={user}, error={e}"
+            )
+            return False
+
+
 
     
     

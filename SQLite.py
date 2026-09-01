@@ -1144,71 +1144,100 @@ def reserve_board_for_loge(order_number, dm, stand_id, table_no, loge):
     """
     Найти конкретную плату по DM в заказе и подготовить её
     к новой прошивке независимо от предыдущего результата.
+    new       → возьмёт
+    done      → возьмёт
+    failed    → возьмёт     
     """
+
     conn = sqlite3.connect("orders.db")
     cur = conn.cursor()
 
-    dm_norm = dm[:-1] if dm.endswith("B") else dm
+    dm_norm = dm.strip()
+    if dm_norm.endswith("B"):
+        dm_norm = dm_norm[:-1]
 
-    cur.execute("""
-        UPDATE order_details
-        SET
-            status = ?,
-            stand_id = ?,
-            data_matrix = ?
-        WHERE id = (
+    try:
+        # плату, которая прямо сейчас уже занята другим столом.  не разрешать reserved_*, placed_*, sent.
+        cur.execute("""
             SELECT D.id
-            FROM order_details D
-            JOIN orders O ON O.id = D.order_id
-            WHERE O.order_number = ?
-              AND (
-                    D.serial_number = ?
-                    OR D.serial_number_8 = ?
-                    OR D.data_matrix = ?
-                  )
-              AND (D.status IS NULL OR D.status = 'new')
-            LIMIT 1
+                FROM order_details D
+                JOIN orders O ON O.id = D.order_id
+                WHERE O.order_number = ?
+                AND (
+                        D.serial_number = ?
+                        OR D.serial_number_8 = ?
+                        OR D.data_matrix = ?
+                    )
+                AND (
+                        D.status IS NULL
+                        OR D.status IN ('new', 'done', 'failed')
+                    )
+                LIMIT 1
+        """, (
+            order_number,
+            dm_norm,
+            dm_norm,
+            dm_norm
+        ))
+
+        row = cur.fetchone()
+
+        if not row:
+            conn.close()
+            logger4.warning(
+                f"[SQLite] Плата {dm_norm} не найдена "
+                f"в заказе {order_number}"
+            )
+            return None
+
+        record_id = row[0]
+
+        # Начинаем НОВЫЙ цикл прошивки этой же платы.
+        cur.execute("""
+            UPDATE order_details
+            SET
+                status = ?,
+                stand_id = ?,
+                data_matrix = ?,
+
+                test_result = NULL,
+                log_path = NULL,
+                report_path = NULL,
+                error_description = NULL,
+
+                started_at = NULL,
+                finished_at = NULL,
+                date_sent = NULL
+
+            WHERE id = ?
+        """, (
+            f"reserved_t{table_no}_l{loge}",
+            stand_id,
+            dm_norm,
+            record_id
+        ))
+
+        conn.commit()
+
+        logger4.info(
+            f"[SQLite] Плата {dm_norm} подготовлена "
+            f"к повторной прошивке | "
+            f"id={record_id}, "
+            f"status=reserved_t{table_no}_l{loge}"
         )
-    """, (
-        f"reserved_t{table_no}_l{loge}",
-        stand_id,
-        dm_norm,
-        order_number,
-        dm_norm,
-        dm_norm,
-        dm_norm
-    ))
 
-    conn.commit()
+        return record_id
 
-    if cur.rowcount == 0:
+    except Exception as e:
+        conn.rollback()
+        logger4.exception(
+            f"[SQLite] Ошибка резервирования платы "
+            f"{dm_norm}: {e}"
+        )
         return None
 
-    cur.execute("""
-        SELECT id
-        FROM order_details
-        WHERE order_id = (SELECT id FROM orders WHERE order_number = ?)
-          AND data_matrix = ?
-          AND status = ?
-        LIMIT 1
-    """, (order_number, dm_norm, f"reserved_t{table_no}_l{loge}"))
-
-    row = cur.fetchone()
-    return row[0] if row else None
-
-
-def mark_board_placed(record_id, table_no, loge):
-    conn = sqlite3.connect("orders.db")
-    cur = conn.cursor()
-
-    cur.execute("""
-        UPDATE order_details
-        SET status = ?
-        WHERE id = ?
-    """, (f"placed_t{table_no}_l{loge}", record_id))
-
-    conn.commit()
-    return cur.rowcount > 0
+    finally:
+        conn.close()
 
 
 def release_reserved_board(record_id):

@@ -238,7 +238,6 @@ shared_data = {
         'OPC_restart_RTK':False, # Перезапуск ртк
         'OPC_end_order':False, # Данные о завршен ли заказ или нет если завершен False если нет true
         'OPC_finish_order': False,  # ручной запуск досушки если стопим заказ на середине
-        'OPC_cnt_newBoard':0, # колво непрошитых плат
         'OPC_cnt_Board':0, # колво плат в заказе
         'OPC_success_count':0, #кол во успешно прощитых платё
         'OPC_nonsuccess_count':0, # кол-во неуспешно прошщитых плат
@@ -765,30 +764,13 @@ class OPCClient:
                         btn_load = False
                         # btn_select = False
 
+                
+
                     # ---------- 2) WRITE: витрина DB полей (basic + extra) ----------
                     try:
                         with shared_data_lock:
                             current_order = shared_data['OPC-DB'].get('OPC_Order', '').strip()
 
-                        if current_order:
-                            has_new = SQLite.has_new_boards(current_order)
-
-                            if has_new is False:
-                                logger4.warning(
-                                    f"[MAIN] Новых плат в заказе больше нет. Включаем режим досушки | order={current_order}"
-                                )
-                                NO_MORE_NEW_BOARDS.set()
-
-                            elif has_new is True:
-                                pass
-
-                            else:
-                                logger4.warning(
-                                    f"[MAIN] Не удалось определить наличие новых плат | order={current_order}"
-                                )
-
-                            with shared_data_lock:
-                                shared_data['OPC-DB']['OPC_end_order'] = (has_new is False)
 
                         with shared_data_lock:
                             opcdb = dict(shared_data.get('OPC-DB', {}))
@@ -798,8 +780,6 @@ class OPCClient:
                         self._write(FW_VERSION, opcdb.get('OPC_firmware', 'пусто'), ua.VariantType.String)
 
                         # Кол-во непрошитых (берём OPC_cnt_newBoard, иначе DB_last_count как запасной источник)
-                        # колво непрошитых плат
-                        self._write(CNT_NEW_BOARD, opcdb.get('OPC_cnt_newBoard', 0), ua.VariantType.Int16)
                         # колво плат в заказе
                         self._write(CNT_BOARD, opcdb.get('OPC_cnt_Board', 0), ua.VariantType.Int16)
                         # кол во успешно прощитых платё
@@ -1634,19 +1614,6 @@ class Table:
                 )
                 return None
 
-            has_new = SQLite.has_new_boards(Order)
-            if has_new is False:
-                logger4.warning(
-                    f"Стол {self.number}: в БД новых плат больше нет, 210 не отправляем"
-                )
-                NO_MORE_NEW_BOARDS.set()
-                return None
-
-            if has_new is None:
-                logger4.warning(
-                    f"Стол {self.number}: не удалось проверить наличие новых плат в БД"
-                )
-                return None
 
             logger4.info(
                 f"Стол {self.number}: попытка взять новую плату {attempt}/{max_new_board_tries}"
@@ -1723,7 +1690,7 @@ class Table:
                     order=Order
                 ).get("result")
                 ##################################
-                verified = True #Убери это проверка платы
+                # verified = True #Убери это проверка платы
                 ##################################
             except Exception as e:
                 logger4.exception(
@@ -2347,12 +2314,6 @@ class Table:
                 max_new_board_tries=5
             )
 
-            if dm is None:
-                logger4.warning(
-                    f"[SETUP] Стол {self.number}: новых плат нет, SETUP не выполнен"
-                )
-                NO_MORE_NEW_BOARDS.set()
-                return
 
             self.photodata1 = dm
 

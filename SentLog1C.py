@@ -111,7 +111,7 @@ def send_success_log(board_dict):
     board_output_time = ts.get("board_output_time", now)
 
     payload = {
-        "rtk_id": board_dict["rtk_id"],
+        "rtk_id": "RTK_R050_BoardsIO_1",
         "order": board_dict["order"],
         "version": board_dict["version"],
         "message_type": board_dict.get("message_type"),  # если нужно — раскомментировать
@@ -198,7 +198,7 @@ def send_unsuccess_log(board_dict):
     board_output_time = ts.get("board_output_time", now)
 
     payload = {
-        "rtk_id": board_dict["rtk_id"],
+        "rtk_id": "RTK_R050_BoardsIO_1",
         "order": board_dict["order"],
         "version": board_dict["version"],
         "message_type": board_dict.get("message_type"),

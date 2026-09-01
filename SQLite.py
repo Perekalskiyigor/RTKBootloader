@@ -1142,7 +1142,8 @@ def has_new_boards(order_number):
 
 def reserve_board_for_loge(order_number, dm, stand_id, table_no, loge):
     """
-    Бронируем плату после фото/проверки 1С, но ДО укладки роботом.
+    Найти конкретную плату по DM в заказе и подготовить её
+    к новой прошивке независимо от предыдущего результата.
     """
     conn = sqlite3.connect("orders.db")
     cur = conn.cursor()

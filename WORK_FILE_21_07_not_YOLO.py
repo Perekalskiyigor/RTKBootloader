@@ -13,8 +13,6 @@ import os
 import SQLite
 import Mertech_scanner
 import BoardAprove
-import TrayVision
-
 
 
 
@@ -238,18 +236,11 @@ shared_data = {
         'OPC_restart_RTK':False, # Перезапуск ртк
         'OPC_end_order':False, # Данные о завршен ли заказ или нет если завершен False если нет true
         'OPC_finish_order': False,  # ручной запуск досушки если стопим заказ на середине
+        'OPC_cnt_newBoard':0, # колво непрошитых плат
         'OPC_cnt_Board':0, # колво плат в заказе
         'OPC_success_count':0, #кол во успешно прощитых платё
         'OPC_nonsuccess_count':0, # кол-во неуспешно прошщитых плат
-        'OPC_name': "",  # имя пользователя, заносимое в 1с
-
-        'VISION__status': 'idle',   # машинное зрение тары
-        'VISION_ERROR': '',
-        'VISION_count_new_board': 0, # новых плат в таре
-        'VISION_occupied_positions': [],# занятые ячейки
-        'VISION_bad_board_position': [],# неправильно уложенные платы
-        'VISION_empty_positions': [],# не занятые ячейки
-        'VISION_border_order': False,
+        'OPC_name': ""  # имя пользователя, заносимое в 1с
         },
 
 }
@@ -646,14 +637,9 @@ class OPCClient:
                         'ns=2;s=Application.UserInterface.OPC_end_order',
 
                         # Узел флага ручного завершения заказа ручной режим досушки
-                        'ns=2;s=Application.UserInterface.OPC_finish_order',
-                        # Нейросеть
-                        'ns=2;s=Application.UserInterface.OPC_vision_count',
-                        'ns=2;s=Application.UserInterface.OPC_vision_occupied',
-                        'ns=2;s=Application.UserInterface.OPC_vision_bad',
-                        'ns=2;s=Application.UserInterface.OPC_vision_empty',
-                        'ns=2;s=Application.UserInterface.OPC_vision_order',
-                        'ns=2;s=Application.UserInterface.OPC_vision_status',
+                        'ns=2;s=Application.UserInterface.OPC_finish_order'
+
+                        
                     ]
                     ok_count = 0
                     for nid in warm_ids:
@@ -730,14 +716,6 @@ class OPCClient:
         OPC_FINISH_ORDER = 'ns=2;s=Application.UserInterface.OPC_finish_order' # Узел ручного запуска досушки заказа
         OPC_NAME = 'ns=2;s=Application.UserInterface.OPC_name'
 
-        # Нейросеть анализ тары
-        VISION_COUNT = ('ns=2;s=Application.UserInterface.OPC_vision_count')
-        VISION_OCCUPIED = ('ns=2;s=Application.UserInterface.OPC_vision_occupied')
-        VISION_BAD = ('ns=2;s=Application.UserInterface.OPC_vision_bad')
-        VISION_EMPTY = ('ns=2;s=Application.UserInterface.OPC_vision_empty')
-        VISION_ORDER = ('ns=2;s=Application.UserInterface.OPC_vision_order')
-        VISION_STATUS = ('ns=2;s=Application.UserInterface.OPC_vision_status')
-
         # шаблон nodeId для столов
         def T(n, leaf):
             return f'ns=2;s=Application.UserInterface.Table{n}.{leaf}'
@@ -764,13 +742,30 @@ class OPCClient:
                         btn_load = False
                         # btn_select = False
 
-                
-
                     # ---------- 2) WRITE: витрина DB полей (basic + extra) ----------
                     try:
                         with shared_data_lock:
                             current_order = shared_data['OPC-DB'].get('OPC_Order', '').strip()
 
+                        if current_order:
+                            has_new = SQLite.has_new_boards(current_order)
+
+                            if has_new is False:
+                                logger4.warning(
+                                    f"[MAIN] Новых плат в заказе больше нет. Включаем режим досушки | order={current_order}"
+                                )
+                                NO_MORE_NEW_BOARDS.set()
+
+                            elif has_new is True:
+                                pass
+
+                            else:
+                                logger4.warning(
+                                    f"[MAIN] Не удалось определить наличие новых плат | order={current_order}"
+                                )
+
+                            with shared_data_lock:
+                                shared_data['OPC-DB']['OPC_end_order'] = (has_new is False)
 
                         with shared_data_lock:
                             opcdb = dict(shared_data.get('OPC-DB', {}))
@@ -780,6 +775,8 @@ class OPCClient:
                         self._write(FW_VERSION, opcdb.get('OPC_firmware', 'пусто'), ua.VariantType.String)
 
                         # Кол-во непрошитых (берём OPC_cnt_newBoard, иначе DB_last_count как запасной источник)
+                        # колво непрошитых плат
+                        self._write(CNT_NEW_BOARD, opcdb.get('OPC_cnt_newBoard', 0), ua.VariantType.Int16)
                         # колво плат в заказе
                         self._write(CNT_BOARD, opcdb.get('OPC_cnt_Board', 0), ua.VariantType.Int16)
                         # кол во успешно прощитых платё
@@ -791,46 +788,6 @@ class OPCClient:
                             ua.VariantType.Boolean
                         )
                         #print(f"*****************************{opcdb.get('OPC_end_order', False)}")
-
-                        # ==========================================================
-                        # Данные нейросети
-                        # ==========================================================
-
-                        self._write(
-                            VISION_COUNT,
-                            int(opcdb.get('VISION_count_new_board', 0)),
-                            ua.VariantType.Int16
-                        )
-
-                        self._write(
-                            VISION_OCCUPIED,
-                            str(opcdb.get('VISION_occupied_positions', '')),
-                            ua.VariantType.String
-                        )
-
-                        self._write(
-                            VISION_BAD,
-                            str(opcdb.get('VISION_bad_board_position', '')),
-                            ua.VariantType.String
-                        )
-
-                        self._write(
-                            VISION_EMPTY,
-                            str(opcdb.get('VISION_empty_positions', '')),
-                            ua.VariantType.String
-                        )
-
-                        self._write(
-                            VISION_ORDER,
-                            bool(opcdb.get('VISION_border_order', False)),
-                            ua.VariantType.Boolean
-                        )
-
-                        self._write(
-                            VISION_STATUS,
-                            int(opcdb.get('VISION_status', 0)),
-                            ua.VariantType.Int16
-                        )
 
                         # Список заказов (строка/массив строк)
                         sr = opcdb.get('OPC_search_result', "")
@@ -957,53 +914,13 @@ class OPCClient:
                     except Exception as e:
                         print(f"[OPC] read OPC_Order failed: {e}")
                     ######### Добавление заказа вы БД при его остутствии
-                    
-                    ######### Добавление заказа в БД при его отсутствии #########
-                    with shared_data_lock:
-                        current_order = str(
-                            shared_data['OPC-DB'].get('OPC_Order', '')
-                        ).strip()
-
-                    # Пока оператор заказ не выбрал — вообще ничего не спрашиваем у 1С
-                    if current_order:
-
-                        # Дополнительная защита от мусора/неполного номера
-                        if len(current_order) >= 5:
-
-                            try:
-                                db_connection = SQL.DatabaseConnection()
-
-                                if not db_connection.check_order(current_order):
-
-                                    logger4.info(
-                                        f"[MAIN] Заказ {current_order} отсутствует в локальной БД. "
-                                        f"Запрашиваем данные из 1С"
-                                    )
-
-                                    dict_result = Provider1C.fetch_data(current_order)
-
-                                    if dict_result:
-                                        db_connection.get_order_insert_orders_frm1C(dict_result)
-
-                                        print(f"Заказ {current_order} добавлен")
-                                        logger4.info(
-                                            f"[MAIN] Заказ {current_order} успешно добавлен в БД"
-                                        )
-                                    else:
-                                        logger4.warning(
-                                            f"[MAIN] 1С не вернула данные для заказа {current_order}"
-                                        )
-
-                            except Exception as e:
-                                logger4.exception(
-                                    f"[MAIN] Ошибка получения заказа {current_order} из 1С: {e}"
-                                )
-
-                    else:
-                        # Это нормальное состояние при запуске программы.
-                        # Ничего в 1С не отправляем.
-                        pass
-                    
+                    db_connection = SQL.DatabaseConnection()
+                    if not(db_connection.check_order(shared_data['OPC-DB']['OPC_Order'])):
+                        order_crop = str(shared_data['OPC-DB']['OPC_Order'])[4:]
+                        with shared_data_lock:
+                            dict_result = Provider1C.fetch_data(Order)
+                            db_connection.get_order_insert_orders_frm1C(dict_result)
+                            print("заказ добавлен")
 
                     # ---------- 5) Пушим статусы столов (1..3) ----------
                     # try:
@@ -1614,6 +1531,19 @@ class Table:
                 )
                 return None
 
+            has_new = SQLite.has_new_boards(Order)
+            if has_new is False:
+                logger4.warning(
+                    f"Стол {self.number}: в БД новых плат больше нет, 210 не отправляем"
+                )
+                NO_MORE_NEW_BOARDS.set()
+                return None
+
+            if has_new is None:
+                logger4.warning(
+                    f"Стол {self.number}: не удалось проверить наличие новых плат в БД"
+                )
+                return None
 
             logger4.info(
                 f"Стол {self.number}: попытка взять новую плату {attempt}/{max_new_board_tries}"
@@ -1690,7 +1620,7 @@ class Table:
                     order=Order
                 ).get("result")
                 ##################################
-                # verified = True #Убери это проверка платы
+                verified = True #Убери это проверка платы
                 ##################################
             except Exception as e:
                 logger4.exception(
@@ -2314,6 +2244,12 @@ class Table:
                 max_new_board_tries=5
             )
 
+            if dm is None:
+                logger4.warning(
+                    f"[SETUP] Стол {self.number}: новых плат нет, SETUP не выполнен"
+                )
+                NO_MORE_NEW_BOARDS.set()
+                return
 
             self.photodata1 = dm
 
@@ -2796,57 +2732,6 @@ class Table:
         time.sleep(2)
 
 
-#########################Нейронка определение заполненности тары СТАРТ#####################################################################################
-def startup_vision_check():
-    """Скрпит запускающий нейронку на аннлиз по фото тары новых плат"""
-
-    try:
-
-        logger4.info(
-            "[VISION] Запускаем анализ тары"
-        )
-        opc_set (shared_data, f'OPC_log', f"Запускаем анализ тары нейросетью")
-
-        result = TrayVision.analyze_tray()
-
-        with shared_data_lock:
-
-            shared_data['OPC-DB']['VISION_count_new_board'] = (
-                result['count_new_board']
-            )
-
-            shared_data['OPC-DB']['VISION_occupied_positions'] = (
-                result['occupied_positions']
-            )
-
-            shared_data['OPC-DB']['VISION_bad_board_position'] = (
-                result['bad_board_position']
-            )
-
-            shared_data['OPC-DB']['VISION_empty_positions'] = (
-                result['empty_positions']
-            )
-
-            shared_data['OPC-DB']['VISION_border_order'] = (
-                result['border_order']
-            )
-
-        logger4.info(
-            f"[VISION] Анализ завершён: {result}"
-        )
-        opc_set (shared_data, f'OPC_log', f"Анализ тары нейросетью завершен успешно, данные получены")
-
-    except Exception as e:
-
-        logger4.exception(
-            f"[VISION] Ошибка анализа: {e}"
-        )
-
-
-#########################Нейронка определение заполненности тары СТОП#####################################################################################
-
-
-
 #########################Блок логики запуска потоков#####################################################################################
 # Глобальные переменные (у тебя уже есть)
 # shared_data, shared_data_lock
@@ -2932,28 +2817,6 @@ if __name__ == "__main__":
     url = "opc.tcp://192.168.1.3:48010"
     logger4.info(f"[MAIN]Запускаем обен с OPCClient сервером по адресу {url}")
     opc_client = OPCClient(url, 2, shared_data)
-
-
-     # ==================================================
-    # Однократный анализ тары нейросетью
-    # ==================================================
-
-    logger4.info(
-            "[MAIN] Старт потока анализа тары нейросетью"
-        )
-    vision_thread = threading.Thread(
-        target=startup_vision_check,
-        name="StartupVision",
-        daemon=True
-    )
-
-    vision_thread.start()
-
-    logger4.info(
-        "[MAIN] Поток анализа тары нейросетью запущен"
-    )
-
-
 
 
     

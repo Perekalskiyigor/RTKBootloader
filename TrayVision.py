@@ -884,9 +884,9 @@ def analyze_tray():
 
 
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
 
-#     result = analyze_tray()
+    result = analyze_tray()
 
-#     print("\nФИНАЛЬНЫЙ РЕЗУЛЬТАТ:")
-#     print(result)
+    print("\nФИНАЛЬНЫЙ РЕЗУЛЬТАТ:")
+    print(result)

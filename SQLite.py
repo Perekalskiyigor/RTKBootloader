@@ -1240,6 +1240,20 @@ def reserve_board_for_loge(order_number, dm, stand_id, table_no, loge):
         conn.close()
 
 
+def mark_board_placed(record_id, table_no, loge):
+    conn = sqlite3.connect("orders.db")
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE order_details
+        SET status = ?
+        WHERE id = ?
+    """, (f"placed_t{table_no}_l{loge}", record_id))
+
+    conn.commit()
+    return cur.rowcount > 0
+
+
 def release_reserved_board(record_id):
     conn = sqlite3.connect("orders.db")
     cur = conn.cursor()

@@ -21,7 +21,7 @@ psycopg2==2.9.10
 pyinstaller==6.16.0
 pyinstaller-hooks-contrib==2025.9
 pylibdmtx==0.1.10
-pymodbus==3.8.6
+pymodbus==2.5.3
 pyserial==3.5
 python-dateutil==2.9.0.post0
 pytz==2025.2

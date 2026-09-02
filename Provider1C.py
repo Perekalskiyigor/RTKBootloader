@@ -64,13 +64,16 @@ def fetch_data(order):
         url = f"{fetch_data_url}{order}"
         payload = {}
         headers = {
-        'Authorization': 'Basic bWFya19EUEE6MTIzNDU2elo='
+        'Authorization': 'Basic cnRrX2NtcHA6NDU2Nzg5QWE='
         }
         logger4.info(f"[Provider1C] Запрос данных по заказу: {order}")
         response = requests.get(url, headers=headers, verify=True, timeout=15)
         response.raise_for_status()
         #print(response.text)
         data = response.json()
+
+        print("\n=== RAW ИЗ 1С ===")
+        print(repr(data['products']['firmware']))
 
 
         order_id = data.get('order')
@@ -170,11 +173,12 @@ def fetch_data(order):
 # db_connection.get_order_insert_orders_frm1C(dict)
 
 # """ 
-# # getOrders()
-# # db_connection = SQLite.DatabaseConnection()
+# getOrders()
+# db_connection = SQLite.DatabaseConnection()
 
 # getOrders()
-# dict = fetch_data("ЗНП-32223.1.1")
+# dict = fetch_data("ЗНП-37270.3.1")
+# print(dict)
 
 
 # db_connection = SQLite.DatabaseConnection()

@@ -1685,10 +1685,13 @@ class Table:
 
             # 4. Проверка в 1С
             try:
+                logger4.info(f"Работа фукнции применимости платы к заказу плата {dm} заказ {Order}")
                 verified = BoardAprove.check_board(
                     board_id=dm,
                     order=Order
                 ).get("result")
+                logger4.info(f"Результат проверки применимости платы к заказу плата {dm} заказ {Order} ===== {verified}")
+                print(f"Результат проверки применимости платы к заказу плата {dm} заказ {Order} ===== {verified}")
                 ##################################
                 # verified = True #Убери это проверка платы
                 ##################################

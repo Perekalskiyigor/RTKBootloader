@@ -32,8 +32,10 @@ NODE_RUNNING = "ns=2;s=Application.UserInterface.OPC_log"
 POLL_SEC = 0.5
 
 EXE1 = r"C:\nails_table_v4\hub\nails_table_hub\nails_table_hub.exe"
-EXE2 = r"C:\Users\i.perekalskii\Desktop\DEV\RTKBootloader\dist\WORK_FILE_21_07.exe"
-EXE3 = r"C:\Users\i.perekalskii\Desktop\DEV\RTKBootloader\dist\ServerRTK.exe"
+#EXE2 = r"C:\Users\i.perekalskii\Desktop\DEV\RTKBootloader\dist\WORK_FILE_21_07.exe"
+EXE2 = r"C:\Users\rtk-cmpp\Desktop\DEV\RTKBootloader\dist\WORK_FILE_21_07.exe"
+#EXE3 = r"C:\Users\i.perekalskii\Desktop\DEV\RTKBootloader\dist\ServerRTK.exe"
+EXE3 = r"C:\Users\rtk-cmpp\Desktop\DEV\RTKBootloader\dist\ServerRTK.exe"
 CONNECT_TIMEOUT_SEC = 8.0
 RECONNECT_DELAY_SEC = 2.0
 

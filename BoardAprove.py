@@ -78,11 +78,13 @@ def check_board(
 
 
 # res = check_board(
-#     board_id="U00081422B",
-#     order="ЗНП-29961.1.1"
+#     board_id="U00067282T",
+#     order="ЗНП-48375.1.1"
 # )
 
 # result = res["result"]
+
+
 
 # print(result)
 

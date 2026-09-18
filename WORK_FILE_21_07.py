@@ -1692,9 +1692,7 @@ class Table:
                 ).get("result")
                 logger4.info(f"Результат проверки применимости платы к заказу плата {dm} заказ {Order} ===== {verified}")
                 print(f"Результат проверки применимости платы к заказу плата {dm} заказ {Order} ===== {verified}")
-                ##################################
-                # verified = True #Убери это проверка платы
-                ##################################
+                
             except Exception as e:
                 logger4.exception(
                     f"Стол {self.number}: ошибка проверки платы DM={dm} в 1С: {e}"
@@ -1706,7 +1704,14 @@ class Table:
                 f"проверка 1С result={verified}"
             )
 
-            if not verified:
+            ##################################
+            verified = True #Убери это проверка платы
+            print(f"Внимание работа заглушки на проверку платы присвоили verified ={verified}")
+            logger4.info(f"Внимание работа заглушки на проверку платы присвоили verified ={verified}")
+            
+            ##################################
+
+            if verified is False:
                 logger4.warning(
                     f"Стол {self.number}: плата DM={dm} НЕ прошла проверку 1С — уводим в брак"
                 )

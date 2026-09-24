@@ -237,7 +237,7 @@ class FirmwareLoader:
                 logger4.exception(f"[Botloader] Не удалось записать брак в БД: {e}")
                 print("[Botloader] Не удалось записать брак в БД")
 
-                self.db_connection.set_user(record_id, user)
+            self.db_connection.set_user(record_id, user)
 
             self.cleanup()
             logger4.info(f"[Botloader] Цикл прошивки завершен с ошибкой | record_id={record_id}")
@@ -255,6 +255,7 @@ class FirmwareLoader:
             is_success = str(test_result_raw).strip() == "1" or test_result_raw is True
 
             serial_number = resultTest.get("data_matrix", "")
+            log_path = resultTest.get("log_path") or ""
 
             logger4.info(
                 f"[Botloader][1С] Подготовка payload для 1С | "
@@ -270,6 +271,7 @@ class FirmwareLoader:
                     "tray_number": "123455"
                 },
                 "operator": user,
+                "log_path": log_path,
                 "timestamps": {
                     "dm_code_time": now,
                     "firmware_finished_time": now,

@@ -167,6 +167,8 @@ def fetch_data(order):
         raise
 
 
+
+
 """
 # dict = fetch_data("ЗНП-5972.1.1")
 # db_connection = SQLite.DatabaseConnection()
@@ -177,7 +179,7 @@ def fetch_data(order):
 # db_connection = SQLite.DatabaseConnection()
 
 # getOrders()
-# dict = fetch_data("ЗНП-37270.3.1")
+# dict = fetch_data("ЗНП-29961.1.1")
 # print(dict)
 
 

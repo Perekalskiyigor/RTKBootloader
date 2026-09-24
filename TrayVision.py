@@ -5,10 +5,12 @@ from PIL import Image
 import cv2
 import numpy as np
 import os
-import vlc
+# import vlc
+from camera_take_photo import save_single_photo
 import time
 from ultralytics import YOLO
 from datetime import datetime
+
 
 LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "operationsYOLO.log")
 
@@ -52,69 +54,101 @@ def run_operation(operation_no, operation_name, func):
 class CellClassifier:
     def __init__(self, yolo_model_path, resnet_model_path, classes):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
+
         self.yolo = YOLO(yolo_model_path)
-        
-        self.resnet = models.resnet18(pretrained=False)
-        num_ftrs = self.resnet.fc.in_features
-        self.resnet.fc = nn.Linear(num_ftrs, len(classes))
-        self.resnet.load_state_dict(torch.load(resnet_model_path, map_location=self.device))
-        self.resnet = self.resnet.to(self.device)
-        self.resnet.eval()
-        
+
+        self.classifier_model = models.mobilenet_v3_small(weights=None)
+        num_ftrs = self.classifier_model.classifier[3].in_features
+        self.classifier_model.classifier[3] = nn.Linear(num_ftrs, len(classes))
+        state_dict = torch.load(resnet_model_path, map_location=self.device)
+        self.classifier_model.load_state_dict(state_dict)
+        self.classifier_model = self.classifier_model.to(self.device)
+        self.classifier_model.eval()
+
         self.classes = classes
-        
+
         self.transform = transforms.Compose([
             transforms.Resize((224, 224)),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225]
+            )
         ])
-    
+
     def classify_cell(self, cell_image):
         cell_rgb = cv2.cvtColor(cell_image, cv2.COLOR_BGR2RGB)
         cell_pil = Image.fromarray(cell_rgb)
         cell_tensor = self.transform(cell_pil).unsqueeze(0).to(self.device)
-        
+
         with torch.no_grad():
-            outputs = self.resnet(cell_tensor)
+            outputs = self.classifier_model(cell_tensor)
             probabilities = torch.softmax(outputs, dim=1)
             confidence, predicted = torch.max(probabilities, 1)
-        
+
         class_name = self.classes[predicted.item()]
         confidence_value = confidence.item()
-        
+
         return class_name, confidence_value
-    
+
+    def _sort_cells_grid(self, cells, num_rows=3, num_cols=20):
+        if not cells:
+            return cells
+
+        expected = num_rows * num_cols
+        if len(cells) != expected:
+            print(
+                f"ВНИМАНИЕ: ожидалось {expected} ячеек, "
+                f"обнаружено {len(cells)}. Сортировка по строкам может быть неточной.",
+                flush=True
+            )
+
+        cells_sorted_by_y = sorted(cells, key=lambda c: c['center_y'])
+
+        rows = []
+        for i in range(num_rows):
+            start = i * num_cols
+            end = start + num_cols
+            row = cells_sorted_by_y[start:end]
+            row.sort(key=lambda c: c['center_x'])
+            rows.append(row)
+
+        result = []
+        for row in rows:
+            result.extend(row)
+
+        return result
+
     def process_image(self, image):
         if image is None:
             return None
-        
+
         original_image = image.copy()
-        results = self.yolo(image, conf=0.45)
-        
+        results = self.yolo(image, conf=0.7)
+
         cells_info = []
-        
+
         if len(results) > 0 and results[0].boxes is not None:
             boxes = results[0].boxes.xyxy.cpu().numpy()
-            
+
             for idx, box in enumerate(boxes):
                 x1, y1, x2, y2 = map(int, box)
-                
+
                 x1 = max(0, x1)
                 y1 = max(0, y1)
                 x2 = min(image.shape[1], x2)
                 y2 = min(image.shape[0], y2)
-                
+
                 if x2 <= x1 or y2 <= y1:
                     continue
-                
+
                 cell_image = image[y1:y2, x1:x2]
-                
+
                 if cell_image.size == 0:
                     continue
-                
+
                 class_name, confidence = self.classify_cell(cell_image)
-                
+
                 cells_info.append({
                     'bbox': (x1, y1, x2, y2),
                     'class': class_name,
@@ -123,60 +157,60 @@ class CellClassifier:
                     'center_y': (y1 + y2) // 2,
                     'center_x': (x1 + x2) // 2
                 })
-        
-        cells_info.sort(key=lambda c: (c['center_y'], c['center_x']))
-        
+
+        cells_info = self._sort_cells_grid(cells_info, num_rows=3, num_cols=20)
+
         return {
             'original_image': original_image,
             'cells': cells_info
         }
-    
+
     def check_order(self, cells):
         if not cells:
             return True, []
-        
+
         filled_status = []
         for cell in cells:
             if cell['class'] == 'filled':
                 filled_status.append(1)
             else:
                 filled_status.append(0)
-        
+
         if not filled_status:
             return True, []
-        
+
         first_filled = None
         for i, status in enumerate(filled_status):
             if status == 1:
                 first_filled = i
                 break
-        
+
         if first_filled is None:
             return True, []
-        
+
         if first_filled != 0:
             return False, [first_filled + 1]
-        
+
         filled_positions = [i for i, status in enumerate(filled_status) if status == 1]
-        
+
         is_sequential = True
         gaps = []
-        
+
         for i in range(len(filled_positions) - 1):
             if filled_positions[i + 1] - filled_positions[i] > 1:
                 is_sequential = False
                 for pos in range(filled_positions[i] + 1, filled_positions[i + 1]):
                     gaps.append(pos + 1)
-        
+
         return is_sequential, gaps
-    
+
     def get_results(self, result):
         cells = result['cells']
-        
+
         filled_positions = []
         empty_positions = []
         wrong_side_positions = []
-        
+
         for i, cell in enumerate(cells):
             position = i + 1
             if cell['class'] == 'filled':
@@ -185,12 +219,12 @@ class CellClassifier:
                 empty_positions.append(position)
             elif cell['class'] == 'wrong_side':
                 wrong_side_positions.append(position)
-        
+
         count_new_board = len(filled_positions)
-        
+
         is_sequential, gaps = self.check_order(cells)
         border_order = is_sequential
-        
+
         return {
             'count_new_board': count_new_board,
             'occupied_positions': filled_positions,
@@ -198,44 +232,61 @@ class CellClassifier:
             'empty_positions': empty_positions,
             'border_order': border_order
         }
-    
+
     def visualize_results(self, result):
         image = result['original_image'].copy()
         overlay = image.copy()
-        
+
         class_colors = {
             'filled': (0, 200, 0),
             'empty': (200, 0, 0),
-            'wrong_side': (0, 0, 200)
         }
-        
-        for cell in result['cells']:
-            x1, y1, x2, y2 = cell['bbox']
-            class_name = cell['class']
-            
-            color = class_colors.get(class_name, (200, 200, 200))
-            
-            cv2.rectangle(overlay, (x1, y1), (x2, y2), color, -1)
-        
-        cv2.addWeighted(overlay, 0.3, image, 0.7, 0, image)
-        
-        for cell in result['cells']:
-            x1, y1, x2, y2 = cell['bbox']
-            class_name = cell['class']
-            
-            color = class_colors.get(class_name, (200, 200, 200))
-            
-            cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
-        
-        filled_count = sum(1 for cell in result['cells'] if cell['class'] == 'filled')
-        total_cells = len(result['cells'])
-        
-        is_sequential, gaps = self.check_order(result['cells'])
-        
+
         font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 0.5
         thickness = 1
-        
+
+        for cell in result['cells']:
+            x1, y1, x2, y2 = cell['bbox']
+            class_name = cell['class']
+
+            color = class_colors.get(class_name, (200, 200, 200))
+
+            cv2.rectangle(overlay, (x1, y1), (x2, y2), color, -1)
+
+        cv2.addWeighted(overlay, 0.3, image, 0.7, 0, image)
+
+        for idx, cell in enumerate(result['cells'], start=1):
+            x1, y1, x2, y2 = cell['bbox']
+            class_name = cell['class']
+
+            color = class_colors.get(class_name, (200, 200, 200))
+
+            cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
+
+            # --- Номер по центру ячейки, белым ---
+            label = str(idx)
+            (lw, lh), _ = cv2.getTextSize(label, font, font_scale, thickness)
+
+            cx = (x1 + x2) // 2 - lw // 2
+            cy = (y1 + y2) // 2 + lh // 2
+
+            cv2.putText(
+                image,
+                label,
+                (cx, cy),
+                font,
+                font_scale,
+                (255, 255, 255),
+                thickness,
+                cv2.LINE_AA,
+            )
+
+        filled_count = sum(1 for cell in result['cells'] if cell['class'] == 'filled')
+        total_cells = len(result['cells'])
+
+        is_sequential, gaps = self.check_order(result['cells'])
+
         if is_sequential:
             text = f"Загружено: {filled_count}"
         else:
@@ -243,25 +294,26 @@ class CellClassifier:
                 text = f"Загружено: {filled_count}  ВНИМАНИЕ! Заполнение начато с {gaps[0]}-й ячейки"
             else:
                 text = f"Загружено: {filled_count}  ВНИМАНИЕ! Пропуски на позициях {gaps}"
-        
+
         (text_w, text_h), _ = cv2.getTextSize(text, font, font_scale, thickness)
-        
+
         padding = 8
         bg_width = text_w + padding * 2
         bg_height = text_h + padding * 2
-        
+
         if is_sequential:
             cv2.rectangle(image, (10, 10), (10 + bg_width, 10 + bg_height), (0, 0, 0), -1)
             cv2.rectangle(image, (10, 10), (10 + bg_width, 10 + bg_height), (255, 255, 255), 1)
         else:
             cv2.rectangle(image, (10, 10), (10 + bg_width, 10 + bg_height), (0, 0, 255), -1)
             cv2.rectangle(image, (10, 10), (10 + bg_width, 10 + bg_height), (255, 255, 255), 2)
-        
+
         cv2.putText(image, text, (10 + padding, 10 + padding + text_h), font, font_scale, (255, 255, 255), thickness)
-        
+
         return image
 
-def crop_image(image, crop_left=300, crop_right=400, crop_top=100, crop_bottom=200):
+def preprocess_image(image, crop_left=300, crop_right=400, crop_top=100, crop_bottom=200):
+    image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
     height, width = image.shape[:2]
     
     left = crop_left
@@ -278,20 +330,15 @@ def crop_image(image, crop_left=300, crop_right=400, crop_top=100, crop_bottom=2
 
 
 def analyze_tray():
-
-    player = None
-
-    try:
-
         # --------------------------------------------------
         # 1. Старт
         # --------------------------------------------------
 
-        def op1():
+    def op1():
             print("1. Программа запущена", flush=True)
             return None, "Старт процесса"
 
-        run_operation(
+    run_operation(
             1,
             "Программа запущена",
             op1
@@ -302,7 +349,7 @@ def analyze_tray():
         # 2. CUDA
         # --------------------------------------------------
 
-        def op2():
+    def op2():
             print("2. Проверяю CUDA...", flush=True)
 
             cuda_available = torch.cuda.is_available()
@@ -321,7 +368,7 @@ def analyze_tray():
                 f"CUDA={cuda_available}; Device={device_name}"
             )
 
-        run_operation(
+    run_operation(
             2,
             "Проверка CUDA",
             op2
@@ -332,7 +379,7 @@ def analyze_tray():
         # 3. Загружаем модели
         # --------------------------------------------------
 
-        def op3():
+    def op3():
 
             print(
                 "3. Загружаю модели...",
@@ -353,14 +400,13 @@ def analyze_tray():
 
                 classes=[
                     'empty',
-                    'filled',
-                    'wrong_side'
+                    'filled'
                 ]
             )
 
             return obj, "YOLO + ResNet загружены"
 
-        classifier = run_operation(
+    classifier = run_operation(
             3,
             "Загрузка моделей",
             op3
@@ -371,7 +417,7 @@ def analyze_tray():
         # 4
         # --------------------------------------------------
 
-        def op4():
+    def op4():
 
             print(
                 "4. Модели загружены",
@@ -380,7 +426,7 @@ def analyze_tray():
 
             return None, "Модели готовы к работе"
 
-        run_operation(
+    run_operation(
             4,
             "Модели загружены",
             op4
@@ -391,24 +437,22 @@ def analyze_tray():
         # Конфигурация
         # --------------------------------------------------
 
-        RTSP_URL = 'rtsp://172.21.19.19:8554/live'
+    CAMERA_IP = "192.168.1.51"
 
-        PHOTO_DIR = (
+    PHOTO_DIR = (
             '//SRV-NN/Users/i.perekalskii/'
             'Desktop/DEVelopers/rtk/photo/'
         )
 
-        RESULTS_DIR = (
+    RESULTS_DIR = (
             '//SRV-NN/Users/i.perekalskii/'
             'Desktop/DEVelopers/rtk/results/'
         )
-
-
         # --------------------------------------------------
         # 5. Каталоги
         # --------------------------------------------------
 
-        def op5():
+    def op5():
 
             print(
                 "5. Создаю каталоги...",
@@ -431,7 +475,7 @@ def analyze_tray():
                 f"RESULTS_DIR={RESULTS_DIR}"
             )
 
-        run_operation(
+    run_operation(
             5,
             "Создание каталогов",
             op5
@@ -442,7 +486,7 @@ def analyze_tray():
         # 6
         # --------------------------------------------------
 
-        def op6():
+    def op6():
 
             print(
                 "6. Каталоги OK",
@@ -451,7 +495,7 @@ def analyze_tray():
 
             return None, "Каталоги доступны"
 
-        run_operation(
+    run_operation(
             6,
             "Проверка каталогов",
             op6
@@ -459,263 +503,59 @@ def analyze_tray():
 
 
         # --------------------------------------------------
-        # 7. VLC
+        # 7 - сохранение фотографии с камеры
         # --------------------------------------------------
+    def op7():
+            print("7. Сохраняю фото с камеры...", flush=True)
 
-        def op7():
-
-            print(
-                "7. Создаю VLC...",
-                flush=True
+            saved_path = save_single_photo(
+                save_dir=PHOTO_DIR,
+                camera_ip=CAMERA_IP
             )
 
-            obj = vlc.Instance(
-                "--vout=vdummy",
-                "--no-audio",
-                "--no-video-title-show",
-                "--avcodec-hw=disable",
-                "--no-osd",
-                "--quiet"
-            )
+            print(f"Фото сохранено: {saved_path}", flush=True)
+            return saved_path, f"SAVED={saved_path}"
 
-            return obj, "VLC Instance создан"
 
-        instance = run_operation(
+    saved_photo_path = run_operation(
             7,
-            "Создание VLC",
+            "Сохранение фото с камеры",
             op7
         )
 
 
         # --------------------------------------------------
-        # 8
+        # 8 - читаем фото из папки
         # --------------------------------------------------
+    def op8():
+            print("8. Читаю сохранённое изображение...", flush=True)
 
-        def op8():
+            if not os.path.isfile(saved_photo_path):
+                raise RuntimeError(f"Файл не найден: {saved_photo_path}")
 
-            print(
-                "8. VLC создан",
-                flush=True
-            )
+            img = cv2.imread(saved_photo_path)
 
-            p = instance.media_player_new()
+            if img is None:
+                raise RuntimeError(
+                    f"OpenCV не смог прочитать файл: {saved_photo_path}"
+                )
 
-            m = instance.media_new(
-                RTSP_URL
-            )
+            return img, f"FILE={saved_photo_path}"
 
-            m.add_option(
-                '--avcodec-hw=disable'
-            )
-
-            p.set_media(m)
-
-            return (
-                (p, m),
-                "MediaPlayer и Media созданы"
-            )
-
-        player, media = run_operation(
+    image = run_operation(
             8,
-            "Настройка VLC",
+            "Чтение изображения",
             op8
         )
 
-
         # --------------------------------------------------
-        # 9. RTSP
+        # 9
         # --------------------------------------------------
 
-        def op9():
+    def op9():
 
             print(
-                "9. Запускаю RTSP:",
-                RTSP_URL,
-                flush=True
-            )
-
-            player.play()
-
-            return (
-                None,
-                f"RTSP_URL={RTSP_URL}"
-            )
-
-        run_operation(
-            9,
-            "Запуск RTSP",
-            op9
-        )
-
-
-        # --------------------------------------------------
-        # 10. Ждем поток
-        # --------------------------------------------------
-
-        def op10():
-
-            print(
-                "10. Жду появления видеопотока...",
-                flush=True
-            )
-
-            timeout = 15
-            started = time.time()
-
-            while time.time() - started < timeout:
-
-                width, height = player.video_get_size(0)
-
-                if width > 0 and height > 0:
-
-                    print(
-                        f"Поток появился: "
-                        f"{width}x{height}",
-                        flush=True
-                    )
-
-                    return (
-                        (width, height),
-                        f"Поток появился: "
-                        f"{width}x{height}"
-                    )
-
-                print(
-                    "Жду кадр...",
-                    flush=True
-                )
-
-                time.sleep(1)
-
-            raise RuntimeError(
-                "Видеопоток так и не появился "
-                "за 15 сек"
-            )
-
-        width, height = run_operation(
-            10,
-            "Ожидание видеопотока",
-            op10
-        )
-
-
-        time.sleep(1)
-
-
-        # --------------------------------------------------
-        # 11. Фото
-        # --------------------------------------------------
-
-        timestamp = datetime.now().strftime(
-            "%H%M%S"
-        )
-
-        snapshot_path = os.path.join(
-            PHOTO_DIR,
-            f"{timestamp}.png"
-        )
-
-        def op11():
-
-            print(
-                "11. Делаю снимок:",
-                snapshot_path,
-                flush=True
-            )
-
-            snapshot_result = (
-                player.video_take_snapshot(
-                    0,
-                    snapshot_path,
-                    0,
-                    0
-                )
-            )
-
-            if snapshot_result != 0:
-
-                raise RuntimeError(
-                    f"VLC не смог сохранить кадр, "
-                    f"код={snapshot_result}"
-                )
-
-            return (
-                snapshot_result,
-                f"FILE={snapshot_path}"
-            )
-
-        snapshot_result = run_operation(
-            11,
-            "Создание снимка",
-            op11
-        )
-
-
-        # --------------------------------------------------
-        # 12
-        # --------------------------------------------------
-
-        def op12():
-
-            print(
-                "12. VLC snapshot result:",
-                snapshot_result,
-                flush=True
-            )
-
-            return (
-                None,
-                f"VLC_RESULT={snapshot_result}"
-            )
-
-        run_operation(
-            12,
-            "Результат VLC snapshot",
-            op12
-        )
-
-
-        # --------------------------------------------------
-        # 13. Читаем изображение
-        # --------------------------------------------------
-
-        def op13():
-
-            print(
-                "13. Читаю изображение...",
-                flush=True
-            )
-
-            img = cv2.imread(
-                snapshot_path
-            )
-
-            if img is None:
-
-                raise RuntimeError(
-                    "OpenCV не смог прочитать кадр"
-                )
-
-            return (
-                img,
-                f"FILE={snapshot_path}"
-            )
-
-        image = run_operation(
-            13,
-            "Чтение изображения",
-            op13
-        )
-
-
-        # --------------------------------------------------
-        # 14
-        # --------------------------------------------------
-
-        def op14():
-
-            print(
-                "14. Размер изображения:",
+                "9. Размер изображения:",
                 image.shape,
                 flush=True
             )
@@ -725,68 +565,74 @@ def analyze_tray():
                 f"SHAPE={image.shape}"
             )
 
-        run_operation(
-            14,
+    run_operation(
+            9,
             "Определение размера изображения",
-            op14
+            op9
         )
 
 
         # --------------------------------------------------
-        # crop
+        # поворт кадра
         # --------------------------------------------------
-
-        cropped_image = crop_image(
-            image,
-            300,
-            400,
-            100,
-            200
-        )
+    # image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
+    cropped_image = preprocess_image(image,0,0,0,0)
 
 
         # --------------------------------------------------
         # 15. YOLO + ResNet
         # --------------------------------------------------
 
-        def op15():
+    def op10():
+        print("10. Запускаю YOLO + ResNet...", flush=True)
 
-            print(
-                "15. Запускаю YOLO + ResNet...",
-                flush=True
-            )
+        data = classifier.process_image(cropped_image)
 
-            data = classifier.process_image(
-                cropped_image
-            )
+        if data is None:
+            raise RuntimeError("Ошибка обработки кадра")
 
-            if data is None:
+        return data, f"INPUT_SHAPE={cropped_image.shape}"
 
-                raise RuntimeError(
-                    "Ошибка обработки кадра"
-                )
+    result_data = run_operation(
+        10,
+        "YOLO + ResNet",
+        op10
+    )
 
-            return (
-                data,
-                f"INPUT_SHAPE="
-                f"{cropped_image.shape}"
-            )
 
-        result_data = run_operation(
-            15,
-            "YOLO + ResNet",
-            op15
-        )
+    # --------------------------------------------------
+    # 10.1. Сохранение результата
+    # --------------------------------------------------
 
+    def op10_1():
+        print("10.1. Сохраняю результат в папку...", flush=True)
+
+        visualized = classifier.visualize_results(result_data)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_path = os.path.join(RESULTS_DIR, f"result_{timestamp}.png")
+
+        ok = cv2.imwrite(out_path, visualized)
+        if not ok:
+            raise RuntimeError(f"Не удалось сохранить файл: {out_path}")
+
+        print(f"Результат сохранён: {out_path}", flush=True)
+        return out_path, f"SAVED={out_path}"
+
+    result_image_path = run_operation(
+        10.1,
+        "Сохранение результата",
+        op10_1
+    )
 
         # --------------------------------------------------
-        # 16
+        # 11
         # --------------------------------------------------
 
-        def op16():
+    def op11():
 
             print(
-                "16. Нейросеть закончила обработку",
+                "11. Нейросеть закончила обработку",
                 flush=True
             )
 
@@ -796,18 +642,18 @@ def analyze_tray():
                 f"{len(result_data['cells'])}"
             )
 
-        run_operation(
-            16,
+    run_operation(
+            11,
             "Нейросеть закончила обработку",
-            op16
+            op11
         )
 
 
         # --------------------------------------------------
-        # 17. Результат
+        # 12. Результат
         # --------------------------------------------------
 
-        def op17():
+    def op12():
 
             results = classifier.get_results(
                 result_data
@@ -855,32 +701,14 @@ def analyze_tray():
 
             return results, details
 
-        results = run_operation(
-            17,
+    results = run_operation(
+            12,
             "Формирование результата",
-            op17
+            op12
         )
 
 
-        # --------------------------------------------------
-        # ГЛАВНОЕ
-        # --------------------------------------------------
-
-        return results
-
-
-    finally:
-
-        # VLC обязательно гасим,
-        # даже если где-то выше произошла ошибка
-
-        if player is not None:
-
-            try:
-                player.stop()
-
-            except Exception:
-                pass
+    return results
 
 
 

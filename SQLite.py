@@ -340,7 +340,7 @@ class DatabaseConnection:
                 UPDATE order_details
                 SET
                     status = 'sent',
-                    started_at = CURRENT_TIMESTAMP
+                    started_at = datetime('now', '+5 hours')
                 WHERE id = ?
                 AND (
                     status LIKE 'reserved_%'
@@ -432,7 +432,7 @@ class DatabaseConnection:
                         UPDATE order_details
                         SET
                             status = 'failed',
-                            finished_at = CURRENT_TIMESTAMP,
+                            finished_at = datetime('now', '+5 hours'),
                             test_result = 404,
                             error_description = ?
                         WHERE id = ?
@@ -757,8 +757,8 @@ class DatabaseConnection:
                 f'order_id={order_id}, module={board_name}'
             )
             self.cursor.execute('''
-                INSERT INTO Orders (order_number, module, Nomenclature, Value, VersionLoadFile, fw_version, marking_templates)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO Orders (time_added, order_number, module, Nomenclature, Value, VersionLoadFile, fw_version, marking_templates)
+                VALUES (datetime('now', '+5 hours'), ?, ?, ?, ?, ?, ?, ?)
             ''', (order_id, board_name, components, count, firmware, version, marking_templates))
             self.conn.commit()
 
@@ -1152,7 +1152,9 @@ def reserve_board_for_loge(order_number, dm, stand_id, table_no, loge):
     conn = sqlite3.connect("orders.db")
     cur = conn.cursor()
 
-    dm_norm = dm.strip()
+    dm_full = dm.strip()
+
+    dm_norm = dm_full
     if dm_norm.endswith("B"):
         dm_norm = dm_norm[:-1]
 
@@ -1213,7 +1215,7 @@ def reserve_board_for_loge(order_number, dm, stand_id, table_no, loge):
         """, (
             f"reserved_t{table_no}_l{loge}",
             stand_id,
-            dm_norm,
+            dm_full,
             record_id
         ))
 

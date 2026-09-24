@@ -125,6 +125,7 @@ def send_success_log(board_dict):
                 "operator": good_item["operator"],
                 "error": good_item.get("error", 0),
                 "timestamps":ts,
+                "full_log_path": "",
                 "dm_code_time": dm_code_time,
                 "firmware_finished_time": firmware_finished_time,
                 "board_output_time": board_output_time
@@ -211,6 +212,7 @@ def send_unsuccess_log(board_dict):
                 "operator": bad_item["operator"],
                 "error": bad_item["error"],
                 "timestamps":ts,
+                "full_log_path": bad_item.get("log_path", ""),
                 "dm_code_time": dm_code_time,
                 "firmware_finished_time": firmware_finished_time,
                 "board_output_time": board_output_time
@@ -290,26 +292,32 @@ board_dict_success = {
 
 board_dict_fail = {
     "rtk_id": "RTK_R050_BoardsIO_1",
-    "order": "ЗНП-37025.1.1",
-    "version": "",
+    "order": "ЗНП-29961.1.1",
+    "version": "R050_DO_16_012_000_ABA",
     "message_type": "firmware_log",
     "good": [],
     "bad": [
         {
             "board": {
-                "number": "Z01746283B",
+                "number": "U00082801B",
                 "tray_number": "123455"
             },
-            "operator": "A.Eliseeva",
+            "operator": "rtk_server",
             "error": 2,
+
+            "full_log_path": r"C:\nails_table_v4\hub\nails_table_hub\resources\outputs\reports\nt_cmpp_rtk_2\ЗНП_29961_1_1\log_R050_DO_16_012_000_ABA_U00082801B_N1_1.txt",
+
             "timestamps": {
-                "dm_code_time": "2026-04-20 09:21:02.653260",
-                "firmware_finished_time": "2026-04-20 09:21:33.371907",
-                "board_output_time": "2026-04-20 09:00:33.587027"
+                "dm_code_time": "2026-09-24 05:14:24",
+                "firmware_finished_time": "2026-09-24 05:15:46",
+                "board_output_time": "2026-09-24 05:15:46"
             }
         }
     ]
 }
+
+# response = send_unsuccess_log(board_dict_fail)
+# print("Ответ сервера:", response)
 
 # Вызов
 #response = send_unsuccess_log(board_dict_fail)

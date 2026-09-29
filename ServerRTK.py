@@ -51,16 +51,19 @@ def save_firmware_result(data):
         if isinstance(data_matrix, list):
             print("[RTK SERVER] data_matrix пришел как LIST")
             data_matrix = data_matrix[0] if data_matrix else None
-
-        # Убираем B если она есть в датаматриксе
+        
         if isinstance(data_matrix, str):
             data_matrix = data_matrix.strip()
-
-            if data_matrix.endswith("B"):
-                print(f"[RTK SERVER] Удаляем B из data_matrix={data_matrix}")
-                data_matrix = data_matrix[:-1]
-
-        print(f"[RTK SERVER] normalized data_matrix={data_matrix}")
+        
+        # Сохраняем оба варианта DataMatrix
+        data_matrix_full = data_matrix
+        
+        data_matrix_norm = data_matrix
+        if isinstance(data_matrix_norm, str) and data_matrix_norm.endswith("B"):
+            data_matrix_norm = data_matrix_norm[:-1]
+        
+        print(f"[RTK SERVER] full data_matrix={data_matrix_full}")
+        print(f"[RTK SERVER] normalized data_matrix={data_matrix_norm}")
 
         log_path = data.get("log_file_path")
         report_path = data.get("report_file_path")
@@ -103,7 +106,7 @@ def save_firmware_result(data):
                 status = ?,
                 finished_at = CURRENT_TIMESTAMP,
                 result_source = 'rtk_server'
-            WHERE data_matrix = ?
+            WHERE (data_matrix = ? OR data_matrix = ?)
               AND status = 'sent'
         ''', (
             stand_id,
@@ -113,7 +116,8 @@ def save_firmware_result(data):
             report_path,
             error_description,
             status,
-            data_matrix
+            data_matrix_full,
+            data_matrix_norm
         ))
 
         print(f"[RTK SERVER] cursor.rowcount={cursor.rowcount}")
@@ -125,28 +129,25 @@ def save_firmware_result(data):
         if cursor.rowcount == 0:
             print(
                 f"[RTK SERVER][WARNING] Ничего не обновлено | "
-                f"data_matrix={data_matrix}"
+                f"full={data_matrix_full}, norm={data_matrix_norm}"
             )
 
             # Дополнительная диагностика
             cursor.execute('''
                 SELECT id, data_matrix, status
                 FROM order_details
-                WHERE data_matrix = ?
-            ''', (data_matrix,))
+                WHERE data_matrix = ? OR data_matrix = ?
+            ''', (data_matrix_full, data_matrix_norm))
 
             row = cursor.fetchone()
 
             if row:
                 print(f"[RTK SERVER] Запись найдена но status != sent | row={row}")
             else:
-                print(f"[RTK SERVER] Вообще не найден data_matrix={data_matrix}")
-
-            logging.warning(
-                f"[RTK SERVER] Результат НЕ записан в БД | "
-                f"data_matrix={data_matrix}, status должен быть sent"
-            )
-
+                print(
+                    f"[RTK SERVER] Вообще не найден data_matrix | "
+                    f"full={data_matrix_full}, norm={data_matrix_norm}"
+                )
         else:
             print(
                 f"[RTK SERVER][OK] Результат записан | "

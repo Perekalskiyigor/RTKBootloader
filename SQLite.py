@@ -1305,6 +1305,55 @@ def insert_log_for1C(description: str, user: str, status: int = 0):
         if conn:
             conn.close()
 
+def clear_all_except_finished():
+    """
+    Сбрасывает промежуточные статусы плат после аварийного останова.
+
+    Не трогаем:
+        done
+        failed
+
+    Сбрасываем в NULL:
+        new
+        reserved_*
+        placed_*
+        sent
+        любые другие статусы
+    """
+
+    conn = sqlite3.connect("orders.db")
+    cur = conn.cursor()
+
+    try:
+        cur.execute("""
+            UPDATE order_details
+            SET status = NULL
+            WHERE status IS NOT NULL
+              AND status NOT IN ('done', 'failed')
+        """)
+
+        updated_count = cur.rowcount
+        conn.commit()
+
+        logger4.info(
+            f"[SQLite] clear_all_except_finished: "
+            f"сброшено статусов={updated_count}"
+        )
+
+        return updated_count
+
+    except Exception as e:
+        conn.rollback()
+
+        logger4.exception(
+            f"[SQLite] clear_all_except_finished ошибка: {e}"
+        )
+
+        return None
+
+    finally:
+        conn.close()
+
 
 # res = has_new_boards('ЗНП-29961.1.1')
 # print(res)
@@ -1431,3 +1480,7 @@ else:
 # description="Test",
 # user="V.Ovchinnikov"
 # )
+
+
+# res= clear_all_except_finished()
+# print(res)

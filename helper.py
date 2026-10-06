@@ -997,7 +997,12 @@ class OrdersApp(tk.Tk):
                     },
                     "operator": str(operator),
                     "error": 2,
-                    "timestamps": timestamps
+                    "timestamps": timestamps,
+                    "full_log_path": (
+                        str(board_row["log_path"])
+                        if board_row["log_path"]
+                        else ""
+                    )
                 }
             ]
 
@@ -1040,6 +1045,7 @@ class OrdersApp(tk.Tk):
                 date_sent,
                 user,
                 test_result,
+                log_path,
                 serial_number_9,
                 serial_number_15,
                 serial_number,

@@ -62,6 +62,7 @@ def fetch_data(order):
     try:
         order = order[4:]   # срезаем "ЗНП-"
         url = f"{fetch_data_url}{order}"
+        logger4.info(f"[Provider1C] ФАКТИЧЕСКИЙ URL на который отправляем запрос: {url}")
         payload = {}
         headers = {
         'Authorization': 'Basic cnRrX2NtcHA6NDU2Nzg5QWE='
@@ -71,7 +72,7 @@ def fetch_data(order):
         response.raise_for_status()
         #print(response.text)
         data = response.json()
-
+        logger4.info(f"[Provider1C] получаем от 1с, сами не редачим {data}")
         print("\n=== RAW ИЗ 1С ===")
         print(repr(data['products']['firmware']))
 
@@ -100,7 +101,7 @@ def fetch_data(order):
                 'marking_templates': marking_templates_str
             }
         }
-
+        logger4.info(f"[Provider1C] Подгрузили в словарь от 1с {result}")
         # Извлекаем данные первого шаблона (если он есть)
         if marking_templates:
             first_template = marking_templates[0]
@@ -179,7 +180,7 @@ def fetch_data(order):
 # db_connection = SQLite.DatabaseConnection()
 
 # getOrders()
-# dict = fetch_data("ЗНП-29961.1.1")
+# dict = fetch_data("ЗНП-48378.1.1")
 # print(dict)
 
 

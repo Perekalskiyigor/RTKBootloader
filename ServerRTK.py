@@ -273,6 +273,7 @@ if __name__ == '__main__':
             time.sleep(1)
     threading.Thread(target=monitor_parent, daemon=True).start()
     app.run(host="192.168.1.100", port=5003)
+    input()
 
 
 """

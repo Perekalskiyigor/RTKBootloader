@@ -4,6 +4,26 @@ import logging
 import configparser
 import datetime
 from requests.auth import HTTPBasicAuth
+import logging
+logger1c = logging.getLogger("API1CLog")
+logger1c.setLevel(logging.INFO)
+
+# Чтобы при повторном import не добавлялись обработчики повторно
+if not logger1c.handlers:
+    file_handler = logging.FileHandler(
+        "API1C.log",
+        encoding="utf-8"
+    )
+
+    formatter = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(message)s"
+    )
+
+    file_handler.setFormatter(formatter)
+    logger1c.addHandler(file_handler)
+
+# Не передаём сообщения в общий root logger
+logger1c.propagate = False
 
 # Загрузка конфигурации
 config = configparser.ConfigParser()
@@ -33,6 +53,7 @@ url_token = config['server']['url_token']
 
 
 def get_token():
+    logger1c.info("Receive new token")
     data = {
         'grant_type': 'CLIENT_CREDENTIALS'
     }
@@ -63,10 +84,18 @@ def get_token():
             logging.error(
                 f"API1C - Token request failed with status {response.status_code}: {response.text}"
             )
+            logger1c.error(
+                "Token request failed | HTTP=%s | response=%s",
+                response.status_code,
+                response.text
+            )
             return None
 
     except Exception as e:
-        logging.error(f"API1C - Error receive new token: {str(e)}")
+        logger1c.exception(
+        "Error receiving token | error=%s",
+        str(e)
+        )
         return None
 
 
@@ -137,6 +166,11 @@ def send_success_log(board_dict):
     print("== JSON Request Body (SUCCESS) ==")
     print(json.dumps(payload, indent=2, ensure_ascii=False))
 
+    logger1c.info(
+    "SEND BOARD_GOOD | payload=%s",
+    json.dumps(payload, ensure_ascii=False)
+    )
+
     headers = {
         'Content-Type': 'application/json',
         'Authorization': f'Bearer {token}',
@@ -150,10 +184,16 @@ def send_success_log(board_dict):
             verify=False,
             timeout=10
         )
+
+        logger1c.info(
+                    "RESPONSE BOARD_GOOD | HTTP=%s | response=%s",
+                    response.status_code,
+                    response.text
+                )
+        
         response.raise_for_status()
 
-        logging.info("Request successful. Status: %s", response.status_code)
-        logging.info("Response: %s", response.text)
+        
         print(f"\nУспешно отправлено: {response.status_code}")
 
         try:
@@ -163,7 +203,10 @@ def send_success_log(board_dict):
             return response.text
 
     except requests.exceptions.RequestException as e:
-        logging.error("Error sending request: %s", str(e))
+        logger1c.exception(
+        "REQUEST ERROR | error=%s",
+        str(e)
+        )
         print(f"\nОшибка отправки: {e}")
         return None
 
@@ -212,7 +255,7 @@ def send_unsuccess_log(board_dict):
                 "operator": bad_item["operator"],
                 "error": bad_item["error"],
                 "timestamps":ts,
-                "full_log_path": bad_item.get("log_path", ""),
+                "full_log_path": bad_item.get("full_log_path", ""),
                 "dm_code_time": dm_code_time,
                 "firmware_finished_time": firmware_finished_time,
                 "board_output_time": board_output_time
@@ -222,6 +265,11 @@ def send_unsuccess_log(board_dict):
 
     print("== JSON Request Body (UNSUCCESS) ==")
     print(json.dumps(payload, indent=2, ensure_ascii=False))
+
+    logger1c.info(
+    "SEND BOARD_BAD | payload=%s",
+    json.dumps(payload, ensure_ascii=False)
+    )
 
     # Лучше тоже через токен, чтобы было одинаково,
     # но если сервер ждёт BasicAuth — можно вернуть как у тебя было.
@@ -244,10 +292,16 @@ def send_unsuccess_log(board_dict):
             verify=False,
             timeout=10
         )
+
+        logger1c.info(
+                    "RESPONSE BOARD_BAD | HTTP=%s | response=%s",
+                    response.status_code,
+                    response.text
+                )
+        
         response.raise_for_status()
 
-        logging.info("Request successful. Status: %s", response.status_code)
-        logging.info("Response: %s", response.text)
+        
         print(f"\nУспешно отправлено: {response.status_code}")
 
         try:
@@ -257,7 +311,10 @@ def send_unsuccess_log(board_dict):
             return response.text
 
     except requests.exceptions.RequestException as e:
-        logging.error("Error sending request: %s", str(e))
+        logger1c.exception(
+        "REQUEST ERROR | error=%s",
+        str(e)
+        )
         print(f"\nОшибка отправки: {e}")
         return None
 

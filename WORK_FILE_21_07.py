@@ -17,7 +17,6 @@ import TrayVision
 
 
 
-
 # --- Глобальная аварийная остановка всего комплекса ---
 EMERGENCY_STOP = threading.Event()
 NO_MORE_NEW_BOARDS = threading.Event()  # больше не брать из тары
@@ -2923,6 +2922,10 @@ def run_table_pipeline(table: Table, do_defence=True, do_setup=True):
 if __name__ == "__main__":
     SQLite.insert_log_for1C(description="Включение РТК", user=user)
     SQLite.insert_log_for1C(description="Авторизация оператора", user=user)
+
+    #Читсим базу плат от статусов которые не закончены, нужно чтобы робот платы в брак не уводил
+    res_status = SQLite.clear_all_except_finished()
+    logger4.info(f"[MAIN]Выполнен запрос очистки всех статусов кроме дан и фаилд. Очищено {res_status} строк")
 
     logger4.info("[MAIN]старт основного скрипта")
 

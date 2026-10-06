@@ -2,6 +2,7 @@
 
 """Служба которая мониторит бд таблицу лог и шлет логи которые накопил ртк. Работает как отдельная служба"""
 import os
+import sys
 import time
 import json
 import logging
@@ -20,7 +21,7 @@ SQLite → HTTP forwarder (конфиг прямо в коде)
 - Ищет в SQLite таблице `Logs` строки со `status = 0`
 - Формирует JSON:
 {
-    "rtk_id": "RTK_R500_CH_1",
+    "rtk_id": "RTK_R050_BoardsIO_1",
     "event_log": [
         {"operator": <user>, "event": <description>, "time": <data>},
         ...
@@ -32,15 +33,22 @@ SQLite → HTTP forwarder (конфиг прямо в коде)
 Отредактируйте блок CONFIG ниже под себя и запускайте: `python sqlite_log_forwarder.py`
 """
 
+if getattr(sys, "frozen", False):
+    # Запущено как PyInstaller EXE
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    # Запущено как обычный .py
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # =========================
 # CONFIG — правьте под себя
 # =========================
 DAILY_TIME = "15:07"                              # время ежедневного запуска (локальное время, HH:MM или HH:MM:SS)
 RUN_ON_STARTUP = False                              # если True — выполнит отправку сразу при старте
 # =========================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-DB_PATH = os.path.join(BASE_DIR, "orders.db")          # путь к вашей SQLite БД
+
+DB_PATH = os.path.join(BASE_DIR, "orders.db")
 ENDPOINT_URL = "https://c.prosyst.ru/prosoft_erp_work/hs/rtk/eventlog/"      # ваш эндпоинт
 RTK_ID = "RTK_R050_BoardsIO_1"                         # идентификатор в payload
 POLL_INTERVAL_SEC = 300                              # период опроса (сек)

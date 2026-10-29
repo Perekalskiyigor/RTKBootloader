@@ -297,7 +297,7 @@ def send_unsuccess_log(board_dict):
     firmware_finished_time = ts.get("firmware_finished_time", now)
     board_output_time = ts.get("board_output_time", now)
     network_log_path = copy_log_to_whiskey(
-    bad_item.get("full_log_path", "")
+    bad_item.get("full_log_path") or bad_item.get("log_path", "")
     )
 
     payload = {

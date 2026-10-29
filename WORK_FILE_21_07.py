@@ -2166,7 +2166,7 @@ class Table:
         print(f"[НАЧАЛО] ЦИКЛ MAIN для {self.number} стола старт")
         logger4.info(f"[НАЧАЛО] ЦИКЛ MAIN для {self.number} стола старт")
 
-        current_loge = 2  # Начинаем с ложемента 2
+        current_loge = 1  # Начинаем с ложемента 2
         _, next_photodata = self._take_photo()
         while True:
             try:
@@ -2316,7 +2316,7 @@ class Table:
             logger4.info(f"[SETUP] Стол {self.number}: робот захвачен")
 
             dm = self._place_new_board_with_photo(
-                target_loge=2,
+                target_loge=1,
                 max_photo_attempts=3,
                 max_new_board_tries=5
             )
@@ -2325,9 +2325,9 @@ class Table:
             self.photodata1 = dm
 
             logger4.info(
-                f"[SETUP] Стол {self.number}: первая плата уложена на ложе 2, DM={dm}"
+                f"[SETUP] Стол {self.number}: первая плата уложена на ложе 1, DM={dm}"
             )
-            print(f"[SETUP] Стол {self.number}: первая плата уложена на ложе 2, DM={dm}")
+            print(f"[SETUP] Стол {self.number}: первая плата уложена на ложе 1, DM={dm}")
 
         finally:
             print(f"[SETUP] Стол {self.number}: робот освобожден")
@@ -2353,8 +2353,8 @@ class Table:
         print(f"[MAIN] ЦИКЛ MAIN для {self.number} стола старт")
         log_message(self.number, "info", f"[MAIN] ЦИКЛ MAIN для {self.number} стола старт")
 
-        # Стартуем: на ложе 2 уже есть плата — начнём шить с него
-        current_loge = 2
+        # Стартуем: на ложе 1 уже есть плата — начнём шить с него
+        current_loge = 1
         # Закоментировал эту строку так как сетап получит значение photodata1
         # self.photodata1 = '111'                     # DM для первой прошивки (если требуется)
         
